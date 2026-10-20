@@ -1,0 +1,18 @@
+{
+  "projectId": "d37f7ffc-2ffc-4da9-88ea-8ee0106eba69",
+  "tests": {
+    "01-onboarding-to-quest": "ced284f4-1177-4d90-9186-2bf894c5142a",
+    "02-read-counter": "9eefc70e-aeb5-4ccb-879d-ce6636d92fb5",
+    "03-breakfast-confirm": "aa2c7677-125b-4a4a-920a-c8a4223d7ffb",
+    "04-study-timer-live": "5980abcf-8c0e-430c-a593-484f5e5cf9fb",
+    "05-quest-complete-notice": "b87e07f0-cf27-42d2-b405-b1d1facaca73",
+    "06-status-tab": "9fcc8287-9c8f-451f-9fbb-d6eccf8afa27",
+    "07-penalty-tab": "1af35c03-d898-40c4-ae16-4aac7e8da1cd",
+    "08-onboarding-validation": "c7ce075b-c288-4343-a904-9b6726921a8d",
+    "09-custom-objective": "9f7432d1-327a-4da7-bb0a-2f05fbf766ea",
+    "10-mute-toggle": "d088fd2d-6c5b-4b76-a817-3392ce27b81d"
+  },
+  "superseded": {
+    "01-onboarding-needs-real-hold": "73def8b1-b0aa-48ed-9141-3812156797fc"
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "projectId": "d37f7ffc-2ffc-4da9-88ea-8ee0106eba69",
+  "type": "frontend",
+  "name": "Onboarding: a new user registers and reaches the Daily Quest screen",
+  "planSteps": [
+    {
+      "type": "action",
+      "description": "Open the app at / and wait up to 30 seconds for the '[ SYSTEM ]' window to appear (a Flutter web app; it can take a while to load, and controls are exposed in the accessibility tree)"
+    },
+    {
+      "type": "assertion",
+      "description": "A window titled '[ SYSTEM ]' is visible with the text 'Candidate detected.' and a button 'BEGIN REGISTRATION'"
+    },
+    {
+      "type": "action",
+      "description": "Click the 'BEGIN REGISTRATION' button"
+    },
+    {
+      "type": "assertion",
+      "description": "A '[ DAILY QUEST ]' setup window is visible with three 'Objective name' text boxes and a 'CONFIRM OBJECTIVES' button"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONFIRM OBJECTIVES'"
+    },
+    {
+      "type": "assertion",
+      "description": "A '[ LOCK TARGETS ]' window is visible with a 'CONFIRM APPS' button (the web build lists no apps; that is expected)"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONFIRM APPS'"
+    },
+    {
+      "type": "assertion",
+      "description": "A '[ REST PERIOD ]' window is visible with buttons '11:00 PM', '7:00 AM' and 'CONFIRM'"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONFIRM'"
+    },
+    {
+      "type": "assertion",
+      "description": "A '[ PENALTY TERMS ]' window is visible with a 'HOLD TO ACCEPT' button"
+    },
+    {
+      "type": "action",
+      "description": "Click the 'HOLD TO ACCEPT' button once (this test build accepts a single click in place of the hold)"
+    },
+    {
+      "type": "assertion",
+      "description": "The app shows the '[ DAILY QUEST ]' screen listing the objectives 'Have breakfast', 'Study' and 'Read', and a bottom bar with 'QUEST', 'STATUS' and 'PENALTY'"
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "projectId": "d37f7ffc-2ffc-4da9-88ea-8ee0106eba69",
+  "type": "frontend",
+  "name": "Quest: breakfast is confirmed with the hold button",
+  "planSteps": [
+    {
+      "type": "action",
+      "description": "Open the app at / and wait up to 30 seconds for the '[ SYSTEM ]' window to appear (a Flutter web app; it can take a while to load, and controls are exposed in the accessibility tree)"
+    },
+    {
+      "type": "action",
+      "description": "Click 'BEGIN REGISTRATION'"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONFIRM OBJECTIVES'"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONFIRM APPS' on the '[ LOCK TARGETS ]' window (the web build lists no apps; that is expected)"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONFIRM' on the '[ REST PERIOD ]' window"
+    },
+    {
+      "type": "action",
+      "description": "Click 'HOLD TO ACCEPT' once (this test build accepts a click in place of the hold)"
+    },
+    {
+      "type": "assertion",
+      "description": "The '[ DAILY QUEST ]' screen is shown with a bottom bar containing 'QUEST', 'STATUS' and 'PENALTY'"
+    },
+    {
+      "type": "assertion",
+      "description": "The 'Have breakfast' objective shows '0 / 1' and a 'HOLD TO CONFIRM' button"
+    },
+    {
+      "type": "action",
+      "description": "Click 'HOLD TO CONFIRM' once (test build: a click confirms)"
+    },
+    {
+      "type": "assertion",
+      "description": "The button now reads 'CONFIRMED' and 'Have breakfast' shows '1 / 1'"
+    }
+  ]
+}

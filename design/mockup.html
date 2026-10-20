@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Do or Die: design mockup v1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void: #05070d;
+    --panel: rgba(10, 18, 34, 0.72);
+    --line: #2a6bd6;
+    --sys: #4fb3ff;
+    --sys-hi: #a9dcff;
+    --text: #dbe7ff;
+    --dim: #7d8ba8;
+    --gold: #f5c96a;
+    --red: #ff3b4a;
+    --red-dim: #7a1820;
+    --head: 'Chakra Petch', sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: #020308; color: var(--text);
+    font-family: var(--mono);
+    display: flex; flex-direction: column; align-items: center; padding: 28px 16px 48px;
+  }
+  header.page { text-align: center; margin-bottom: 22px; }
+  header.page h1 { font-family: var(--head); letter-spacing: .3em; font-size: 15px; color: var(--sys); margin: 0 0 6px; }
+  header.page p { color: var(--dim); font-size: 12px; margin: 0; }
+  header.page button {
+    margin-top: 12px; background: transparent; color: var(--sys-hi); border: 1px solid var(--line);
+    font-family: var(--mono); font-size: 12px; padding: 6px 14px; cursor: pointer; letter-spacing: .1em;
+  }
+  .row { display: flex; flex-wrap: wrap; gap: 28px; justify-content: center; }
+  .label { text-align: center; font-size: 11px; color: var(--dim); letter-spacing: .2em; margin-top: 10px; }
+
+  .phone {
+    width: 360px; height: 740px; border-radius: 34px; position: relative; overflow: hidden;
+    background: radial-gradient(120% 70% at 50% 0%, #0b1730 0%, var(--void) 60%);
+    border: 1px solid #1a2233; box-shadow: 0 30px 80px rgba(0,0,0,.6);
+  }
+  .phone::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 5;
+    background-image:
+      linear-gradient(rgba(79,179,255,.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(79,179,255,.05) 1px, transparent 1px);
+    background-size: 28px 28px;
+    mask-image: radial-gradient(80% 60% at 50% 30%, #000 30%, transparent 80%);
+  }
+  .phone::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 6;
+    background: repeating-linear-gradient(0deg, rgba(255,255,255,.018) 0 1px, transparent 1px 3px);
+  }
+  .screen { position: relative; z-index: 2; height: 100%; padding: 46px 18px 18px; display: flex; flex-direction: column; gap: 14px; }
+
+  .topbar { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--dim); letter-spacing: .12em; }
+  .rank-chip { font-family: var(--head); font-weight: 700; color: var(--sys-hi); border: 1px solid var(--line); padding: 2px 8px; letter-spacing: .15em; }
+
+  .win {
+    position: relative; background: var(--panel); border: 1px solid rgba(79,179,255,.35);
+    padding: 16px 16px 14px; backdrop-filter: blur(6px);
+    clip-path: polygon(0 10px, 10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+    animation: winIn .42s cubic-bezier(.2,.8,.2,1) both;
+  }
+  .win .br { position: absolute; width: 14px; height: 14px; border-color: var(--sys); border-style: solid; }
+  .win .br.tl { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
+  .win .br.tr { top: -1px; right: -1px; border-width: 2px 2px 0 0; }
+  .win .br.bl { bottom: -1px; left: -1px; border-width: 0 0 2px 2px; }
+  .win .br.bbr { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+  @keyframes winIn {
+    0% { opacity: 0; transform: scaleY(.04); filter: brightness(2.2); }
+    60% { opacity: 1; transform: scaleY(1.02); }
+    100% { transform: scaleY(1); filter: none; }
+  }
+  .win-title {
+    font-family: var(--head); font-weight: 700; letter-spacing: .28em; font-size: 14px; color: var(--sys-hi);
+    text-align: center; padding-bottom: 10px; margin-bottom: 12px;
+    border-bottom: 1px solid rgba(79,179,255,.25); text-shadow: 0 0 10px rgba(79,179,255,.45);
+  }
+  .sub { font-size: 11px; color: var(--dim); text-align: center; margin: -4px 0 12px; letter-spacing: .06em; }
+
+  .task { padding: 10px 0; border-bottom: 1px dashed rgba(79,179,255,.14); }
+  .task:last-child { border-bottom: none; }
+  .task-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; }
+  .task-name { letter-spacing: .04em; }
+  .task-val { color: var(--sys-hi); font-weight: 500; font-variant-numeric: tabular-nums; }
+  .task.done .task-name { color: var(--dim); }
+  .task.done .task-val { color: var(--gold); }
+  .bar { height: 4px; background: rgba(79,179,255,.12); margin-top: 8px; position: relative; overflow: hidden; }
+  .bar i { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--sys); box-shadow: 0 0 8px var(--sys); transition: width .35s cubic-bezier(.2,.8,.2,1); }
+  .task.done .bar i { background: var(--gold); box-shadow: 0 0 8px var(--gold); }
+  .ctrls { display: flex; gap: 8px; margin-top: 8px; }
+  .btn {
+    flex: 1; background: rgba(79,179,255,.06); color: var(--sys-hi); border: 1px solid rgba(79,179,255,.4);
+    font-family: var(--mono); font-size: 11px; letter-spacing: .1em; padding: 7px 0; cursor: pointer;
+    transition: background .15s, transform .08s;
+  }
+  .btn:hover { background: rgba(79,179,255,.14); }
+  .btn:active { transform: scale(.97); }
+  .hold { position: relative; overflow: hidden; }
+  .hold .fill { position: absolute; inset: 0; width: 0; background: rgba(79,179,255,.28); }
+  .hold span { position: relative; }
+
+  .deadline { display: flex; justify-content: space-between; font-size: 11px; color: var(--dim); margin-top: 6px; letter-spacing: .06em; }
+  .deadline b { color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; }
+  .warn { font-size: 11px; color: #ff8a93; text-align: center; letter-spacing: .05em; margin-top: 10px; }
+
+  .xp { margin-top: 2px; }
+  .xp-row { display: flex; justify-content: space-between; font-size: 11px; color: var(--dim); }
+  .xp .bar { height: 6px; }
+
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat { border: 1px solid rgba(79,179,255,.22); padding: 10px; display: flex; justify-content: space-between; align-items: center; }
+  .stat .k { font-size: 11px; color: var(--dim); letter-spacing: .14em; }
+  .stat .v { font-family: var(--head); font-weight: 700; font-size: 22px; color: var(--text); font-variant-numeric: tabular-nums; }
+  .plus { width: 26px; height: 26px; border: 1px solid var(--line); background: transparent; color: var(--sys-hi); cursor: pointer; font-family: var(--mono); }
+  .plus:disabled { opacity: .25; cursor: default; }
+  .big-rank { font-family: var(--head); font-weight: 700; font-size: 72px; line-height: 1; text-align: center; color: var(--sys-hi); text-shadow: 0 0 24px rgba(79,179,255,.55); }
+  .kv { display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0; color: var(--dim); }
+  .kv b { color: var(--text); font-weight: 500; }
+
+  .notice-wrap { position: absolute; inset: 0; z-index: 4; display: flex; align-items: center; justify-content: center; background: rgba(2,4,10,.55); padding: 20px; }
+  .notice-wrap.hidden { display: none; }
+  .notice .win-title { font-size: 13px; }
+  .notice p { text-align: center; font-size: 13px; line-height: 1.7; margin: 0 0 12px; }
+  .notice .reward { color: var(--gold); }
+  .lvl-flash { font-family: var(--head); font-weight: 700; text-align: center; font-size: 30px; letter-spacing: .2em; color: var(--sys-hi); text-shadow: 0 0 18px var(--sys); animation: pulse 1.4s ease-in-out infinite; margin: 6px 0 12px; }
+  @keyframes pulse { 50% { text-shadow: 0 0 34px var(--sys), 0 0 4px #fff; } }
+
+  .phone.red { background: radial-gradient(120% 70% at 50% 0%, #2a070c 0%, #090204 65%); border-color: #3a0f14; }
+  .phone.red::before { background-image: linear-gradient(rgba(255,59,74,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255,59,74,.06) 1px, transparent 1px); }
+  .red .win { border-color: rgba(255,59,74,.5); background: rgba(30,6,10,.7); }
+  .red .win .br { border-color: var(--red); }
+  .red .win-title { color: #ffb3b9; text-shadow: 0 0 12px rgba(255,59,74,.7); border-bottom-color: rgba(255,59,74,.3); animation: glitch 3.2s infinite steps(1); }
+  @keyframes glitch {
+    0%, 92%, 100% { transform: none; text-shadow: 0 0 12px rgba(255,59,74,.7); }
+    93% { transform: translateX(-2px); text-shadow: 2px 0 #4fb3ff, -2px 0 var(--red); }
+    95% { transform: translateX(2px); text-shadow: -2px 0 #4fb3ff, 2px 0 var(--red); }
+  }
+  .red .bar { background: rgba(255,59,74,.14); }
+  .red .bar i { background: var(--red); box-shadow: 0 0 8px var(--red); }
+  .red .btn { color: #ffc2c7; border-color: rgba(255,59,74,.5); background: rgba(255,59,74,.06); }
+  .countdown { font-family: var(--head); font-weight: 700; font-size: 46px; text-align: center; letter-spacing: .08em; color: #fff; font-variant-numeric: tabular-nums; text-shadow: 0 0 18px rgba(255,59,74,.6); }
+  .reps { font-family: var(--head); font-weight: 700; font-size: 40px; text-align: center; color: #ffd0d4; font-variant-numeric: tabular-nums; }
+  .apps { display: flex; gap: 8px; justify-content: center; margin-top: 4px; }
+  .app { font-size: 10px; letter-spacing: .1em; color: #ffb3b9; border: 1px solid rgba(255,59,74,.45); padding: 4px 8px; }
+  .escape { margin-top: auto; text-align: center; font-size: 11px; color: #8a5a60; letter-spacing: .08em; }
+  .decode { white-space: pre; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<header class="page">
+  <h1>DO OR DIE · DESIGN MOCKUP V1</h1>
+  <p>Original art and copy. Interactive: use the controls on each screen.</p>
+  <button id="replay">REPLAY ANIMATIONS</button>
+</header>
+
+<div class="row">
+  <div>
+    <div class="phone" id="questPhone">
+      <div class="screen">
+        <div class="topbar"><span>MON 19 OCT · 14:22</span><span class="rank-chip">RANK E</span></div>
+
+        <div class="win">
+          <i class="br tl"></i><i class="br tr"></i><i class="br bl"></i><i class="br bbr"></i>
+          <div class="win-title decode" data-text="[ DAILY QUEST ]">[ DAILY QUEST ]</div>
+          <div class="sub">Complete every objective before the day ends.</div>
+
+          <div class="task" id="t-breakfast">
+            <div class="task-head"><span class="task-name">Have breakfast</span><span class="task-val" id="v-breakfast">0 / 1</span></div>
+            <div class="bar"><i id="b-breakfast"></i></div>
+            <div class="ctrls"><button class="btn hold" id="holdBtn"><span class="fill"></span><span>HOLD TO CONFIRM</span></button></div>
+          </div>
+
+          <div class="task" id="t-study">
+            <div class="task-head"><span class="task-name">Study</span><span class="task-val" id="v-study">0:00 / 2:00</span></div>
+            <div class="bar"><i id="b-study"></i></div>
+            <div class="ctrls"><button class="btn" id="studyBtn">START TIMER</button><button class="btn" id="studySkip">+30 MIN (DEMO)</button></div>
+          </div>
+
+          <div class="task" id="t-read">
+            <div class="task-head"><span class="task-name">Read</span><span class="task-val" id="v-read">0 / 30 pages</span></div>
+            <div class="bar"><i id="b-read"></i></div>
+            <div class="ctrls"><button class="btn" data-pages="1">+1</button><button class="btn" data-pages="5">+5</button><button class="btn" data-pages="10">+10</button></div>
+          </div>
+
+          <div class="deadline"><span>TIME REMAINING</span><b id="remaining">09:37:41</b></div>
+          <div class="warn">Failure to complete will result in a penalty.</div>
+        </div>
+
+        <div class="win xp" style="animation-delay:.12s">
+          <i class="br tl"></i><i class="br tr"></i><i class="br bl"></i><i class="br bbr"></i>
+          <div class="xp-row"><span>LV. <b id="lv" style="color:var(--text)">4</b></span><span id="xpText">180 / 600 XP</span></div>
+          <div class="bar"><i id="xpBar" style="width:30%"></i></div>
+        </div>
+      </div>
+
+      <div class="notice-wrap hidden" id="notice">
+        <div class="win notice" style="width:100%">
+          <i class="br tl"></i><i class="br tr"></i><i class="br bl"></i><i class="br bbr"></i>
+          <div class="win-title decode" data-text="[ NOTIFICATION ]">[ NOTIFICATION ]</div>
+          <p>The daily quest has been completed.</p>
+          <p class="reward">Reward: +100 XP</p>
+          <div class="lvl-flash" id="lvlFlash">LEVEL UP</div>
+          <p style="color:var(--dim); font-size:12px">3 stat points are available.</p>
+          <div class="ctrls"><button class="btn" id="noticeOk">ACKNOWLEDGE</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="label">1 · DAILY QUEST</div>
+  </div>
+
+  <div>
+    <div class="phone">
+      <div class="screen">
+        <div class="topbar"><span>STATUS</span><span>PLAYER</span></div>
+        <div class="win">
+          <i class="br tl"></i><i class="br tr"></i><i class="br bl"></i><i class="br bbr"></i>
+          <div class="win-title decode" data-text="[ STATUS ]">[ STATUS ]</div>
+          <div class="big-rank">E</div>
+          <div class="sub" style="margin-top:6px">RANK</div>
+          <div class="kv"><span>LEVEL</span><b>4</b></div>
+          <div class="kv"><span>QUESTS CLEARED</span><b>11</b></div>
+          <div class="kv"><span>CURRENT STREAK</span><b>6 days</b></div>
+          <div class="kv"><span>PENALTIES SERVED</span><b>2</b></div>
+        </div>
+        <div class="win" style="animation-delay:.12s">
+          <i class="br tl"></i><i class="br tr"></i><i class="br bl"></i><i class="br bbr"></i>
+          <div class="win-title" style="font-size:12px">ATTRIBUTES</div>
+          <div class="stat-grid" id="stats">
+            <div class="stat"><div><div class="k">STR</div><div class="v" data-v="12">12</div></div><button class="plus">+</button></div>
+            <div class="stat"><div><div class="k">INT</div><div class="v" data-v="15">15</div></div><button class="plus">+</button></div>
+            <div class="stat"><div><div class="k">DIS</div><div class="v" data-v="14">14</div></div><button class="plus">+</button></div>
+            <div class="stat"><div><div class="k">VIT</div><div class="v" data-v="11">11</div></div><button class="plus">+</button></div>
+          </div>
+          <div class="deadline" style="margin-top:12px"><span>AVAILABLE POINTS</span><b id="pts">3</b></div>
+        </div>
+      </div>
+    </div>
+    <div class="label">2 · STATUS</div>
+  </div>
+
+  <div>
+    <div class="phone red">
+      <div class="screen">
+        <div class="topbar" style="color:#a3646b"><span>TUE 20 OCT · 16:05</span><span class="rank-chip" style="color:#ffb3b9;border-color:var(--red)">PENALTY</span></div>
+        <div class="win">
+          <i class="br tl"></i><i class="br tr"></i><i class="br bl"></i><i class="br bbr"></i>
+          <div class="win-title decode" data-text="[ PENALTY ZONE ]">[ PENALTY ZONE ]</div>
+          <div class="sub" style="color:#a3646b">Yesterday's quest was not completed.</div>
+          <div class="countdown" id="lockCd">03:41:12</div>
+          <div class="sub" style="color:#a3646b;margin-top:2px">UNTIL ACCESS IS RESTORED</div>
+          <div class="apps"><span class="app">INSTAGRAM</span><span class="app">YOUTUBE</span><span class="app">BGMI</span></div>
+        </div>
+        <div class="win" style="animation-delay:.12s">
+          <i class="br tl"></i><i class="br tr"></i><i class="br bl"></i><i class="br bbr"></i>
+          <div class="win-title" style="font-size:12px">PUSH-UPS OWED</div>
+          <div class="reps" id="reps">40 / 65</div>
+          <div class="bar" style="margin:10px 0"><i id="repBar" style="width:62%"></i></div>
+          <div class="ctrls"><button class="btn" id="rep1">+1 REP</button><button class="btn" id="rep10">+10 REPS</button></div>
+          <div class="warn" style="color:#ff8a93">Unpaid reps double at midnight.</div>
+        </div>
+        <div class="escape">Emergency exit · logged</div>
+      </div>
+    </div>
+    <div class="label">3 · PENALTY ZONE</div>
+  </div>
+</div>
+
+<script>
+  const glyphs = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%&*+=<>';
+  function decode(el) {
+    const target = el.dataset.text; let frame = 0; const total = 14;
+    clearInterval(el._t);
+    el._t = setInterval(() => {
+      frame++;
+      el.textContent = [...target].map((ch, i) => {
+        if (ch === ' ' || ch === '[' || ch === ']') return ch;
+        return i < (frame / total) * target.length ? ch : glyphs[Math.floor(Math.random() * glyphs.length)];
+      }).join('');
+      if (frame >= total) { clearInterval(el._t); el.textContent = target; }
+    }, 28);
+  }
+  function replay() {
+    document.querySelectorAll('.win').forEach(w => { w.style.animation = 'none'; w.offsetHeight; w.style.animation = ''; });
+    document.querySelectorAll('.decode').forEach(decode);
+  }
+  document.getElementById('replay').onclick = replay;
+  replay();
+
+  const state = { breakfast: 0, study: 0, read: 0, xp: 180, lv: 4, cleared: false };
+  const fmtMin = m => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+  function render() {
+    const set = (id, val, pct, done) => {
+      document.getElementById('v-' + id).textContent = val;
+      document.getElementById('b-' + id).style.width = Math.min(100, Math.round(pct)) + '%';
+      document.getElementById('t-' + id).classList.toggle('done', done);
+    };
+    set('breakfast', `${state.breakfast} / 1`, state.breakfast * 100, state.breakfast >= 1);
+    set('study', `${fmtMin(state.study)} / 2:00`, state.study / 120 * 100, state.study >= 120);
+    set('read', `${state.read} / 30 pages`, state.read / 30 * 100, state.read >= 30);
+    if (!state.cleared && state.breakfast >= 1 && state.study >= 120 && state.read >= 30) {
+      state.cleared = true;
+      setTimeout(() => {
+        state.lv = 5; state.xp = 0;
+        document.getElementById('lv').textContent = state.lv;
+        document.getElementById('xpText').textContent = '0 / 700 XP';
+        document.getElementById('xpBar').style.width = '0%';
+        const n = document.getElementById('notice');
+        n.classList.remove('hidden');
+        n.querySelectorAll('.win').forEach(w => { w.style.animation = 'none'; w.offsetHeight; w.style.animation = ''; });
+        n.querySelectorAll('.decode').forEach(decode);
+      }, 450);
+    }
+  }
+  document.getElementById('noticeOk').onclick = () => document.getElementById('notice').classList.add('hidden');
+
+  const hold = document.getElementById('holdBtn'); const fill = hold.querySelector('.fill');
+  let holdT, holdStart;
+  const startHold = e => {
+    e.preventDefault(); if (state.breakfast >= 1) return; holdStart = performance.now();
+    holdT = setInterval(() => {
+      const p = Math.min(1, (performance.now() - holdStart) / 900);
+      fill.style.width = (p * 100) + '%';
+      if (p >= 1) { clearInterval(holdT); state.breakfast = 1; hold.querySelector('span:last-child').textContent = 'CONFIRMED'; render(); }
+    }, 16);
+  };
+  const endHold = () => { clearInterval(holdT); if (state.breakfast < 1) fill.style.width = '0%'; };
+  hold.addEventListener('pointerdown', startHold);
+  ['pointerup', 'pointerleave'].forEach(ev => hold.addEventListener(ev, endHold));
+
+  let timer = null; const studyBtn = document.getElementById('studyBtn');
+  studyBtn.onclick = () => {
+    if (timer) { clearInterval(timer); timer = null; studyBtn.textContent = 'RESUME TIMER'; return; }
+    studyBtn.textContent = 'PAUSE TIMER';
+    timer = setInterval(() => { state.study = Math.min(120, state.study + 1); render(); if (state.study >= 120) { clearInterval(timer); timer = null; studyBtn.textContent = 'COMPLETE'; } }, 250);
+  };
+  document.getElementById('studySkip').onclick = () => { state.study = Math.min(120, state.study + 30); render(); };
+  document.querySelectorAll('[data-pages]').forEach(b => b.onclick = () => { state.read = Math.min(30, state.read + +b.dataset.pages); render(); });
+  render();
+
+  let rem = 9 * 3600 + 37 * 60 + 41;
+  let lock = 3 * 3600 + 41 * 60 + 12;
+  const hms = s => [Math.floor(s / 3600), Math.floor(s % 3600 / 60), s % 60].map(x => String(x).padStart(2, '0')).join(':');
+  setInterval(() => {
+    rem = Math.max(0, rem - 1); lock = Math.max(0, lock - 1);
+    document.getElementById('remaining').textContent = hms(rem);
+    document.getElementById('lockCd').textContent = hms(lock);
+  }, 1000);
+
+  let pts = 3;
+  document.querySelectorAll('.stat').forEach(s => {
+    const v = s.querySelector('.v'); const b = s.querySelector('.plus');
+    b.onclick = () => {
+      if (pts <= 0) return; pts--; v.dataset.v = +v.dataset.v + 1; v.textContent = v.dataset.v;
+      v.animate([{ color: '#a9dcff', textShadow: '0 0 14px #4fb3ff' }, { color: '#dbe7ff', textShadow: 'none' }], { duration: 600 });
+      document.getElementById('pts').textContent = pts;
+      if (pts === 0) document.querySelectorAll('.plus').forEach(x => x.disabled = true);
+    };
+  });
+
+  let reps = 40; const owed = 65;
+  const repRender = () => { document.getElementById('reps').textContent = `${reps} / ${owed}`; document.getElementById('repBar').style.width = Math.round(reps / owed * 100) + '%'; };
+  document.getElementById('rep1').onclick = () => { reps = Math.min(owed, reps + 1); repRender(); };
+  document.getElementById('rep10').onclick = () => { reps = Math.min(owed, reps + 10); repRender(); };
+</script>
+</body>
+</html>

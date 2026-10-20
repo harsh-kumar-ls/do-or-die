@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Do or Die: colour and intensity slides</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; background: #020308; color: #c9d3e6; font-family: 'JetBrains Mono', monospace; display: flex; flex-direction: column; align-items: center; padding: 22px 12px 30px; }
+  .deck-head { text-align: center; margin-bottom: 14px; }
+  .deck-head .code { font-family: 'Chakra Petch'; font-weight: 700; letter-spacing: .25em; font-size: 13px; color: #8a96ad; }
+  .deck-head h1 { font-family: 'Chakra Petch'; font-weight: 700; letter-spacing: .2em; font-size: 22px; margin: 6px 0 4px; }
+  .deck-head p { font-size: 12px; color: #7d8ba8; margin: 0; max-width: 620px; }
+  .nav { display: flex; gap: 10px; align-items: center; margin: 14px 0 20px; }
+  .nav button { background: transparent; color: #c9d3e6; border: 1px solid #2c3850; font-family: inherit; font-size: 12px; padding: 7px 14px; cursor: pointer; letter-spacing: .1em; }
+  .nav button:hover { border-color: #5b6c8f; }
+  .dots { display: flex; gap: 6px; }
+  .dots span { width: 22px; height: 4px; background: #1d2638; cursor: pointer; }
+  .dots span.on { background: #c9d3e6; }
+  .row { display: flex; flex-wrap: wrap; gap: 22px; justify-content: center; }
+  .cell { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .tag { font-family: 'Chakra Petch'; font-weight: 700; letter-spacing: .2em; font-size: 13px; }
+  .tag small { display: block; font-family: 'JetBrains Mono'; font-weight: 400; letter-spacing: .08em; font-size: 11px; color: #7d8ba8; text-align: center; margin-top: 2px; }
+
+  .phone {
+    --a: .5; --glow: 10px; --glowA: .45; --grid: .05; --scan: .018; --lineA: .35; --bar: 8px;
+    width: 280px; height: 470px; border-radius: 28px; position: relative; overflow: hidden;
+    background: radial-gradient(120% 70% at 50% 0%, var(--top) 0%, var(--void) 62%);
+    border: 1px solid #1a2233;
+  }
+  .phone::before { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 3;
+    background-image: linear-gradient(rgba(var(--rgb), var(--grid)) 1px, transparent 1px), linear-gradient(90deg, rgba(var(--rgb), var(--grid)) 1px, transparent 1px);
+    background-size: 24px 24px; mask-image: radial-gradient(85% 60% at 50% 30%, #000 30%, transparent 80%); }
+  .phone::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 4;
+    background: repeating-linear-gradient(0deg, rgba(255,255,255,var(--scan)) 0 1px, transparent 1px 3px); }
+  .scr { position: relative; z-index: 2; padding: 34px 14px 14px; display: flex; flex-direction: column; gap: 10px; height: 100%; }
+  .top { display: flex; justify-content: space-between; font-size: 10px; color: var(--dim); letter-spacing: .1em; }
+  .chip { font-family: 'Chakra Petch'; font-weight: 700; color: var(--hi); border: 1px solid rgba(var(--rgb), calc(var(--lineA) + .2)); padding: 1px 6px; letter-spacing: .15em; }
+  .win { position: relative; padding: 13px 12px 11px; background: var(--panel); border: 1px solid rgba(var(--rgb), var(--lineA));
+    clip-path: polygon(0 9px, 9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%);
+    box-shadow: inset 0 0 calc(var(--glow) * 2) rgba(var(--rgb), calc(var(--glowA) * .25)); }
+  .br { position: absolute; width: 12px; height: 12px; border: 0 solid var(--sys); }
+  .tl { top: -1px; left: -1px; border-width: 2px 0 0 2px; } .tr { top: -1px; right: -1px; border-width: 2px 2px 0 0; }
+  .bl { bottom: -1px; left: -1px; border-width: 0 0 2px 2px; } .bb { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+  .title { font-family: 'Chakra Petch'; font-weight: 700; letter-spacing: .26em; font-size: 12px; text-align: center; color: var(--hi);
+    padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid rgba(var(--rgb), calc(var(--lineA) * .7));
+    text-shadow: 0 0 var(--glow) rgba(var(--rgb), var(--glowA)); }
+  .t { padding: 7px 0; border-bottom: 1px dashed rgba(var(--rgb), .14); font-size: 11px; }
+  .t:last-of-type { border-bottom: 0; }
+  .th { display: flex; justify-content: space-between; color: var(--text); }
+  .th b { color: var(--hi); font-weight: 500; }
+  .t.done .th span { color: var(--dim); } .t.done .th b { color: #f5c96a; }
+  .bar { height: 3px; background: rgba(var(--rgb), .12); margin-top: 6px; position: relative; }
+  .bar i { position: absolute; inset: 0 auto 0 0; background: var(--sys); box-shadow: 0 0 var(--bar) rgba(var(--rgb), var(--glowA)); }
+  .t.done .bar i { background: #f5c96a; box-shadow: 0 0 var(--bar) rgba(245,201,106,var(--glowA)); }
+  .btn { margin-top: 6px; width: 100%; background: rgba(var(--rgb), .06); color: var(--hi); border: 1px solid rgba(var(--rgb), calc(var(--lineA) + .05)); font-family: inherit; font-size: 10px; letter-spacing: .1em; padding: 5px 0; }
+  .dl { display: flex; justify-content: space-between; font-size: 10px; color: var(--dim); margin-top: 6px; }
+  .dl b { color: var(--text); font-weight: 500; }
+  .warn { font-size: 10px; color: #ff8a93; text-align: center; margin-top: 6px; }
+  .lv { display: flex; justify-content: space-between; font-size: 10px; color: var(--dim); }
+  .big { font-family: 'Chakra Petch'; font-weight: 700; font-size: 38px; text-align: center; color: #fff; letter-spacing: .06em; text-shadow: 0 0 calc(var(--glow) * 1.4) rgba(var(--rgb), var(--glowA)); }
+  .apps { display: flex; gap: 6px; justify-content: center; margin-top: 6px; }
+  .apps span { font-size: 9px; letter-spacing: .1em; color: var(--hi); border: 1px solid rgba(var(--rgb), calc(var(--lineA) + .1)); padding: 3px 6px; }
+  .sub { font-size: 10px; color: var(--dim); text-align: center; letter-spacing: .05em; }
+  .flicker .title { animation: fl 3s infinite steps(1); }
+  @keyframes fl { 0%, 90%, 100% { transform: none; } 92% { transform: translateX(-2px); text-shadow: 2px 0 #4fb3ff, -2px 0 #ff3b4a; } 94% { transform: translateX(2px); } }
+</style>
+</head>
+<body>
+<div class="deck-head">
+  <div class="code" id="code">SLIDE 1 / 7</div>
+  <h1 id="name">ELECTRIC BLUE</h1>
+  <p id="desc"></p>
+</div>
+<div class="nav">
+  <button id="prev">◀ PREV</button>
+  <div class="dots" id="dots"></div>
+  <button id="next">NEXT ▶</button>
+</div>
+<div class="row" id="row"></div>
+<p style="font-size:11px;color:#5d6880;margin-top:22px">Arrow keys also work. Tell me the code of the one you like, e.g. "B2".</p>
+
+<script>
+  const palettes = [
+    { id: 'A', name: 'ELECTRIC BLUE', desc: 'The current design. Bright blue frames on a deep navy void.', sys: '#4fb3ff', hi: '#a9dcff', rgb: '79,179,255', void: '#05070d', top: '#0b1730', text: '#dbe7ff', dim: '#7d8ba8', panel: 'rgba(10,18,34,.72)' },
+    { id: 'B', name: 'COBALT DEEP', desc: 'Darker, more saturated royal blue. Heavier and more serious.', sys: '#2f6bff', hi: '#9db8ff', rgb: '47,107,255', void: '#04050c', top: '#0a1236', text: '#d6defa', dim: '#7480a6', panel: 'rgba(8,12,34,.75)' },
+    { id: 'C', name: 'CYAN PULSE', desc: 'Sharper, cooler cyan. More "hologram", more electric.', sys: '#22e1ff', hi: '#b3f6ff', rgb: '34,225,255', void: '#030a0d', top: '#062026', text: '#d5f6fb', dim: '#6f97a1', panel: 'rgba(5,22,28,.72)' },
+    { id: 'D', name: 'ARCANE VIOLET', desc: 'Blue shifted to violet. Mystical, darker energy.', sys: '#8b6bff', hi: '#cfc2ff', rgb: '139,107,255', void: '#07050f', top: '#170f33', text: '#e3dcff', dim: '#8a81a8', panel: 'rgba(18,12,38,.72)' },
+    { id: 'E', name: 'NEAR BLACK', desc: 'True black background, muted steel-blue lines. Minimal and stark.', sys: '#6f8fb8', hi: '#c9d6ea', rgb: '111,143,184', void: '#000000', top: '#07090d', text: '#d0d7e2', dim: '#6b7380', panel: 'rgba(8,10,14,.85)' },
+    { id: 'F', name: 'ICE WHITE', desc: 'Pale, almost white system light on dark slate. Clean and clinical.', sys: '#cfe8ff', hi: '#ffffff', rgb: '207,232,255', void: '#06080c', top: '#121a26', text: '#e8f1fb', dim: '#7d8796', panel: 'rgba(16,22,32,.75)' },
+    { id: 'P', name: 'PENALTY ZONE RED', desc: 'The penalty screen at three intensities, for whichever main palette you pick.', penalty: true, sys: '#ff3b4a', hi: '#ffb3b9', rgb: '255,59,74', void: '#090204', top: '#2a070c', text: '#ffe3e5', dim: '#a3646b', panel: 'rgba(30,6,10,.72)' },
+  ];
+  const levels = [
+    { n: 1, label: 'SUBTLE', note: 'Thin lines, almost no glow', vars: { '--glow': '2px', '--glowA': '.18', '--grid': '.02', '--scan': '0', '--lineA': '.22', '--bar': '2px' } },
+    { n: 2, label: 'BALANCED', note: 'Current mockup level', vars: { '--glow': '10px', '--glowA': '.45', '--grid': '.05', '--scan': '.018', '--lineA': '.35', '--bar': '8px' } },
+    { n: 3, label: 'INTENSE', note: 'Strong glow, bright grid, heavy scanlines', vars: { '--glow': '20px', '--glowA': '.85', '--grid': '.10', '--scan': '.04', '--lineA': '.6', '--bar': '14px' } },
+  ];
+
+  const quest = () => `
+    <div class="win"><i class="br tl"></i><i class="br tr"></i><i class="br bl"></i><i class="br bb"></i>
+      <div class="title">[ DAILY QUEST ]</div>
+      <div class="t done"><div class="th"><span>Have breakfast</span><b>1 / 1</b></div><div class="bar"><i style="width:100%"></i></div></div>
+      <div class="t"><div class="th"><span>Study</span><b>1:15 / 2:00</b></div><div class="bar"><i style="width:62%"></i></div></div>
+      <div class="t"><div class="th"><span>Read</span><b>12 / 30 pages</b></div><div class="bar"><i style="width:40%"></i></div><button class="btn">+5 PAGES</button></div>
+      <div class="dl"><span>TIME REMAINING</span><b>09:37:41</b></div>
+      <div class="warn">Failure to complete will result in a penalty.</div>
+    </div>
+    <div class="win"><i class="br tl"></i><i class="br tr"></i><i class="br bl"></i><i class="br bb"></i>
+      <div class="lv"><span>LV. 4</span><span>180 / 600 XP</span></div><div class="bar"><i style="width:30%"></i></div>
+    </div>`;
+  const penalty = () => `
+    <div class="win"><i class="br tl"></i><i class="br tr"></i><i class="br bl"></i><i class="br bb"></i>
+      <div class="title">[ PENALTY ZONE ]</div>
+      <div class="sub">Yesterday's quest was not completed.</div>
+      <div class="big">03:41:12</div>
+      <div class="sub">UNTIL ACCESS IS RESTORED</div>
+      <div class="apps"><span>INSTAGRAM</span><span>YOUTUBE</span><span>BGMI</span></div>
+    </div>
+    <div class="win"><i class="br tl"></i><i class="br tr"></i><i class="br bl"></i><i class="br bb"></i>
+      <div class="title" style="font-size:11px">PUSH-UPS OWED</div>
+      <div class="big" style="font-size:30px">40 / 65</div>
+      <div class="bar" style="margin:8px 0"><i style="width:62%"></i></div>
+      <div class="warn">Unpaid reps double at midnight.</div>
+    </div>`;
+
+  let i = 0;
+  const dots = document.getElementById('dots');
+  palettes.forEach((_, k) => { const d = document.createElement('span'); d.onclick = () => show(k); dots.appendChild(d); });
+
+  function show(k) {
+    i = (k + palettes.length) % palettes.length;
+    const p = palettes[i];
+    document.getElementById('code').textContent = `SLIDE ${i + 1} / ${palettes.length} · PALETTE ${p.id}`;
+    const name = document.getElementById('name');
+    name.textContent = p.name; name.style.color = p.hi; name.style.textShadow = `0 0 14px rgba(${p.rgb},.5)`;
+    document.getElementById('desc').textContent = p.desc;
+    [...dots.children].forEach((d, n) => d.classList.toggle('on', n === i));
+    const row = document.getElementById('row');
+    row.innerHTML = '';
+    for (const lv of levels) {
+      const cell = document.createElement('div'); cell.className = 'cell';
+      const phone = document.createElement('div');
+      phone.className = 'phone' + (p.penalty && lv.n === 3 ? ' flicker' : '');
+      const vars = { '--sys': p.sys, '--hi': p.hi, '--rgb': p.rgb, '--void': p.void, '--top': p.top, '--text': p.text, '--dim': p.dim, '--panel': p.panel, ...lv.vars };
+      for (const [key, val] of Object.entries(vars)) phone.style.setProperty(key, val);
+      phone.innerHTML = `<div class="scr"><div class="top"><span>${p.penalty ? 'TUE 20 OCT · 16:05' : 'MON 19 OCT · 14:22'}</span><span class="chip">${p.penalty ? 'PENALTY' : 'RANK E'}</span></div>${p.penalty ? penalty() : quest()}</div>`;
+      const tag = document.createElement('div'); tag.className = 'tag'; tag.style.color = p.hi;
+      tag.innerHTML = `${p.id}${lv.n} · ${lv.label}<small>${lv.note}</small>`;
+      cell.append(phone, tag);
+      row.appendChild(cell);
+    }
+  }
+  document.getElementById('prev').onclick = () => show(i - 1);
+  document.getElementById('next').onclick = () => show(i + 1);
+  document.addEventListener('keydown', e => { if (e.key === 'ArrowLeft') show(i - 1); if (e.key === 'ArrowRight') show(i + 1); });
+  show(0);
+</script>
+</body>
+</html>

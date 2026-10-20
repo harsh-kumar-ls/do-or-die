@@ -1,0 +1,153 @@
+import '../domain/block_list.dart';
+import '../domain/day.dart';
+import '../domain/engine.dart';
+import '../domain/penalty.dart';
+import '../domain/progression.dart';
+import '../domain/tasks.dart';
+
+/// Hand-written JSON conversion for everything that is saved. Kept explicit
+/// so a saved file stays readable and stable across app versions.
+
+String dayToJson(DayKey d) => d.toString();
+
+DayKey dayFromJson(Object? j) {
+  final parts = (j as String).split('-').map(int.parse).toList();
+  return DayKey(parts[0], parts[1], parts[2]);
+}
+
+Map<String, Object?> taskToJson(TaskDefinition t) => {
+  'id': t.id,
+  'name': t.name,
+  'type': t.type.name,
+  'target': t.target,
+};
+
+TaskDefinition taskFromJson(Map<String, Object?> j) => TaskDefinition(
+  id: j['id'] as String,
+  name: j['name'] as String,
+  type: TaskType.values.byName(j['type'] as String),
+  target: j['target'] as int,
+);
+
+Map<String, Object?> planToJson(QuestPlan p) => {
+  'versions': [
+    for (final v in p.versions)
+      {
+        'effectiveFrom': dayToJson(v.effectiveFrom),
+        'tasks': [for (final t in v.tasks) taskToJson(t)],
+      },
+  ],
+};
+
+QuestPlan planFromJson(Map<String, Object?> j) {
+  final versions = [
+    for (final v in (j['versions'] as List).cast<Map<String, Object?>>())
+      PlanVersion(dayFromJson(v['effectiveFrom']), [
+        for (final t in (v['tasks'] as List).cast<Map<String, Object?>>())
+          taskFromJson(t),
+      ]),
+  ];
+  return QuestPlan.fromVersions(versions);
+}
+
+Map<String, Object?> blockListToJson(BlockList b) => {
+  'versions': [
+    for (final v in b.versions)
+      {
+        'effectiveFrom': dayToJson(v.effectiveFrom),
+        'packages': v.packages.toList()..sort(),
+      },
+  ],
+};
+
+BlockList blockListFromJson(Map<String, Object?> j) => BlockList.fromVersions([
+  for (final v in (j['versions'] as List).cast<Map<String, Object?>>())
+    BlockListVersion(
+      dayFromJson(v['effectiveFrom']),
+      Set.unmodifiable((v['packages'] as List).cast<String>()),
+    ),
+]);
+
+Map<String, Object?> sleepToJson(SleepWindow s) => {
+  'startMinute': s.startMinute,
+  'endMinute': s.endMinute,
+};
+
+SleepWindow sleepFromJson(Map<String, Object?> j) => SleepWindow(
+  startMinute: j['startMinute'] as int,
+  endMinute: j['endMinute'] as int,
+);
+
+Map<String, Object?>? debtToJson(ExerciseDebt? d) => d == null
+    ? null
+    : {
+        'dueDay': dayToJson(d.dueDay),
+        'pushupsOwed': d.pushupsOwed,
+        'squatsOwed': d.squatsOwed,
+        'pushupsDone': d.pushupsDone,
+        'squatsDone': d.squatsDone,
+      };
+
+ExerciseDebt? debtFromJson(Map<String, Object?>? j) => j == null
+    ? null
+    : ExerciseDebt(
+        dueDay: dayFromJson(j['dueDay']),
+        pushupsOwed: j['pushupsOwed'] as int,
+        squatsOwed: j['squatsOwed'] as int,
+        pushupsDone: j['pushupsDone'] as int,
+        squatsDone: j['squatsDone'] as int,
+      );
+
+Map<String, Object?>? lockToJson(LockWindow? w) => w == null
+    ? null
+    : {
+        'day': dayToJson(w.day),
+        'start': w.start.toIso8601String(),
+        'end': w.end.toIso8601String(),
+        'clamped': w.clamped,
+      };
+
+LockWindow? lockFromJson(Map<String, Object?>? j) => j == null
+    ? null
+    : LockWindow(
+        day: dayFromJson(j['day']),
+        start: DateTime.parse(j['start'] as String),
+        end: DateTime.parse(j['end'] as String),
+        clamped: j['clamped'] as bool,
+      );
+
+Map<String, Object?> stateToJson(GameState s) => {
+  'startDay': dayToJson(s.startDay),
+  'lastClosedDay': s.lastClosedDay == null ? null : dayToJson(s.lastClosedDay!),
+  'level': s.level,
+  'xp': s.xp,
+  'unspentStatPoints': s.unspentStatPoints,
+  'stats': {for (final e in s.stats.entries) e.key.name: e.value},
+  'debt': debtToJson(s.debt),
+  'lock': lockToJson(s.lock),
+};
+
+GameState stateFromJson(Map<String, Object?> j) => GameState(
+  startDay: dayFromJson(j['startDay']),
+  lastClosedDay: j['lastClosedDay'] == null
+      ? null
+      : dayFromJson(j['lastClosedDay']),
+  level: j['level'] as int,
+  xp: j['xp'] as int,
+  unspentStatPoints: j['unspentStatPoints'] as int,
+  stats: {
+    for (final e in (j['stats'] as Map).cast<String, int>().entries)
+      Stat.values.byName(e.key): e.value,
+  },
+  debt: debtFromJson((j['debt'] as Map?)?.cast<String, Object?>()),
+  lock: lockFromJson((j['lock'] as Map?)?.cast<String, Object?>()),
+);
+
+Map<String, Object?> progressToJson(Map<DayKey, DayProgress> p) => {
+  for (final e in p.entries) dayToJson(e.key): e.value,
+};
+
+Map<DayKey, DayProgress> progressFromJson(Map<String, Object?> j) => {
+  for (final e in j.entries)
+    dayFromJson(e.key): Map<String, int>.from(e.value as Map),
+};

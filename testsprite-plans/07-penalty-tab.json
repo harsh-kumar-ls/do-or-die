@@ -1,0 +1,51 @@
+{
+  "projectId": "d37f7ffc-2ffc-4da9-88ea-8ee0106eba69",
+  "type": "frontend",
+  "name": "Penalty: with no failed day, the Penalty Zone shows no penalty and no chosen apps",
+  "planSteps": [
+    {
+      "type": "action",
+      "description": "Open the app at / and wait up to 30 seconds for the '[ SYSTEM ]' window to appear (a Flutter web app; it can take a while to load, and controls are exposed in the accessibility tree)"
+    },
+    {
+      "type": "action",
+      "description": "Click 'BEGIN REGISTRATION'"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONFIRM OBJECTIVES'"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONFIRM APPS' on the '[ LOCK TARGETS ]' window (the web build lists no apps; that is expected)"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONFIRM' on the '[ REST PERIOD ]' window"
+    },
+    {
+      "type": "action",
+      "description": "Click 'HOLD TO ACCEPT' once (this test build accepts a click in place of the hold)"
+    },
+    {
+      "type": "assertion",
+      "description": "The '[ DAILY QUEST ]' screen is shown with a bottom bar containing 'QUEST', 'STATUS' and 'PENALTY'"
+    },
+    {
+      "type": "action",
+      "description": "Click 'PENALTY' in the bottom bar"
+    },
+    {
+      "type": "assertion",
+      "description": "A '[ PENALTY ZONE ]' window shows 'No penalty is in effect.', a clock '00:00:00' and 'NO LOCK TODAY'"
+    },
+    {
+      "type": "assertion",
+      "description": "The text 'No apps chosen. A failed day locks nothing until you choose some.' and an 'EDIT LOCKED APPS' button are shown"
+    },
+    {
+      "type": "assertion",
+      "description": "No 'PUSH-UPS OWED' window and no 'EMERGENCY EXIT' button are shown"
+    }
+  ]
+}

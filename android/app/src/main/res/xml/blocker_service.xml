@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Watched apps are set at runtime to the user's chosen list (see
+     BlockerAccessibilityService.applyWatchedPackages). Window content is never read. -->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:notificationTimeout="300"
+    android:canRetrieveWindowContent="false"
+    android:packageNames="com.doordie.do_or_die.none"
+    android:description="@string/blocker_description" />

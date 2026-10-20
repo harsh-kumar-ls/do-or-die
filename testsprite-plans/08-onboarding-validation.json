@@ -1,0 +1,27 @@
+{
+  "projectId": "d37f7ffc-2ffc-4da9-88ea-8ee0106eba69",
+  "type": "frontend",
+  "name": "Onboarding: an objective without a name is refused",
+  "planSteps": [
+    {
+      "type": "action",
+      "description": "Open the app at / and wait up to 30 seconds for the '[ SYSTEM ]' window to appear (a Flutter web app; it can take a while to load, and controls are exposed in the accessibility tree)"
+    },
+    {
+      "type": "action",
+      "description": "Click 'BEGIN REGISTRATION'"
+    },
+    {
+      "type": "action",
+      "description": "Click '+ ADD OBJECTIVE'"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONFIRM OBJECTIVES' without typing a name in the new, empty objective"
+    },
+    {
+      "type": "assertion",
+      "description": "The error text 'Every task needs a name.' is shown and the '[ DAILY QUEST ]' setup window is still displayed (no '[ REST PERIOD ]' window)"
+    }
+  ]
+}

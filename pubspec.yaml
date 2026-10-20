@@ -1,0 +1,43 @@
+name: do_or_die
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.13.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_animate: ^4.5.2
+  flutter_local_notifications: ^22.3.2
+  flutter_soloud: ^5.2.1
+  flutter_timezone: ^5.1.1
+  shared_preferences: ^2.5.6
+  timezone: ^0.11.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  # Original sound effects, synthesized by tools/gen_sfx.py.
+  assets:
+    - assets/sfx/
+
+  # Both fonts are SIL Open Font License 1.1; licences in assets/fonts.
+  fonts:
+    - family: ChakraPetch
+      fonts:
+        - asset: assets/fonts/ChakraPetch-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/ChakraPetch-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/ChakraPetch-Bold.ttf
+          weight: 700
+    - family: JetBrainsMono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono.ttf

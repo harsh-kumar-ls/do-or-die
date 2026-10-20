@@ -1,0 +1,63 @@
+{
+  "projectId": "d37f7ffc-2ffc-4da9-88ea-8ee0106eba69",
+  "type": "frontend",
+  "name": "Quest: completing every objective shows the System notice",
+  "planSteps": [
+    {
+      "type": "action",
+      "description": "Open the app at / and wait up to 30 seconds for the '[ SYSTEM ]' window to appear (a Flutter web app; it can take a while to load, and controls are exposed in the accessibility tree)"
+    },
+    {
+      "type": "action",
+      "description": "Click 'BEGIN REGISTRATION'"
+    },
+    {
+      "type": "action",
+      "description": "In the second objective row (named 'Study'), clear the 'Target minutes' text box and type 1"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONFIRM OBJECTIVES'"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONFIRM APPS' on the '[ LOCK TARGETS ]' window (the web build lists no apps; that is expected)"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONFIRM' on the '[ REST PERIOD ]' window"
+    },
+    {
+      "type": "action",
+      "description": "Click 'HOLD TO ACCEPT' once (this test build accepts a click in place of the hold)"
+    },
+    {
+      "type": "assertion",
+      "description": "The '[ DAILY QUEST ]' screen is shown with a bottom bar containing 'QUEST', 'STATUS' and 'PENALTY'"
+    },
+    {
+      "type": "action",
+      "description": "Click 'HOLD TO CONFIRM' once for 'Have breakfast'"
+    },
+    {
+      "type": "action",
+      "description": "In the 'Read' objective, click '+10' three times"
+    },
+    {
+      "type": "action",
+      "description": "Click 'START' in the 'Study' objective, then wait 70 seconds without clicking"
+    },
+    {
+      "type": "assertion",
+      "description": "A '[ NOTIFICATION ]' window appears containing the text 'The daily quest has been completed.' and 'Reward: +100 XP'"
+    },
+    {
+      "type": "action",
+      "description": "Click 'ACKNOWLEDGE'"
+    },
+    {
+      "type": "assertion",
+      "description": "The notification closes and the quest screen shows 'All objectives complete.'"
+    }
+  ]
+}
