@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../app/game_service.dart';
 import '../platform/blocker.dart';
 import '../spike/blocker_spike_screen.dart';
 import 'fx.dart';
@@ -16,10 +17,18 @@ import 'widgets/notice_overlay.dart';
 enum _Tab { quest, status, penalty }
 
 class AppShell extends StatefulWidget {
-  const AppShell({super.key, required this.model, required this.blocker});
+  const AppShell({
+    super.key,
+    required this.model,
+    required this.blocker,
+    this.onRestarted,
+  });
 
   final GameModel model;
   final AppBlocker blocker;
+
+  /// Receives the fresh game after the trial is restarted.
+  final ValueChanged<GameService>? onRestarted;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -71,6 +80,15 @@ class _AppShellState extends State<AppShell> {
                                   ),
                                   _Tab.status => StatusScreen(
                                     model: m,
+                                    onRestartTrial: widget.onRestarted == null
+                                        ? null
+                                        : () async {
+                                            final next = await m.service
+                                                .restartTrial();
+                                            if (next != null) {
+                                              widget.onRestarted!(next);
+                                            }
+                                          },
                                     onOpenDiagnostics: () =>
                                         Navigator.of(context).push(
                                           MaterialPageRoute(

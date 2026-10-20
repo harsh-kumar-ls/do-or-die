@@ -8,6 +8,9 @@ import 'saved_game.dart';
 abstract class GameStore {
   Future<SavedGame?> load();
   Future<void> save(SavedGame game);
+
+  /// Keeps a finished or abandoned game (with its full log) for later review.
+  Future<void> archive(SavedGame game);
 }
 
 /// Stores the game as a JSON string. Works on Android and web.
@@ -28,6 +31,13 @@ class PrefsGameStore implements GameStore {
   @override
   Future<void> save(SavedGame game) =>
       _prefs.setString(_key, jsonEncode(game.toJson()));
+
+  /// Each archive gets its own key; nothing is ever overwritten.
+  @override
+  Future<void> archive(SavedGame game) => _prefs.setString(
+    'doordie.archive.${DateTime.now().millisecondsSinceEpoch}',
+    jsonEncode(game.toJson()),
+  );
 }
 
 /// For tests.
@@ -48,4 +58,14 @@ class MemoryGameStore implements GameStore {
     _raw = jsonEncode(game.toJson());
     saves++;
   }
+
+  /// Archived games, oldest first.
+  final archived = <SavedGame>[];
+
+  @override
+  Future<void> archive(SavedGame game) async => archived.add(
+    SavedGame.fromJson(
+      jsonDecode(jsonEncode(game.toJson())) as Map<String, Object?>,
+    ),
+  );
 }

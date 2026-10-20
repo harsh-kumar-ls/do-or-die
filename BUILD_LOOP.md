@@ -157,4 +157,12 @@ Each prompt is what I'd run for that iteration of the loop.
   - Decision: no background judging at midnight (risk of two engines writing the save at once). Covered by the scheduled notices, the "judgement pending" wake-up notice, and the M6 redirect. Revisit if the trial shows a gap.
   - Gates: format and analyze clean, 85/85 tests; desugaring build OK; installed.
   - Device finding: OriginOS turned the accessibility service off after each of the last two updates, so it must be re-enabled after every update (the warning flags it).
+  - **Confirmed on the phone (2026-10-20):** notifications allowed, "Alarms & reminders" allowed, and the 09:00 notice scheduled exact (delivery window 0, previously 1 hour). Delivery with the app closed is confirmed by tomorrow's 09:00 notice.
+- [x] **M7 Dry-run mode (built 2026-10-20).**
+  - Engine: `isEnforced(failedDay)`. A dry-run day still works out the real penalty and the real random lock window, emits them with `enforced: false`, and logs them, but adds no debt, no lock and no carry-over.
+  - `SavedGame.liveFrom`: new games start with a 3-day dry run (live from day 4). Saves without the field are always enforced, so tonight's first real failure is unchanged.
+  - [ DRY RUN ] notice shows the would-be push-ups and lock window, and the go-live date.
+  - Status: trial day N / 30, penalty mode, and RESTART TRIAL (3-second hold). Restart archives the old game to its own key and starts fresh with the same objectives, apps and sleep window. It is **refused while a penalty is owed, scheduled or running**, so it can't be used to escape one.
+  - Gates: format and analyze clean, 91/91 tests (6 new dry-run tests). Installed; service needed re-enabling again after the update.
+  - The "fast-forward clock" idea from the plan was dropped: the engine tests already move a test clock through days, which covers it without shipping a time-travel control in the real app.
   - Covers the web UI only; Android blocking, notifications and reboot behaviour stay in T3/T5.

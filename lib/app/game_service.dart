@@ -60,29 +60,36 @@ class GameService {
   }
 
   /// Starts a new game from onboarding choices.
+  ///
+  /// With [dryRunDays] > 0, failures on the first that-many days are a dry
+  /// run: judged, shown and logged, but nothing is owed or locked.
   static Future<GameService> start({
     required GameStore store,
     required List<TaskDefinition> tasks,
     required Set<String> blockedPackages,
     SleepWindow sleep = const SleepWindow(),
+    int dryRunDays = 0,
     Clock clock = const SystemClock(),
     Random? random,
     QuestEngine? engine,
   }) async {
     final now = clock.now();
     final day = DayKey.fromDateTime(now);
+    final liveFrom = dryRunDays > 0 ? day.addDays(dryRunDays) : null;
     final game = SavedGame(
       state: GameState.start(day),
       plan: QuestPlan.initial(day, tasks),
       progress: const {},
       blockList: BlockList.initial(day, blockedPackages),
       sleep: sleep,
+      liveFrom: liveFrom,
       log: List.unmodifiable([
         LogEntry(now, 'game_started', {
           'day': day.toString(),
           'tasks': [for (final t in tasks) taskToJson(t)],
           'blocked': blockedPackages.toList()..sort(),
           'sleep': {'start': sleep.startMinute, 'end': sleep.endMinute},
+          'liveFrom': liveFrom?.toString(),
         }),
       ]),
     );
@@ -93,6 +100,46 @@ class GameService {
       random ?? Random(),
       engine ?? QuestEngine(),
       game,
+    );
+  }
+
+  /// Day of the trial, starting at 1 on the day the game began.
+  int get trialDay => state.startDay.daysUntil(today) + 1;
+
+  /// The first day whose failure is enforced; null if always enforced.
+  DayKey? get liveFrom => _game.liveFrom;
+
+  /// Whether failing today would only be a dry run.
+  bool get isDryRunToday => !_game.isEnforced(today);
+
+  /// A penalty is owed, scheduled or running today.
+  bool get penaltyInEffect {
+    final debt = state.debt;
+    final owes = debt != null && debt.dueDay == today && !debt.isPaid;
+    final lock = state.lock;
+    final locked = lock != null && lock.end.isAfter(now);
+    return owes || locked;
+  }
+
+  /// Archives this game and starts a fresh trial with the same objectives,
+  /// apps and sleep window. Refused while a penalty is in effect, so a
+  /// restart can never be used to escape one. Returns null when refused.
+  Future<GameService?> restartTrial({int dryRunDays = 3}) async {
+    if (penaltyInEffect) return null;
+    if (_game.timer != null) await stopTimer();
+    final archived = _game.copyWith(
+      newLogEntries: [LogEntry(now, 'trial_restarted')],
+    );
+    await _store.archive(archived);
+    return start(
+      store: _store,
+      tasks: todaysTasks,
+      blockedPackages: blockedToday,
+      sleep: _game.sleep,
+      dryRunDays: dryRunDays,
+      clock: _clock,
+      random: _random,
+      engine: engine,
     );
   }
 
@@ -115,6 +162,7 @@ class GameService {
       sleep: _game.sleep,
       random: _random,
       now: now,
+      isEnforced: _game.isEnforced,
     );
     if (result.events.isEmpty) return const [];
     await _commit(

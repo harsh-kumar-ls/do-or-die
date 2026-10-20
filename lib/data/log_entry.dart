@@ -42,17 +42,27 @@ class LogEntry {
         'carried_over',
         {'day': day, 'pushups': pushups, 'squats': squats},
       ),
-      PenaltyIssued(:final pushups, :final squats) => LogEntry(
+      PenaltyIssued(:final pushups, :final squats, :final enforced) => LogEntry(
         at,
         'penalty_issued',
-        {'day': day, 'pushups': pushups, 'squats': squats},
+        {
+          'day': day,
+          'pushups': pushups,
+          'squats': squats,
+          'enforced': enforced,
+        },
       ),
-      LockScheduled(:final window) => LogEntry(at, 'lock_scheduled', {
-        'day': day,
-        'start': window.start.toIso8601String(),
-        'end': window.end.toIso8601String(),
-        'clamped': window.clamped,
-      }),
+      LockScheduled(:final window, :final enforced) => LogEntry(
+        at,
+        'lock_scheduled',
+        {
+          'day': day,
+          'start': window.start.toIso8601String(),
+          'end': window.end.toIso8601String(),
+          'clamped': window.clamped,
+          'enforced': enforced,
+        },
+      ),
       LockMissed() => LogEntry(at, 'lock_missed', {'day': day}),
     };
   }

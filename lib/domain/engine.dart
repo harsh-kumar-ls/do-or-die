@@ -94,16 +94,27 @@ class CarriedOver extends GameEvent {
 }
 
 class PenaltyIssued extends GameEvent {
-  const PenaltyIssued(super.day, {required this.pushups, required this.squats});
+  const PenaltyIssued(
+    super.day, {
+    required this.pushups,
+    required this.squats,
+    this.enforced = true,
+  });
 
   /// The new penalty for the failed day, before any carry-over.
   final int pushups;
   final int squats;
+
+  /// False during a dry run: worked out and shown, but not owed.
+  final bool enforced;
 }
 
 class LockScheduled extends GameEvent {
-  const LockScheduled(super.day, this.window);
+  const LockScheduled(super.day, this.window, {this.enforced = true});
   final LockWindow window;
+
+  /// False during a dry run: the window is shown, but nothing is locked.
+  final bool enforced;
 }
 
 class LockMissed extends GameEvent {
@@ -132,6 +143,10 @@ class QuestEngine {
   ///
   /// Days are only ever closed going forward: if the clock moves backwards,
   /// nothing is reopened or recalculated.
+  ///
+  /// [isEnforced] decides, per failed day, whether its penalty is real. A
+  /// dry-run day still gets the full penalty and lock window worked out and
+  /// reported, but nothing is owed and nothing is locked.
   EngineResult closeDaysBefore({
     required GameState state,
     required DayKey today,
@@ -140,6 +155,7 @@ class QuestEngine {
     required SleepWindow sleep,
     required Random random,
     required DateTime now,
+    bool Function(DayKey failedDay) isEnforced = _always,
   }) {
     final events = <GameEvent>[];
     var s = state;
@@ -153,11 +169,14 @@ class QuestEngine {
         sleep,
         random,
         now,
+        isEnforced(day),
         events,
       );
     }
     return EngineResult(s, events);
   }
+
+  static bool _always(DayKey _) => true;
 
   GameState _closeDay(
     GameState s,
@@ -167,6 +186,7 @@ class QuestEngine {
     SleepWindow sleep,
     Random random,
     DateTime now,
+    bool enforced,
     List<GameEvent> events,
   ) {
     final failedIds = [
@@ -211,11 +231,18 @@ class QuestEngine {
     final tomorrow = day.addDays(1);
 
     if (!cleared) {
-      newPushups = penalties.pushupsForLevel(penaltyLevel);
-      newSquats = penalties.squatsForLevel(penaltyLevel);
-      events.add(PenaltyIssued(day, pushups: newPushups, squats: newSquats));
+      final pushups = penalties.pushupsForLevel(penaltyLevel);
+      final squats = penalties.squatsForLevel(penaltyLevel);
+      events.add(
+        PenaltyIssued(
+          day,
+          pushups: pushups,
+          squats: squats,
+          enforced: enforced,
+        ),
+      );
 
-      lock = scheduler.schedule(
+      final window = scheduler.schedule(
         day: tomorrow,
         durationMinutes: penalties.lockMinutesForLevel(penaltyLevel),
         sleep: sleep,
@@ -223,8 +250,16 @@ class QuestEngine {
         notBefore: now,
       );
       events.add(
-        lock == null ? LockMissed(tomorrow) : LockScheduled(tomorrow, lock),
+        window == null
+            ? LockMissed(tomorrow)
+            : LockScheduled(tomorrow, window, enforced: enforced),
       );
+
+      if (enforced) {
+        newPushups = pushups;
+        newSquats = squats;
+        lock = window;
+      }
     }
 
     final totalPushups = newPushups + carryPushups;

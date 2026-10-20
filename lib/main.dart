@@ -119,12 +119,20 @@ class _DoOrDieAppState extends State<DoOrDieApp> {
       tasks: r.tasks,
       blockedPackages: r.blocked,
       sleep: r.sleep,
+      dryRunDays: 3,
       clock: widget.platform.clock,
     );
     final model = _modelFor(service);
     setState(() => _model = model);
     // Ask once registration is done, when the reason is obvious.
     await model.requestNotifications();
+  }
+
+  /// Swaps in the fresh trial; the old game is already archived.
+  void _restarted(GameService service) {
+    final old = _model;
+    setState(() => _model = _modelFor(service));
+    old?.dispose();
   }
 
   @override
@@ -144,7 +152,12 @@ class _DoOrDieAppState extends State<DoOrDieApp> {
                 ),
               ),
             )
-          : AppShell(model: model, blocker: blocker),
+          : AppShell(
+              key: ObjectKey(model),
+              model: model,
+              blocker: blocker,
+              onRestarted: _restarted,
+            ),
     );
   }
 }

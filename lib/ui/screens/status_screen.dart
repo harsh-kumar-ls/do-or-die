@@ -5,10 +5,19 @@ import '../../domain/progression.dart';
 import '../game_model.dart';
 import '../theme.dart';
 import '../widgets/fill_column.dart';
+import '../widgets/hud_controls.dart';
 import '../widgets/system_window.dart';
 
 class StatusScreen extends StatelessWidget {
-  const StatusScreen({super.key, required this.model, this.onOpenDiagnostics});
+  const StatusScreen({
+    super.key,
+    required this.model,
+    this.onOpenDiagnostics,
+    this.onRestartTrial,
+  });
+
+  /// Archives this game and starts a fresh trial (with a dry run).
+  final Future<void> Function()? onRestartTrial;
 
   final GameModel model;
   final VoidCallback? onOpenDiagnostics;
@@ -60,6 +69,24 @@ class StatusScreen extends StatelessWidget {
                         _kv(p, 'QUESTS CLEARED', '$cleared'),
                         _kv(p, 'CURRENT STREAK', '${_streak(model)} days'),
                         _kv(p, 'PENALTIES SERVED', '$penalties'),
+                        _kv(p, 'TRIAL DAY', '${model.service.trialDay} / 30'),
+                        _kv(p, 'PENALTIES', model.trialMode),
+                        if (onRestartTrial != null) ...[
+                          const SizedBox(height: 10),
+                          if (model.service.penaltyInEffect)
+                            Text(
+                              'Restart unavailable while a penalty is in effect.',
+                              textAlign: TextAlign.center,
+                              style: Hud.mono(11, p.dim),
+                            )
+                          else
+                            HoldButton(
+                              label: 'HOLD 3S · RESTART TRIAL',
+                              doneLabel: 'RESTARTING',
+                              holdFor: const Duration(seconds: 3),
+                              onConfirmed: onRestartTrial!,
+                            ),
+                        ],
                       ],
                     ),
                   ],

@@ -7,6 +7,7 @@ import '../app/notification_planner.dart';
 import '../app/penalty_enforcer.dart';
 import '../app/trusted_clock.dart';
 import '../platform/notifier.dart';
+import '../domain/day.dart';
 import '../domain/engine.dart';
 import '../domain/progression.dart';
 import '../domain/tasks.dart';
@@ -279,22 +280,63 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
               .whereType<PenaltyIssued>()
               .where((p) => p.day == e.day)
               .firstOrNull;
-          _queue(
-            SystemNotice(
-              title: '[ WARNING ]',
-              danger: true,
-              lines: [
-                'Quest for ${_dayName(e)} was not completed.',
-                if (penalty != null)
-                  'Penalty issued: ${penalty.pushups} push-ups${penalty.squats > 0 ? ', ${penalty.squats} squats' : ''}.',
-                'A lock will begin at an undisclosed time today.',
-              ],
-            ),
-          );
+          final lock = events
+              .whereType<LockScheduled>()
+              .where((l) => l.day == e.day.addDays(1))
+              .firstOrNull;
+          final exercise = penalty == null
+              ? null
+              : '${penalty.pushups} push-ups${penalty.squats > 0 ? ', ${penalty.squats} squats' : ''}';
+          if (penalty != null && !penalty.enforced) {
+            // Dry run: nothing is enforced, so the whole penalty is shown.
+            final live = service.liveFrom;
+            _queue(
+              SystemNotice(
+                title: '[ DRY RUN ]',
+                lines: [
+                  'Quest for ${_dayName(e)} was not completed.',
+                  'Penalty that would apply: $exercise.',
+                  if (lock != null)
+                    'Lock that would apply: ${_hm(lock.window.start)} to ${_hm(lock.window.end)}.',
+                  if (live != null)
+                    'Not enforced. Penalties go live on ${_dateName(live)}.',
+                ],
+              ),
+            );
+          } else {
+            _queue(
+              SystemNotice(
+                title: '[ WARNING ]',
+                danger: true,
+                lines: [
+                  'Quest for ${_dayName(e)} was not completed.',
+                  if (exercise != null) 'Penalty issued: $exercise.',
+                  if (lock != null)
+                    'A lock will begin at an undisclosed time today.',
+                ],
+              ),
+            );
+          }
         default:
           break;
       }
     }
+  }
+
+  static String _hm(DateTime t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  static String _dateName(DayKey d) {
+    const names = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+    return '${names[DateTime(d.year, d.month, d.day).weekday - 1]} ${d.day}';
+  }
+
+  /// "DRY RUN" or "LIVE", with the go-live date while in dry run.
+  String get trialMode {
+    final live = service.liveFrom;
+    return service.isDryRunToday && live != null
+        ? 'DRY RUN until ${_dateName(live)}'
+        : 'LIVE';
   }
 
   String _dayName(GameEvent e) {

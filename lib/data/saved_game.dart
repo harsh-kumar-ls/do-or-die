@@ -34,6 +34,7 @@ class SavedGame {
     required this.sleep,
     required this.log,
     this.timer,
+    this.liveFrom,
   });
 
   factory SavedGame.fromJson(Map<String, Object?> j) => SavedGame(
@@ -51,6 +52,7 @@ class SavedGame {
     timer: j['timer'] == null
         ? null
         : RunningTimer.fromJson((j['timer'] as Map).cast<String, Object?>()),
+    liveFrom: j['liveFrom'] == null ? null : dayFromJson(j['liveFrom']),
   );
 
   static const schemaVersion = 1;
@@ -67,6 +69,14 @@ class SavedGame {
   /// The timer task currently running, if any.
   final RunningTimer? timer;
 
+  /// The first day whose failure is really enforced. Failures before it are
+  /// a dry run: judged, shown and logged, but nothing is owed or locked.
+  /// Null (games saved before dry-run mode existed) means always enforced.
+  final DayKey? liveFrom;
+
+  /// Whether a failure on [day] brings a real penalty.
+  bool isEnforced(DayKey day) => liveFrom == null || !day.isBefore(liveFrom!);
+
   Map<String, Object?> toJson() => {
     'schemaVersion': schemaVersion,
     'state': stateToJson(state),
@@ -76,6 +86,7 @@ class SavedGame {
     'sleep': sleepToJson(sleep),
     'log': [for (final e in log) e.toJson()],
     'timer': timer?.toJson(),
+    'liveFrom': liveFrom == null ? null : dayToJson(liveFrom!),
   };
 
   /// Returns a copy. [newLogEntries] are appended; existing entries can't be
@@ -95,6 +106,7 @@ class SavedGame {
     blockList: blockList ?? this.blockList,
     sleep: sleep ?? this.sleep,
     timer: timer != null ? timer() : this.timer,
+    liveFrom: liveFrom,
     log: newLogEntries.isEmpty
         ? log
         : List.unmodifiable([...log, ...newLogEntries]),
