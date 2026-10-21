@@ -170,10 +170,15 @@ Each prompt is what I'd run for that iteration of the loop.
   - Penalty sound made louder for phone speakers (overtones at 100–160 Hz, harder compression): loudness 0.32 → 0.47, phone-audible 0.17 → 0.29. Tab pop unchanged. Candidates were auditioned in a temporary Sound Lab, since removed.
   - Bugs fixed: RESTART TRIAL was hidden below the fold of the Status window (now a pinned footer with the exact blocking reason); a long-press anywhere on Status opened diagnostics and beat the 3 s restart hold (diagnostics now needs 7 quick taps, and is refused during a penalty because its stop button could end a real lock).
   - The user restarted the trial: the real 30-day trial began 2026-10-21 (dry run days 1–3, live from day 4).
-- [ ] **M8 Hardening (built 2026-10-21; regression pass in progress).**
+- [x] **M8 Hardening (done 2026-10-21).**
   - **Root cause of "the service turns off after every update": a force stop, not the update.** Android disables an app's accessibility service when the app is force-stopped, and every install command used here ended with `am force-stop`. A plain `adb install -r` keeps it on (verified). **Never force-stop the app when installing.**
   - The same mechanism is a real-world escape (Settings → Force stop, or an aggressive memory cleaner). Mitigations: the watchdog checks the service on every sync and **logs one `blocker_offline` incident per outage** (with `duringPenalty` and `repaired`), the count shows on the System Check, and Quest shows a BLOCKER OFFLINE banner. Optional **auto-repair**: if the user grants `WRITE_SECURE_SETTINGS` once via adb (their choice; it changes a security setting), the app turns its own service back on when it opens.
   - **System Check** screen (from Status): service, notifications, on-time alerts, battery exemption (new request), automatic time, auto-repair, plus OriginOS hand-checks (Autostart, lock in Recents) and the outage count.
   - `AppBlocker.canBlock` replaces type checks against the web stand-in (a test exposed that the type check also skipped test doubles).
-  - Gates: format and analyze clean, 105/105 tests (5 new watchdog tests). TestSprite full run (10 tests) in progress against a fresh test-mode web build.
+  - Gates: format and analyze clean, **106/106 tests**.
+  - **Regression pass:** TestSprite full run (10 tests) found one real regression: 06 Status hid LEVEL and QUESTS CLEARED in the Status window's inner scroll on a short browser window (caused by the pinned footer). A height cut-off did not fix it; the final fix removes the inner scroll entirely (the window stretches on tall screens, the page scrolls on short ones). After the fix: **all 10 TestSprite tests passed** (01 7/7, 02 10/10 on rerun after a one-off blank load, 03 9/9, 04 10/10, 05 15/15, 06 10/10, 07 10/10, 08 5/5, 09 9/9, 10 9/9).
+  - **On the phone:** a plain `adb install -r` kept the blocker service on, twice (no force-stop); battery exemption granted; the user confirmed the Status layout fits. Auto-repair not granted (optional, user's choice).
+  - TestSprite credits used this month: 14.5 of 150.
+
+**All milestones (M0–M8) complete. The 30-day trial is running: day 1 was 2026-10-21; dry run days 1–3; penalties live from day 4 (2026-10-24).**
   - Covers the web UI only; Android blocking, notifications and reboot behaviour stay in T3/T5.
