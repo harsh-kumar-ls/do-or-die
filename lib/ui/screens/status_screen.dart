@@ -4,7 +4,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../domain/progression.dart';
 import '../game_model.dart';
 import '../theme.dart';
-import '../widgets/fill_column.dart';
 import '../widgets/hud_controls.dart';
 import '../widgets/system_window.dart';
 
@@ -25,10 +24,6 @@ class StatusScreen extends StatelessWidget {
 
   final GameModel model;
   final VoidCallback? onOpenDiagnostics;
-
-  /// Below this height the Status tab scrolls as one page instead of
-  /// stretching its windows, so no row is ever tucked into a hidden scroll.
-  static const _fillMinHeight = 700.0;
 
   @override
   Widget build(BuildContext context) {
@@ -109,23 +104,30 @@ class StatusScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-            childAspectRatio: 2.2,
-            children: [
-              for (final stat in Stat.values)
-                _StatTile(
-                  stat: stat,
-                  value: s.stats[stat] ?? 0,
-                  canSpend: s.unspentStatPoints > 0,
-                  onSpend: () => model.allocateStat(stat),
-                ),
-            ],
-          ),
+          for (final pair in const [
+            [Stat.strength, Stat.intellect],
+            [Stat.discipline, Stat.vitality],
+          ]) ...[
+            Row(
+              children: [
+                for (final (i, stat) in pair.indexed) ...[
+                  if (i > 0) const SizedBox(width: 10),
+                  Expanded(
+                    child: SizedBox(
+                      height: 64,
+                      child: _StatTile(
+                        stat: stat,
+                        value: s.stats[stat] ?? 0,
+                        canSpend: s.unspentStatPoints > 0,
+                        onSpend: () => model.allocateStat(stat),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            if (pair.first == Stat.strength) const SizedBox(height: 10),
+          ],
           const SizedBox(height: 12),
           _kv(p, 'AVAILABLE POINTS', '${s.unspentStatPoints}'),
         ],
@@ -133,61 +135,43 @@ class StatusScreen extends StatelessWidget {
     );
 
     return LayoutBuilder(
-      builder: (context, c) {
-        if (c.maxHeight < _fillMinHeight) {
-          // Short screen: one page, natural heights, scrolls as a whole.
-          return _SevenTaps(
-            onTriggered: onOpenDiagnostics,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(18, 4, 18, 16),
-              children: [
-                SystemWindow(
-                  title: '[ STATUS ]',
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      rank,
-                      const SizedBox(height: 12),
-                      rows,
-                      ...footer,
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                attributes,
-              ],
-            ),
-          );
-        }
-        // Tall screen: the Status window stretches to fill the space.
-        return Padding(
+      builder: (context, c) => _SevenTaps(
+        onTriggered: onOpenDiagnostics,
+        child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(18, 4, 18, 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: _SevenTaps(
-                  onTriggered: onOpenDiagnostics,
-                  child: SystemWindow(
-                    expand: true,
-                    title: '[ STATUS ]',
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(child: FillColumn(children: [rank, rows])),
-                        // Pinned below the rows so it's never hidden.
-                        ...footer,
-                      ],
+          child: ConstrainedBox(
+            // At least the screen's height, so the Status window can stretch
+            // to fill spare space; taller content makes the page scroll.
+            constraints: BoxConstraints(minHeight: c.maxHeight - 20),
+            child: IntrinsicHeight(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: SystemWindow(
+                      expand: true,
+                      title: '[ STATUS ]',
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          rank,
+                          const Spacer(),
+                          const SizedBox(height: 12),
+                          rows,
+                          const Spacer(),
+                          ...footer,
+                        ],
+                      ),
                     ),
                   ),
-                ),
+                  const SizedBox(height: 12),
+                  attributes,
+                ],
               ),
-              const SizedBox(height: 12),
-              attributes,
-            ],
+            ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
