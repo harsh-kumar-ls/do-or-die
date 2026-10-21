@@ -197,6 +197,34 @@ void main() {
     await tester.pump(const Duration(seconds: 5)); // let the snackbar go
   });
 
+  testWidgets(
+    'on a short screen every Status row is on screen, and restart is reachable by page scroll',
+    (tester) async {
+      await pumpShell(tester);
+      // A short, wide browser window, like the TestSprite one.
+      tester.view.physicalSize = const Size(1280, 640);
+      tester.view.devicePixelRatio = 1;
+      await tester.pump(const Duration(milliseconds: 300));
+      await openStatus(tester);
+
+      for (final row in [
+        'LEVEL',
+        'EXPERIENCE',
+        'QUESTS CLEARED',
+        'CURRENT STREAK',
+      ]) {
+        expect(reallyVisible(tester, find.text(row)), isTrue, reason: row);
+      }
+      // Lower content is reached by scrolling the page itself, which is visible
+      // and expected, not by a hidden scroll inside a window.
+      final restart = find.text('HOLD 3S · RESTART TRIAL');
+      await tester.ensureVisible(restart);
+      await tester.pump();
+      expect(reallyVisible(tester, restart), isTrue);
+      await tester.pump(const Duration(seconds: 1));
+    },
+  );
+
   testWidgets('the study clock ticks on its own, with no taps', (tester) async {
     final clock = FixedClock(DateTime(2026, 10, 20, 15, 0, 0));
     final model = await pumpShell(tester, clock: clock);

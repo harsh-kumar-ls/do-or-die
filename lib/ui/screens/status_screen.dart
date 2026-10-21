@@ -26,6 +26,10 @@ class StatusScreen extends StatelessWidget {
   final GameModel model;
   final VoidCallback? onOpenDiagnostics;
 
+  /// Below this height the Status tab scrolls as one page instead of
+  /// stretching its windows, so no row is ever tucked into a hidden scroll.
+  static const _fillMinHeight = 700.0;
+
   @override
   Widget build(BuildContext context) {
     final p = HudScope.of(context);
@@ -34,135 +38,156 @@ class StatusScreen extends StatelessWidget {
     final cleared = log.where((e) => e.type == 'quest_cleared').length;
     final penalties = log.where((e) => e.type == 'penalty_issued').length;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 4, 18, 16),
+    final rank = Column(
+      children: [
+        Text(
+          model.rank.name.toUpperCase(),
+          textAlign: TextAlign.center,
+          style: Hud.head(
+            84,
+            p.hi,
+            spacing: 0,
+          ).copyWith(height: 1, shadows: p.textGlow(2.4)),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'RANK',
+          textAlign: TextAlign.center,
+          style: Hud.mono(12, p.dim, spacing: .2),
+        ),
+      ],
+    );
+
+    final rows = Column(
+      children: [
+        _kv(p, 'LEVEL', '${s.level}'),
+        _kv(p, 'EXPERIENCE', '${s.xp} / ${model.xpToNext}'),
+        _kv(p, 'QUESTS CLEARED', '$cleared'),
+        _kv(p, 'CURRENT STREAK', '${_streak(model)} days'),
+        _kv(p, 'PENALTIES SERVED', '$penalties'),
+        _kv(p, 'TRIAL DAY', '${model.service.trialDay} / 30'),
+        _kv(p, 'PENALTIES', model.trialMode),
+      ],
+    );
+
+    final footer = <Widget>[
+      if (onOpenSystemCheck != null) ...[
+        const SizedBox(height: 8),
+        HudButton(
+          model.systemIssues == 0
+              ? 'SYSTEM CHECK'
+              : 'SYSTEM CHECK · ${model.systemIssues} TO FIX',
+          dense: true,
+          onPressed: onOpenSystemCheck,
+        ),
+      ],
+      if (onRestartTrial != null) ...[
+        Container(
+          height: 1,
+          margin: const EdgeInsets.only(top: 8, bottom: 10),
+          color: p.sys.withValues(alpha: p.lineAlpha * .6),
+        ),
+        if (model.restartBlockedReason case final reason?)
+          Text(
+            reason,
+            textAlign: TextAlign.center,
+            style: Hud.mono(11, Hud.warn),
+          )
+        else
+          HoldButton(
+            label: 'HOLD 3S · RESTART TRIAL',
+            doneLabel: 'RESTARTING',
+            holdFor: const Duration(seconds: 3),
+            onConfirmed: onRestartTrial!,
+          ),
+      ],
+    ];
+
+    final attributes = SystemWindow(
+      title: 'ATTRIBUTES',
+      delay: const Duration(milliseconds: 120),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: _SevenTaps(
-              onTriggered: onOpenDiagnostics,
-              child: SystemWindow(
-                expand: true,
-                title: '[ STATUS ]',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      child: FillColumn(
-                        children: [
-                          Column(
-                            children: [
-                              Text(
-                                model.rank.name.toUpperCase(),
-                                textAlign: TextAlign.center,
-                                style: Hud.head(
-                                  84,
-                                  p.hi,
-                                  spacing: 0,
-                                ).copyWith(height: 1, shadows: p.textGlow(2.4)),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'RANK',
-                                textAlign: TextAlign.center,
-                                style: Hud.mono(12, p.dim, spacing: .2),
-                              ),
-                            ],
-                          ),
-                          Column(
-                            children: [
-                              _kv(p, 'LEVEL', '${s.level}'),
-                              _kv(
-                                p,
-                                'EXPERIENCE',
-                                '${s.xp} / ${model.xpToNext}',
-                              ),
-                              _kv(p, 'QUESTS CLEARED', '$cleared'),
-                              _kv(
-                                p,
-                                'CURRENT STREAK',
-                                '${_streak(model)} days',
-                              ),
-                              _kv(p, 'PENALTIES SERVED', '$penalties'),
-                              _kv(
-                                p,
-                                'TRIAL DAY',
-                                '${model.service.trialDay} / 30',
-                              ),
-                              _kv(p, 'PENALTIES', model.trialMode),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Pinned below the scrollable rows so it's never hidden.
-                    if (onOpenSystemCheck != null) ...[
-                      const SizedBox(height: 8),
-                      HudButton(
-                        model.systemIssues == 0
-                            ? 'SYSTEM CHECK'
-                            : 'SYSTEM CHECK · ${model.systemIssues} TO FIX',
-                        dense: true,
-                        onPressed: onOpenSystemCheck,
-                      ),
-                    ],
-                    if (onRestartTrial != null) ...[
-                      Container(
-                        height: 1,
-                        margin: const EdgeInsets.only(top: 8, bottom: 10),
-                        color: p.sys.withValues(alpha: p.lineAlpha * .6),
-                      ),
-                      if (model.restartBlockedReason case final reason?)
-                        Text(
-                          reason,
-                          textAlign: TextAlign.center,
-                          style: Hud.mono(11, Hud.warn),
-                        )
-                      else
-                        HoldButton(
-                          label: 'HOLD 3S · RESTART TRIAL',
-                          doneLabel: 'RESTARTING',
-                          holdFor: const Duration(seconds: 3),
-                          onConfirmed: onRestartTrial!,
-                        ),
-                    ],
-                  ],
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: 2.2,
+            children: [
+              for (final stat in Stat.values)
+                _StatTile(
+                  stat: stat,
+                  value: s.stats[stat] ?? 0,
+                  canSpend: s.unspentStatPoints > 0,
+                  onSpend: () => model.allocateStat(stat),
                 ),
-              ),
-            ),
+            ],
           ),
           const SizedBox(height: 12),
-          SystemWindow(
-            title: 'ATTRIBUTES',
-            delay: const Duration(milliseconds: 120),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                GridView.count(
-                  crossAxisCount: 2,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  mainAxisSpacing: 10,
-                  crossAxisSpacing: 10,
-                  childAspectRatio: 2.2,
-                  children: [
-                    for (final stat in Stat.values)
-                      _StatTile(
-                        stat: stat,
-                        value: s.stats[stat] ?? 0,
-                        canSpend: s.unspentStatPoints > 0,
-                        onSpend: () => model.allocateStat(stat),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _kv(p, 'AVAILABLE POINTS', '${s.unspentStatPoints}'),
-              ],
-            ),
-          ),
+          _kv(p, 'AVAILABLE POINTS', '${s.unspentStatPoints}'),
         ],
       ),
+    );
+
+    return LayoutBuilder(
+      builder: (context, c) {
+        if (c.maxHeight < _fillMinHeight) {
+          // Short screen: one page, natural heights, scrolls as a whole.
+          return _SevenTaps(
+            onTriggered: onOpenDiagnostics,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(18, 4, 18, 16),
+              children: [
+                SystemWindow(
+                  title: '[ STATUS ]',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      rank,
+                      const SizedBox(height: 12),
+                      rows,
+                      ...footer,
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                attributes,
+              ],
+            ),
+          );
+        }
+        // Tall screen: the Status window stretches to fill the space.
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(18, 4, 18, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: _SevenTaps(
+                  onTriggered: onOpenDiagnostics,
+                  child: SystemWindow(
+                    expand: true,
+                    title: '[ STATUS ]',
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(child: FillColumn(children: [rank, rows])),
+                        // Pinned below the rows so it's never hidden.
+                        ...footer,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              attributes,
+            ],
+          ),
+        );
+      },
     );
   }
 
