@@ -89,14 +89,29 @@ class _AppShellState extends State<AppShell> {
                                               widget.onRestarted!(next);
                                             }
                                           },
-                                    onOpenDiagnostics: () =>
-                                        Navigator.of(context).push(
-                                          MaterialPageRoute(
-                                            builder: (_) => BlockerSpikeScreen(
-                                              blocker: widget.blocker,
-                                            ),
+                                    onOpenDiagnostics: () {
+                                      // Diagnostics can start and stop locks,
+                                      // so it must never be a way out of a
+                                      // real penalty.
+                                      if (m.service.penaltyInEffect) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Diagnostics is unavailable while a penalty is in effect.',
+                                                ),
+                                              ),
+                                            );
+                                        return;
+                                      }
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) => BlockerSpikeScreen(
+                                            blocker: widget.blocker,
                                           ),
                                         ),
+                                      );
+                                    },
                                   ),
                                   _Tab.penalty => PenaltyScreen(
                                     model: m,

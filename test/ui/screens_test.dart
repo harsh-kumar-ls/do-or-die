@@ -24,7 +24,11 @@ const tasks = [
 ];
 
 void main() {
-  Future<GameModel> pumpShell(WidgetTester tester, {Clock? clock}) async {
+  Future<GameModel> pumpShell(
+    WidgetTester tester, {
+    Clock? clock,
+    ValueChanged<GameService>? onRestarted,
+  }) async {
     tester.view.physicalSize = const Size(1080, 2340);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
@@ -45,7 +49,7 @@ void main() {
           child: AppShell(
             model: model,
             blocker: NoopAppBlocker(),
-            onRestarted: (_) {},
+            onRestarted: onRestarted ?? (_) {},
           ),
         ),
       ),
@@ -111,6 +115,87 @@ void main() {
       await tester.pump(const Duration(seconds: 1)); // let title animations end
     },
   );
+
+  Future<void> openStatus(WidgetTester tester) async {
+    await tester.tap(find.text('STATUS'));
+    await tester.pump(const Duration(milliseconds: 600));
+  }
+
+  const diagnosticsTitle = 'Blocking spike (M5)';
+
+  testWidgets('holding RESTART TRIAL restarts, and never opens diagnostics', (
+    tester,
+  ) async {
+    GameService? restarted;
+    await pumpShell(tester, onRestarted: (g) => restarted = g);
+    await openStatus(tester);
+
+    final hold = await tester.startGesture(
+      tester.getCenter(find.text('HOLD 3S · RESTART TRIAL')),
+    );
+    for (var i = 0; i < 35; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    await hold.up();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text(diagnosticsTitle), findsNothing);
+    expect(restarted, isNotNull);
+    expect(restarted!.trialDay, 1);
+    await tester.pump(const Duration(seconds: 1));
+  });
+
+  testWidgets('holding the rank letter opens nothing', (tester) async {
+    await pumpShell(tester);
+    await openStatus(tester);
+    final hold = await tester.startGesture(
+      tester.getCenter(find.text('E').first),
+    );
+    await tester.pump(const Duration(seconds: 2));
+    await hold.up();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text(diagnosticsTitle), findsNothing);
+  });
+
+  testWidgets('seven quick taps on the Status window open diagnostics', (
+    tester,
+  ) async {
+    await pumpShell(tester);
+    await openStatus(tester);
+    final spot = tester.getCenter(find.text('LEVEL'));
+    for (var i = 0; i < 7; i++) {
+      await tester.tapAt(spot);
+      await tester.pump(const Duration(milliseconds: 120));
+    }
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text(diagnosticsTitle), findsOneWidget);
+  });
+
+  testWidgets('diagnostics is refused while a penalty is in effect', (
+    tester,
+  ) async {
+    final clock = FixedClock(DateTime(2026, 10, 19, 10));
+    final model = await pumpShell(tester, clock: clock);
+    clock.set(DateTime(2026, 10, 20, 6, 30)); // Monday failed: push-ups owed
+    await model.tick();
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.tap(find.text('ACKNOWLEDGE'));
+    await tester.pump(const Duration(milliseconds: 600));
+    await openStatus(tester);
+
+    final spot = tester.getCenter(find.text('LEVEL'));
+    for (var i = 0; i < 7; i++) {
+      await tester.tapAt(spot);
+      await tester.pump(const Duration(milliseconds: 120));
+    }
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text(diagnosticsTitle), findsNothing);
+    expect(
+      find.text('Diagnostics is unavailable while a penalty is in effect.'),
+      findsOneWidget,
+    );
+    await tester.pump(const Duration(seconds: 5)); // let the snackbar go
+  });
 
   testWidgets('the study clock ticks on its own, with no taps', (tester) async {
     final clock = FixedClock(DateTime(2026, 10, 20, 15, 0, 0));

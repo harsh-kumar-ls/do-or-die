@@ -36,8 +36,8 @@ class StatusScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
-            child: GestureDetector(
-              onLongPress: onOpenDiagnostics,
+            child: _SevenTaps(
+              onTriggered: onOpenDiagnostics,
               child: SystemWindow(
                 expand: true,
                 title: '[ STATUS ]',
@@ -178,6 +178,53 @@ class StatusScreen extends StatelessWidget {
     }
     return streak;
   }
+}
+
+/// Fires [onTriggered] after 7 quick taps within 4 seconds, like Android's
+/// hidden developer options. Holds never count, so a 3-second hold on a
+/// button inside can't open anything by accident. Uses raw pointer events,
+/// so it never competes with the buttons it wraps.
+class _SevenTaps extends StatefulWidget {
+  const _SevenTaps({required this.child, this.onTriggered});
+
+  final Widget child;
+  final VoidCallback? onTriggered;
+
+  @override
+  State<_SevenTaps> createState() => _SevenTapsState();
+}
+
+class _SevenTapsState extends State<_SevenTaps> {
+  static const _needed = 7;
+  static const _within = Duration(seconds: 4);
+  static const _quickTap = Duration(milliseconds: 300);
+
+  final _taps = <DateTime>[];
+  DateTime? _downAt;
+
+  void _up() {
+    final down = _downAt;
+    _downAt = null;
+    if (down == null || widget.onTriggered == null) return;
+    final now = DateTime.now();
+    if (now.difference(down) > _quickTap) return; // a hold, not a tap
+    _taps
+      ..add(now)
+      ..removeWhere((t) => now.difference(t) > _within);
+    if (_taps.length >= _needed) {
+      _taps.clear();
+      widget.onTriggered!();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Listener(
+    behavior: HitTestBehavior.translucent,
+    onPointerDown: (_) => _downAt = DateTime.now(),
+    onPointerUp: (_) => _up(),
+    onPointerCancel: (_) => _downAt = null,
+    child: widget.child,
+  );
 }
 
 class _StatTile extends StatelessWidget {
