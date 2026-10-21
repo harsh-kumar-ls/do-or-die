@@ -116,11 +116,32 @@ def main():
         s = math.sin(2 * math.pi * 55 * t) + 0.6 * math.sin(2 * math.pi * 58.3 * t) + 0.25 * math.sin(2 * math.pi * 110 * t)
         s = math.tanh(1.8 * s)  # soft distortion
         throb.append(s * wobble * env(i, n, 0.02, 0.9) * 0.6)
-    write("penalty", mix(throb, tone(220, 0.5, 0.12, 0.01, 0.6, sweep_to=180), offsets=[0, 0.05]), peak=0.8)
 
-    # Window open (tab switch / panel power-on): airy upward swish.
-    swish = lowpass(noise(0.18, 0.4, 0.5, seed=3), 0.25)
-    write("window", mix(swish, tone(400, 0.18, 0.2, 0.01, 0.6, sweep_to=900)), peak=0.35)
+    # Penalty Zone entry: a hard impact (noise crack + deep hit), then a long,
+    # heavy throb. Soft-clipped so it plays near full scale without harshness.
+    crack = lowpass(noise(0.06, 1.0, 0.25, seed=11), 0.6)
+    hit = tone(90, 0.45, 1.0, 0.001, 0.5, sweep_to=40, harmonics=(1.0, 0.5, 0.2))
+    long_throb = []
+    n = int(RATE * 1.6)
+    for i in range(n):
+        t = i / RATE
+        wobble = 0.55 + 0.45 * math.sin(2 * math.pi * 3.0 * t)
+        s = math.sin(2 * math.pi * 50 * t) + 0.7 * math.sin(2 * math.pi * 53.5 * t) + 0.35 * math.sin(2 * math.pi * 100 * t)
+        long_throb.append(math.tanh(2.2 * s) * wobble * env(i, n, 0.03, 0.85) * 0.7)
+    siren = tone(260, 0.7, 0.18, 0.02, 0.6, sweep_to=170, harmonics=(1.0, 0.4))
+    penalty = mix(crack, hit, long_throb, siren, offsets=[0, 0, 0.08, 0.12])
+    write("penalty", [math.tanh(1.6 * s) for s in penalty], peak=0.98)
+
+    # Panel pop (tab switch): a window popping up in front of you. Short air
+    # rush rising into a bright pop, then a soft low "landing" thump.
+    rush = lowpass(noise(0.09, 0.5, 0.4, seed=5), 0.35)
+    rise = tone(500, 0.08, 0.25, 0.005, 0.7, sweep_to=1600)
+    pop = mix(
+        tone(1900, 0.06, 0.6, 0.0008, 0.25, harmonics=(1.0, 0.35)),
+        tone(2850, 0.04, 0.25, 0.0008, 0.2),
+    )
+    land = tone(160, 0.12, 0.6, 0.001, 0.35, sweep_to=90)
+    write("window", mix(rush, rise, pop, land, offsets=[0, 0.01, 0.075, 0.08]), peak=0.75)
 
 
 if __name__ == "__main__":

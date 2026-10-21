@@ -20,14 +20,20 @@ class BlockActivity : Activity() {
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var countdown: TextView
 
+    private lateinit var releaseLine: TextView
+
     private val tick = object : Runnable {
         override fun run() {
-            val remaining = BlockerState.lockEndsAt(this@BlockActivity) - TrustedTime.nowMillis()
-            if (remaining <= 0) {
+            val ctx = this@BlockActivity
+            // Lock over, or a short release just started: get out of the way.
+            if (!BlockerState.isLocked(ctx)) {
                 finish()
                 return
             }
-            countdown.text = format(remaining)
+            countdown.text = format(BlockerState.lockEndsAt(ctx) - TrustedTime.nowMillis())
+            val used = BlockerState.releases(ctx)
+            releaseLine.text = if (used == 0) "" else
+                "Releases used: $used (${used * 15} min)"
             handler.postDelayed(this, 1000)
         }
     }
@@ -59,6 +65,13 @@ class BlockActivity : Activity() {
             typeface = Typeface.MONOSPACE
             gravity = Gravity.CENTER
         }
+        releaseLine = TextView(this).apply {
+            setTextColor(red)
+            textSize = 14f
+            typeface = Typeface.MONOSPACE
+            gravity = Gravity.CENTER
+            setPadding(0, 16, 0, 24)
+        }
         val leave = Button(this).apply {
             text = "Leave"
             setOnClickListener { goHome() }
@@ -73,6 +86,7 @@ class BlockActivity : Activity() {
                 addView(title)
                 addView(body)
                 addView(countdown)
+                addView(releaseLine)
                 addView(leave)
             },
         )

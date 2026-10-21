@@ -136,4 +136,33 @@ void main() {
     expect(plan.every((n) => n.at.isAfter(now)), isTrue);
     expect(plan.map((n) => n.id).toSet().length, plan.length);
   });
+
+  test(
+    '"lock re-engaged" fires exactly when a release ends, with the count',
+    () async {
+      final g = await start();
+      clock.set(DateTime(2026, 10, 20, 6));
+      await g.tick();
+      final lock = g.state.lock!;
+      clock.set(lock.start.add(const Duration(minutes: 30)));
+      await g.releaseLock();
+
+      final notice = byId(
+        planner.plan(g, clock.now()),
+        NoticeId.lockReengaged,
+      )!;
+      expect(notice.at, lock.start.add(const Duration(minutes: 45)));
+      expect(notice.body, contains('Releases used: 1 (15 min)'));
+    },
+  );
+
+  test('no "re-engaged" notice if the lock ends during the release', () async {
+    final g = await start();
+    clock.set(DateTime(2026, 10, 20, 6));
+    await g.tick();
+    final lock = g.state.lock!;
+    clock.set(lock.end.subtract(const Duration(minutes: 5)));
+    await g.releaseLock();
+    expect(byId(planner.plan(g, clock.now()), NoticeId.lockReengaged), isNull);
+  });
 }

@@ -100,7 +100,7 @@ PLANS = {
             act("Click 'PENALTY' in the bottom bar"),
             check("A '[ PENALTY ZONE ]' window shows 'No penalty is in effect.', a clock '00:00:00' and 'NO LOCK TODAY'"),
             check("The text 'No apps chosen. A failed day locks nothing until you choose some.' and an 'EDIT LOCKED APPS' button are shown"),
-            check("No 'PUSH-UPS OWED' window and no 'EMERGENCY EXIT' button are shown"),
+            check("No 'PUSH-UPS OWED' window and no 'RELEASE 15 MIN' button are shown"),
         ],
     ),
     "08-onboarding-validation": (

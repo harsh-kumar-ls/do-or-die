@@ -120,7 +120,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     return now.isBefore(lock.start);
   }
 
-  bool get inPenalty => hasDebt || lockActive || lockPending;
+  bool get inPenalty => hasDebt || lockActive || lockPending || lockReleased;
 
   Future<void> tick() async {
     await _refreshClock();
@@ -189,11 +189,25 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     );
   }
 
-  /// Ends the running lock. Returns false if none was running.
-  Future<bool> emergencyStop() async {
-    var stopped = false;
-    await _run(() async => stopped = await service.emergencyStop());
-    return stopped;
+  /// Takes a 15-minute release from the running lock. Returns false if the
+  /// lock isn't in force right now.
+  Future<bool> releaseLock() async {
+    var released = false;
+    await _run(() async => released = await service.releaseLock());
+    return released;
+  }
+
+  /// Inside today's lock window, but in a short release.
+  bool get lockReleased => state.lock?.isReleasedAt(now) ?? false;
+
+  /// When the current release ends, if one is running.
+  DateTime? get releaseEndsAt =>
+      lockReleased ? state.lock!.releasedUntil : null;
+
+  /// Releases taken during today's lock.
+  int get releasesUsed {
+    final lock = state.lock;
+    return lock != null && lock.day == service.today ? lock.releases : 0;
   }
 
   Future<void> addProgress(TaskDefinition t, int delta) =>

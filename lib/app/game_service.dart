@@ -382,19 +382,27 @@ class GameService {
     );
   }
 
-  /// The emergency exit: ends the lock that is running now. Exercise owed is
-  /// untouched. Returns false (and logs nothing) if no lock is running.
-  Future<bool> emergencyStop() async {
+  /// How long one release lasts.
+  static const releaseLength = Duration(minutes: 15);
+
+  /// A short release from the running lock. It can be taken again and again,
+  /// but every one is counted and shown, and none moves the lock's end.
+  /// Exercise owed is untouched. Returns false (and logs nothing) unless the
+  /// lock is actually in force right now.
+  Future<bool> releaseLock() async {
     final now = _clock.now();
     final lock = _game.state.lock;
     if (lock == null || !lock.isActiveAt(now)) return false;
+    final released = lock.releaseAt(now, releaseLength);
     await _commit(
       _game.copyWith(
-        state: _game.state.copyWith(lock: () => null),
+        state: _game.state.copyWith(lock: () => released),
         newLogEntries: [
-          LogEntry(now, 'emergency_stop', {
+          LogEntry(now, 'lock_released', {
             'day': lock.day.toString(),
-            'minutesRemaining': lock.end.difference(now).inMinutes,
+            'release': released.releases,
+            'until': released.releasedUntil!.toIso8601String(),
+            'lockMinutesRemaining': lock.end.difference(now).inMinutes,
           }),
         ],
       ),

@@ -38,6 +38,9 @@ class PenaltyScreen extends StatelessWidget {
         if (model.lockActive) {
           lockLine = 'UNTIL ACCESS IS RESTORED';
           lockValue = hms(lock!.end.difference(now));
+        } else if (model.lockReleased) {
+          lockLine = 'RELEASED · THE LOCK RETURNS IN';
+          lockValue = hms(model.releaseEndsAt!.difference(now));
         } else if (model.lockPending) {
           lockLine = 'THE LOCK WILL BEGIN WITHOUT WARNING';
           lockValue = '--:--:--';
@@ -82,21 +85,31 @@ class PenaltyScreen extends StatelessWidget {
                       HudButton('EDIT LOCKED APPS', onPressed: onEditApps),
                       if (model.lockActive)
                         HoldButton(
-                          label: 'HOLD 3S · EMERGENCY EXIT',
-                          doneLabel: 'LOCK ENDED',
+                          key: ValueKey('release-${model.releasesUsed}'),
+                          label: 'HOLD 3S · RELEASE 15 MIN',
+                          doneLabel: 'RELEASED',
                           holdFor: const Duration(seconds: 3),
                           onConfirmed: () async {
-                            final stopped = await model.emergencyStop();
-                            if (stopped && context.mounted) {
+                            final released = await model.releaseLock();
+                            if (released && context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
+                                SnackBar(
                                   content: Text(
-                                    'Lock ended. This exit has been logged.',
+                                    'Released for 15 minutes. '
+                                    'Release ${model.releasesUsed} today, '
+                                    'and it has been logged.',
                                   ),
                                 ),
                               );
                             }
                           },
+                        ),
+                      if (model.releasesUsed > 0)
+                        Text(
+                          'RELEASES USED TODAY: ${model.releasesUsed} · '
+                          '${model.releasesUsed * 15} MIN',
+                          textAlign: TextAlign.center,
+                          style: Hud.head(13, Hud.warn, spacing: .14),
                         ),
                     ],
                   ),
@@ -122,7 +135,7 @@ class PenaltyScreen extends StatelessWidget {
               ],
               const SizedBox(height: 14),
               Text(
-                'Emergency exit · every use is logged',
+                'Releases last 15 minutes · every one is counted',
                 textAlign: TextAlign.center,
                 style: Hud.mono(11, p.dim.withValues(alpha: .7)),
               ),

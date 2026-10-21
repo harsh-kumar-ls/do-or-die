@@ -105,6 +105,8 @@ Map<String, Object?>? lockToJson(LockWindow? w) => w == null
         'start': w.start.toIso8601String(),
         'end': w.end.toIso8601String(),
         'clamped': w.clamped,
+        'releasedUntil': w.releasedUntil?.toIso8601String(),
+        'releases': w.releases,
       };
 
 LockWindow? lockFromJson(Map<String, Object?>? j) => j == null
@@ -114,6 +116,11 @@ LockWindow? lockFromJson(Map<String, Object?>? j) => j == null
         start: DateTime.parse(j['start'] as String),
         end: DateTime.parse(j['end'] as String),
         clamped: j['clamped'] as bool,
+        // Absent in saves made before releases existed.
+        releasedUntil: j['releasedUntil'] == null
+            ? null
+            : DateTime.parse(j['releasedUntil'] as String),
+        releases: (j['releases'] as int?) ?? 0,
       );
 
 Map<String, Object?> stateToJson(GameState s) => {

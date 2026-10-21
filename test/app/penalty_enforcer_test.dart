@@ -13,6 +13,8 @@ class FakeBlocker extends NoopAppBlocker {
   final calls = <String>[];
   Set<String> packages = {};
   (DateTime, DateTime)? window;
+  DateTime? releasedUntil;
+  int releases = 0;
   String? judgeDue;
 
   @override
@@ -22,9 +24,16 @@ class FakeBlocker extends NoopAppBlocker {
   }
 
   @override
-  Future<void> setLockWindow(DateTime s, DateTime e) async {
+  Future<void> setLockWindow(
+    DateTime s,
+    DateTime e, {
+    DateTime? releasedUntil,
+    int releases = 0,
+  }) async {
     calls.add('window');
     window = (s, e);
+    this.releasedUntil = releasedUntil;
+    this.releases = releases;
   }
 
   @override
@@ -121,33 +130,70 @@ void main() {
     },
   );
 
+  test('a release opens apps for 15 minutes, keeps the end, and is pushed and logged', () async {
+    final g = await start();
+    clock.set(DateTime(2026, 10, 20, 6));
+    await g.tick();
+    final lock = g.state.lock!;
+    final inLock = lock.start.add(const Duration(minutes: 10));
+    clock.set(inLock);
+    await enforcer.sync(g);
+    expect(g.isLockActive(), isTrue);
+
+    expect(await g.releaseLock(), isTrue);
+    await enforcer.sync(g);
+
+    // Released now, the window itself unchanged, and the phone told so.
+    expect(g.isLockActive(), isFalse);
+    expect(g.state.lock!.end, lock.end);
+    expect(blocker.window, (lock.start, lock.end));
+    expect(blocker.releasedUntil, inLock.add(const Duration(minutes: 15)));
+    expect(blocker.releases, 1);
+
+    final entry = g.game.log.lastWhere((e) => e.type == 'lock_released');
+    expect(entry.data['release'], 1);
+    expect(entry.data['lockMinutesRemaining'], 230);
+    // Exercise owed is untouched.
+    expect(g.state.debt!.pushupsOwed, 50);
+
+    // After 15 minutes the lock is back by itself.
+    clock.set(inLock.add(const Duration(minutes: 15)));
+    expect(g.isLockActive(), isTrue);
+  });
+
+  test('releases can be taken again and again, each one counted', () async {
+    final g = await start();
+    clock.set(DateTime(2026, 10, 20, 6));
+    await g.tick();
+    var t = g.state.lock!.start.add(const Duration(minutes: 1));
+    for (var n = 1; n <= 3; n++) {
+      clock.set(t);
+      expect(await g.releaseLock(), isTrue);
+      t = t.add(const Duration(minutes: 20)); // release over, lock back on
+    }
+    await enforcer.sync(g);
+    expect(g.state.lock!.releases, 3);
+    expect(blocker.releases, 3);
+    expect(g.game.log.where((e) => e.type == 'lock_released'), hasLength(3));
+  });
+
   test(
-    'the emergency exit clears the window on the phone and is logged',
+    'no release while already released, or when no lock is running',
     () async {
       final g = await start();
+      final logged = g.game.log.length;
+      expect(await g.releaseLock(), isFalse, reason: 'no lock at all');
+      expect(g.game.log.length, logged);
+
       clock.set(DateTime(2026, 10, 20, 6));
       await g.tick();
-      final lock = g.state.lock!;
-      clock.set(lock.start.add(const Duration(minutes: 10)));
-      await enforcer.sync(g);
-      expect(blocker.window, isNotNull);
-
-      expect(await g.emergencyStop(), isTrue);
-      await enforcer.sync(g);
-      expect(blocker.window, isNull);
-      final entry = g.game.log.lastWhere((e) => e.type == 'emergency_stop');
-      expect(entry.data['minutesRemaining'], 230);
-      // Exercise owed is untouched.
-      expect(g.state.debt!.pushupsOwed, 50);
+      clock.set(g.state.lock!.start.add(const Duration(minutes: 5)));
+      expect(await g.releaseLock(), isTrue);
+      clock.advance(const Duration(minutes: 5));
+      expect(await g.releaseLock(), isFalse, reason: 'already released');
+      expect(g.state.lock!.releases, 1);
     },
   );
-
-  test('the emergency exit does nothing when no lock is running', () async {
-    final g = await start();
-    final logged = g.game.log.length;
-    expect(await g.emergencyStop(), isFalse);
-    expect(g.game.log.length, logged);
-  });
 
   test('a lock that has already ended is cleared from the phone', () async {
     final g = await start();

@@ -84,6 +84,8 @@ class LockWindow {
     required this.start,
     required this.end,
     this.clamped = false,
+    this.releasedUntil,
+    this.releases = 0,
   });
 
   final DayKey day;
@@ -93,9 +95,32 @@ class LockWindow {
   /// True if the lock was shortened to fit inside waking hours.
   final bool clamped;
 
-  bool isActiveAt(DateTime t) => !t.isBefore(start) && t.isBefore(end);
+  /// End of the current short release, if one was taken. The window's own
+  /// end never moves: a release spends lock time, it doesn't add any.
+  final DateTime? releasedUntil;
+
+  /// How many releases have been taken during this lock.
+  final int releases;
+
+  bool inWindowAt(DateTime t) => !t.isBefore(start) && t.isBefore(end);
+
+  bool isReleasedAt(DateTime t) =>
+      inWindowAt(t) && releasedUntil != null && t.isBefore(releasedUntil!);
+
+  /// Apps are locked: inside the window and not in a release.
+  bool isActiveAt(DateTime t) => inWindowAt(t) && !isReleasedAt(t);
 
   Duration get duration => end.difference(start);
+
+  /// A copy with one more release, lasting [length] from [now].
+  LockWindow releaseAt(DateTime now, Duration length) => LockWindow(
+    day: day,
+    start: start,
+    end: end,
+    clamped: clamped,
+    releasedUntil: now.add(length),
+    releases: releases + 1,
+  );
 }
 
 class LockScheduler {

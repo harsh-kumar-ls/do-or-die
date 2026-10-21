@@ -78,7 +78,14 @@ abstract class AppBlocker {
   Future<void> setBlockedPackages(Set<String> packages);
 
   /// The scheduled penalty window. The start is never shown to the user.
-  Future<void> setLockWindow(DateTime startsAt, DateTime endsAt);
+  /// During a short release, apps open again until [releasedUntil];
+  /// [releases] is how many have been taken, shown on the block screen.
+  Future<void> setLockWindow(
+    DateTime startsAt,
+    DateTime endsAt, {
+    DateTime? releasedUntil,
+    int releases = 0,
+  });
   Future<void> clearLockWindow();
 
   /// First day not yet judged, as yyyy-MM-dd. If it's before today, opening
@@ -107,7 +114,12 @@ class NoopAppBlocker implements AppBlocker {
   Future<void> setBlockedPackages(Set<String> packages) async {}
 
   @override
-  Future<void> setLockWindow(DateTime startsAt, DateTime endsAt) async {}
+  Future<void> setLockWindow(
+    DateTime startsAt,
+    DateTime endsAt, {
+    DateTime? releasedUntil,
+    int releases = 0,
+  }) async {}
 
   @override
   Future<void> clearLockWindow() async {}
@@ -144,11 +156,17 @@ class AndroidAppBlocker implements AppBlocker {
       .invokeMethod('setBlockedPackages', {'packages': packages.toList()});
 
   @override
-  Future<void> setLockWindow(DateTime startsAt, DateTime endsAt) =>
-      _channel.invokeMethod('setLockWindow', {
-        'startsAt': startsAt.millisecondsSinceEpoch,
-        'endsAt': endsAt.millisecondsSinceEpoch,
-      });
+  Future<void> setLockWindow(
+    DateTime startsAt,
+    DateTime endsAt, {
+    DateTime? releasedUntil,
+    int releases = 0,
+  }) => _channel.invokeMethod('setLockWindow', {
+    'startsAt': startsAt.millisecondsSinceEpoch,
+    'endsAt': endsAt.millisecondsSinceEpoch,
+    'releasedUntil': releasedUntil?.millisecondsSinceEpoch ?? 0,
+    'releases': releases,
+  });
 
   @override
   Future<void> clearLockWindow() => _channel.invokeMethod('clearLockWindow');

@@ -13,7 +13,7 @@ class PenaltyEnforcer {
   final Clock clock;
 
   Set<String>? _sentPackages;
-  (DateTime, DateTime)? _sentWindow;
+  (DateTime, DateTime, DateTime?, int)? _sentWindow;
   bool _sentNoWindow = false;
   String? _sentJudgeDue;
 
@@ -28,9 +28,14 @@ class PenaltyEnforcer {
 
     final lock = game.state.lock;
     if (lock != null && lock.end.isAfter(clock.now())) {
-      final window = (lock.start, lock.end);
+      final window = (lock.start, lock.end, lock.releasedUntil, lock.releases);
       if (_sentWindow != window) {
-        await blocker.setLockWindow(lock.start, lock.end);
+        await blocker.setLockWindow(
+          lock.start,
+          lock.end,
+          releasedUntil: lock.releasedUntil,
+          releases: lock.releases,
+        );
         _sentWindow = window;
         _sentNoWindow = false;
       }

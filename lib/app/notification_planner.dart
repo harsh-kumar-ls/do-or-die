@@ -34,6 +34,7 @@ abstract final class NoticeId {
   static const morning = 3;
   static const lockEngaged = 4;
   static const exercise = 5;
+  static const lockReengaged = 6;
 }
 
 /// Works out which notifications should be scheduled right now. Pure, so the
@@ -123,6 +124,18 @@ class NotificationPlanner {
         '[ PENALTY ZONE ] Lock engaged',
         'Your chosen apps are locked until ${_hm(lock.end)}.',
       );
+
+      // When a short release runs out while the lock still has time left.
+      final until = lock.releasedUntil;
+      if (until != null && until.isBefore(lock.end)) {
+        add(
+          NoticeId.lockReengaged,
+          until,
+          '[ PENALTY ZONE ] Lock re-engaged',
+          'Release over. Releases used: ${lock.releases} '
+              '(${lock.releases * 15} min). Locked until ${_hm(lock.end)}.',
+        );
+      }
     }
 
     return out;

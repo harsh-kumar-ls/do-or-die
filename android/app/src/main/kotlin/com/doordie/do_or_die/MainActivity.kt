@@ -40,7 +40,9 @@ class MainActivity : FlutterActivity() {
                     "setLockWindow" -> {
                         val start = call.argument<Number>("startsAt")?.toLong() ?: 0L
                         val end = call.argument<Number>("endsAt")?.toLong() ?: 0L
-                        BlockerState.setLockWindow(this, start, end)
+                        val releasedUntil = call.argument<Number>("releasedUntil")?.toLong() ?: 0L
+                        val releases = call.argument<Number>("releases")?.toInt() ?: 0
+                        BlockerState.setLockWindow(this, start, end, releasedUntil, releases)
                         result.success(null)
                     }
                     "clearLockWindow" -> {

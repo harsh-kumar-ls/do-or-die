@@ -16,6 +16,8 @@ object BlockerState {
     private const val KEY_PACKAGES = "blockedPackages"
     private const val KEY_LOCK_STARTS_AT = "lockStartsAt"
     private const val KEY_LOCK_ENDS_AT = "lockEndsAt"
+    private const val KEY_RELEASED_UNTIL = "releasedUntil"
+    private const val KEY_RELEASES = "releases"
     private const val KEY_JUDGE_DUE_FROM = "judgeDueFrom"
     private const val KEY_LAST_CONNECTED_AT = "lastConnectedAt"
     private const val KEY_LAST_DISCONNECTED_AT = "lastDisconnectedAt"
@@ -41,16 +43,31 @@ object BlockerState {
     fun lockEndsAt(ctx: Context): Long = prefs(ctx).getLong(KEY_LOCK_ENDS_AT, 0L)
 
     /** True while the current time is inside the lock window. */
+    fun releasedUntil(ctx: Context): Long = prefs(ctx).getLong(KEY_RELEASED_UNTIL, 0L)
+
+    /** Short releases taken during the current lock. */
+    fun releases(ctx: Context): Int = prefs(ctx).getInt(KEY_RELEASES, 0)
+
+    /** Inside the window and not in a short release. */
     fun isLocked(ctx: Context): Boolean {
         val now = TrustedTime.nowMillis()
-        return now >= lockStartsAt(ctx) && now < lockEndsAt(ctx)
+        val inWindow = now >= lockStartsAt(ctx) && now < lockEndsAt(ctx)
+        return inWindow && now >= releasedUntil(ctx)
     }
 
     /** The window the rules engine scheduled. Its start is never shown to the user. */
-    fun setLockWindow(ctx: Context, startsAt: Long, endsAt: Long) {
+    fun setLockWindow(
+        ctx: Context,
+        startsAt: Long,
+        endsAt: Long,
+        releasedUntil: Long = 0L,
+        releases: Int = 0,
+    ) {
         prefs(ctx).edit()
             .putLong(KEY_LOCK_STARTS_AT, startsAt)
             .putLong(KEY_LOCK_ENDS_AT, endsAt)
+            .putLong(KEY_RELEASED_UNTIL, releasedUntil)
+            .putInt(KEY_RELEASES, releases)
             .commit()
     }
 
@@ -58,6 +75,8 @@ object BlockerState {
         prefs(ctx).edit()
             .putLong(KEY_LOCK_STARTS_AT, 0L)
             .putLong(KEY_LOCK_ENDS_AT, 0L)
+            .putLong(KEY_RELEASED_UNTIL, 0L)
+            .putInt(KEY_RELEASES, 0)
             .commit()
     }
 
@@ -122,6 +141,8 @@ object BlockerState {
             "now" to System.currentTimeMillis(),
             "lockStartsAt" to lockStartsAt(ctx),
             "lockEndsAt" to lockEndsAt(ctx),
+            "releasedUntil" to releasedUntil(ctx),
+            "releases" to releases(ctx),
             "locked" to isLocked(ctx),
             "blockedPackages" to blockedPackages(ctx).sorted(),
             "needsJudgement" to needsJudgement(ctx),

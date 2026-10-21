@@ -45,7 +45,7 @@
     },
     {
       "type": "assertion",
-      "description": "No 'PUSH-UPS OWED' window and no 'EMERGENCY EXIT' button are shown"
+      "description": "No 'PUSH-UPS OWED' window and no 'RELEASE 15 MIN' button are shown"
     }
   ]
 }

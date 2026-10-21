@@ -65,8 +65,10 @@ class Fx {
   }
 
   static double _volume(Cue cue) => switch (cue) {
-    Cue.tap || Cue.window => .45,
-    Cue.levelUp || Cue.penalty => .9,
+    Cue.tap => .45,
+    Cue.window => .7,
+    Cue.penalty => 1.0,
+    Cue.levelUp => .9,
     _ => .7,
   };
 
