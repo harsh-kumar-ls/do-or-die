@@ -10,6 +10,7 @@ import 'screens/app_picker_screen.dart';
 import 'screens/penalty_screen.dart';
 import 'screens/quest_screen.dart';
 import 'screens/status_screen.dart';
+import 'screens/system_check_screen.dart';
 import 'theme.dart';
 import 'widgets/hud_background.dart';
 import 'widgets/notice_overlay.dart';
@@ -80,6 +81,15 @@ class _AppShellState extends State<AppShell> {
                                   ),
                                   _Tab.status => StatusScreen(
                                     model: m,
+                                    onOpenSystemCheck: () =>
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (_) => SystemCheckScreen(
+                                              model: m,
+                                              blocker: widget.blocker,
+                                            ),
+                                          ),
+                                        ),
                                     onRestartTrial: widget.onRestarted == null
                                         ? null
                                         : () async {

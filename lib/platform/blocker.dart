@@ -58,6 +58,36 @@ class BlockerStatus {
   final int judgeRedirects;
 }
 
+/// What the System Check reports about the phone.
+class SystemStatus {
+  const SystemStatus({
+    this.serviceEnabled = false,
+    this.batteryExempt = false,
+    this.canSelfRepair = false,
+    this.autoTime = true,
+  });
+
+  factory SystemStatus.fromMap(Map<Object?, Object?> m) => SystemStatus(
+    serviceEnabled: m['serviceEnabled'] as bool? ?? false,
+    batteryExempt: m['batteryExempt'] as bool? ?? false,
+    canSelfRepair: m['canSelfRepair'] as bool? ?? false,
+    autoTime: m['autoTime'] as bool? ?? true,
+  );
+
+  /// The Penalty Zone accessibility service is on.
+  final bool serviceEnabled;
+
+  /// Exempt from battery optimisation, so the OS won't stop the blocker.
+  final bool batteryExempt;
+
+  /// The user granted the optional permission that lets the app turn its own
+  /// blocker service back on.
+  final bool canSelfRepair;
+
+  /// Automatic date and time is on.
+  final bool autoTime;
+}
+
 /// An installed app the user can choose to lock.
 class InstalledApp {
   const InstalledApp(this.package, this.label, this.icon);
@@ -72,6 +102,9 @@ class InstalledApp {
 /// Locks distracting apps. Android uses an accessibility service; other
 /// platforms get a stub until they have their own implementation.
 abstract class AppBlocker {
+  /// Whether this platform can actually lock apps (false on web).
+  bool get canBlock;
+
   Future<BlockerStatus> status();
 
   /// The apps to lock during a penalty window.
@@ -103,10 +136,21 @@ abstract class AppBlocker {
 
   Future<void> openAccessibilitySettings();
   Future<void> openAppSettings();
+
+  Future<SystemStatus> systemStatus();
+  Future<void> requestBatteryExemption();
+
+  /// Turns the blocker service back on if it was switched off. Only works
+  /// once the user has granted the optional permission; returns whether the
+  /// service is on afterwards.
+  Future<bool> repairService();
 }
 
 /// Web and other platforms: no app blocking yet.
 class NoopAppBlocker implements AppBlocker {
+  @override
+  bool get canBlock => false;
+
   @override
   Future<BlockerStatus> status() async => BlockerStatus.fromMap(const {});
 
@@ -141,10 +185,22 @@ class NoopAppBlocker implements AppBlocker {
 
   @override
   Future<void> openAppSettings() async {}
+
+  @override
+  Future<SystemStatus> systemStatus() async => const SystemStatus();
+
+  @override
+  Future<void> requestBatteryExemption() async {}
+
+  @override
+  Future<bool> repairService() async => false;
 }
 
 class AndroidAppBlocker implements AppBlocker {
   static const _channel = MethodChannel('doordie/blocker');
+
+  @override
+  bool get canBlock => true;
 
   @override
   Future<BlockerStatus> status() async => BlockerStatus.fromMap(
@@ -202,4 +258,18 @@ class AndroidAppBlocker implements AppBlocker {
 
   @override
   Future<void> openAppSettings() => _channel.invokeMethod('openAppSettings');
+
+  @override
+  Future<SystemStatus> systemStatus() async => SystemStatus.fromMap(
+    await _channel.invokeMethod<Map<Object?, Object?>>('systemStatus') ??
+        const {},
+  );
+
+  @override
+  Future<void> requestBatteryExemption() =>
+      _channel.invokeMethod('requestBatteryExemption');
+
+  @override
+  Future<bool> repairService() async =>
+      await _channel.invokeMethod<bool>('repairService') ?? false;
 }

@@ -54,8 +54,7 @@ class PenaltyScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (blocker is! NoopAppBlocker)
-                _EnforcementStatus(blocker: blocker),
+              if (blocker.canBlock) _EnforcementStatus(blocker: blocker),
               Expanded(
                 child: SystemWindow(
                   expand: true,

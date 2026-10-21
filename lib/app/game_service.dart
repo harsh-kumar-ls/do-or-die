@@ -382,6 +382,27 @@ class GameService {
     );
   }
 
+  /// Logs that the blocker service was found switched off (for example by a
+  /// force stop), and whether auto-repair turned it back on. These entries
+  /// can't be removed, so the day-30 review sees every one.
+  Future<void> recordBlockerOffline({required bool repaired}) async {
+    await _commit(
+      _game.copyWith(
+        newLogEntries: [
+          LogEntry(_clock.now(), 'blocker_offline', {
+            'day': today.toString(),
+            'duringPenalty': penaltyInEffect,
+            'repaired': repaired,
+          }),
+        ],
+      ),
+    );
+  }
+
+  /// Times the blocker was found switched off during this trial.
+  int get blockerOfflineIncidents =>
+      _game.log.where((e) => e.type == 'blocker_offline').length;
+
   /// How long one release lasts.
   static const releaseLength = Duration(minutes: 15);
 

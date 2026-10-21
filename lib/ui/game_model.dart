@@ -6,6 +6,7 @@ import '../app/game_service.dart';
 import '../app/notification_planner.dart';
 import '../app/penalty_enforcer.dart';
 import '../app/trusted_clock.dart';
+import '../platform/blocker.dart';
 import '../platform/notifier.dart';
 import '../domain/day.dart';
 import '../domain/engine.dart';
@@ -62,6 +63,55 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
 
   bool _notificationsAllowed = true;
   bool _exactTiming = true;
+
+  /// Latest System Check reading; null until first read (or on web).
+  SystemStatus? system;
+
+  /// Whether the blocker was on at the last check; null before the first.
+  bool? _blockerWasOn;
+
+  /// Checks the blocker service is still on. If it was switched off (a force
+  /// stop does this), tries auto-repair, and logs one incident per outage.
+  Future<void> _watchBlocker() async {
+    final blocker = enforcer?.blocker;
+    if (blocker == null || !blocker.canBlock) return;
+    try {
+      var status = await blocker.systemStatus();
+      if (!status.serviceEnabled) {
+        final repaired = await blocker.repairService();
+        if (_blockerWasOn != false) {
+          await service.recordBlockerOffline(repaired: repaired);
+        }
+        if (repaired) status = await blocker.systemStatus();
+      }
+      _blockerWasOn = status.serviceEnabled;
+      system = status;
+    } catch (e) {
+      debugPrint('System check failed: $e');
+    }
+  }
+
+  /// Requirements not met (0 on web or before the first check).
+  int get systemIssues {
+    final s = system;
+    if (s == null) return 0;
+    return [
+      !s.serviceEnabled,
+      !s.batteryExempt,
+      !s.autoTime,
+      notificationsBlocked,
+      lateNotices,
+    ].where((bad) => bad).length;
+  }
+
+  /// The blocker service was found switched off.
+  bool get blockerOffline => system?.serviceEnabled == false;
+
+  /// Re-reads the System Check now (used by the System Check screen).
+  Future<void> refreshSystem() async {
+    await _sync();
+    notifyListeners();
+  }
 
   /// The current time on the game's (trusted) clock.
   DateTime get now => service.now;
@@ -159,6 +209,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     } catch (e) {
       debugPrint('Could not sync the blocker: $e');
     }
+    await _watchBlocker();
     final n = notifier;
     if (n == null) return;
     try {

@@ -38,7 +38,15 @@ flutter test
 flutter run            # on a connected Android phone
 ```
 
-The app blocker is an Android accessibility service. After installing, turn on **Do or Die Penalty Zone** in Accessibility settings (the Penalty tab warns while it is off), allow notifications, and allow **Alarms & reminders** for on-time warnings.
+The app blocker is an Android accessibility service. After installing, open **Status → SYSTEM CHECK** and fix anything marked ✕: turn on **Do or Die Penalty Zone** in Accessibility settings, allow notifications, allow **Alarms & reminders** for on-time warnings, and exempt the app from battery optimisation.
+
+**Never force-stop the app** (including `adb shell am force-stop` after installing): Android switches the accessibility service off when an app is force-stopped. A plain `adb install -r` keeps it on. Every outage is recorded in the trial log.
+
+Optional auto-repair (turns the service back on whenever the app opens). This grants a developer permission that changes a security setting, so run it only if you want it:
+
+```bash
+adb shell pm grant com.doordie.do_or_die android.permission.WRITE_SECURE_SETTINGS
+```
 
 ## End-to-end tests (TestSprite)
 

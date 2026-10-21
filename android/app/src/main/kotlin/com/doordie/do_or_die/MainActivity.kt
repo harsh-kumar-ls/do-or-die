@@ -9,6 +9,7 @@ import android.graphics.Canvas
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.provider.Settings
 import android.provider.Telephony
 import android.telecom.TelecomManager
@@ -63,6 +64,24 @@ class MainActivity : FlutterActivity() {
                         startActivity(Intent(Settings.ACTION_DATE_SETTINGS))
                         result.success(null)
                     }
+                    "systemStatus" -> result.success(
+                        mapOf(
+                            "serviceEnabled" to isServiceEnabled(),
+                            "batteryExempt" to isBatteryExempt(),
+                            "canSelfRepair" to canSelfRepair(),
+                            "autoTime" to TrustedTime.autoTimeEnabled(this),
+                        ),
+                    )
+                    "requestBatteryExemption" -> {
+                        startActivity(
+                            Intent(
+                                Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                                Uri.parse("package:$packageName"),
+                            ),
+                        )
+                        result.success(null)
+                    }
+                    "repairService" -> result.success(repairService())
                     "startLock" -> {
                         BlockerState.startLock(this, call.argument<Int>("minutes") ?: 0)
                         result.success(null)
@@ -87,6 +106,41 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    private fun isBatteryExempt(): Boolean =
+        (getSystemService(Context.POWER_SERVICE) as PowerManager)
+            .isIgnoringBatteryOptimizations(packageName)
+
+    /**
+     * True only if the user granted WRITE_SECURE_SETTINGS themselves, once,
+     * with: adb shell pm grant com.doordie.do_or_die android.permission.WRITE_SECURE_SETTINGS
+     */
+    private fun canSelfRepair(): Boolean =
+        checkSelfPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS) ==
+            PackageManager.PERMISSION_GRANTED
+
+    /**
+     * Turns the blocker service back on after something (such as a force
+     * stop) switched it off. Only possible with the user-granted permission
+     * above; adds only this app's own service and leaves others untouched.
+     */
+    private fun repairService(): Boolean {
+        if (isServiceEnabled()) return true
+        if (!canSelfRepair()) return false
+        return try {
+            val me = ComponentName(this, BlockerAccessibilityService::class.java).flattenToString()
+            val current = Settings.Secure.getString(
+                contentResolver,
+                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+            ).orEmpty()
+            val updated = (current.split(':').filter { it.isNotBlank() } + me).distinct().joinToString(":")
+            Settings.Secure.putString(contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, updated)
+            Settings.Secure.putInt(contentResolver, Settings.Secure.ACCESSIBILITY_ENABLED, 1)
+            isServiceEnabled()
+        } catch (e: SecurityException) {
+            false
+        }
     }
 
     private fun isServiceEnabled(): Boolean {

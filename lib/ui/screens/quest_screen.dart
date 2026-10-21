@@ -32,6 +32,15 @@ class QuestScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (model.blockerOffline) ...[
+                _AlertBanner(
+                  title: 'BLOCKER OFFLINE',
+                  body: 'The Penalty Zone service is off, so locks cannot be enforced.',
+                  action: 'FIX',
+                  onTap: onOpenPenalty,
+                ),
+                const SizedBox(height: 12),
+              ],
               if (model.manualClock) ...[
                 _AlertBanner(
                   title: 'MANUAL CLOCK',

@@ -14,7 +14,11 @@ class StatusScreen extends StatelessWidget {
     required this.model,
     this.onOpenDiagnostics,
     this.onRestartTrial,
+    this.onOpenSystemCheck,
   });
+
+  /// Opens the System Check screen.
+  final VoidCallback? onOpenSystemCheck;
 
   /// Archives this game and starts a fresh trial (with a dry run).
   final Future<void> Function()? onRestartTrial;
@@ -93,6 +97,16 @@ class StatusScreen extends StatelessWidget {
                       ),
                     ),
                     // Pinned below the scrollable rows so it's never hidden.
+                    if (onOpenSystemCheck != null) ...[
+                      const SizedBox(height: 8),
+                      HudButton(
+                        model.systemIssues == 0
+                            ? 'SYSTEM CHECK'
+                            : 'SYSTEM CHECK · ${model.systemIssues} TO FIX',
+                        dense: true,
+                        onPressed: onOpenSystemCheck,
+                      ),
+                    ],
                     if (onRestartTrial != null) ...[
                       Container(
                         height: 1,

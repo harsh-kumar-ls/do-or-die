@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <!-- Deadline warnings and System notices. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- On-time deadline warnings; the user grants this in "Alarms & reminders".
@@ -6,6 +7,15 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <!-- Re-schedules pending notices after a reboot. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Lets the user exempt the app from battery optimisation, so OriginOS
+         doesn't stop the blocker or delay notices. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Optional auto-repair of the blocker service. Never granted by
+         installing: only if the user runs, themselves,
+         adb shell pm grant com.doordie.do_or_die android.permission.WRITE_SECURE_SETTINGS -->
+    <uses-permission
+        android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
     <application
         android:label="Do or Die"
         android:name="${applicationName}"
