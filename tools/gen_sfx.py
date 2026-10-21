@@ -129,8 +129,22 @@ def main():
         s = math.sin(2 * math.pi * 50 * t) + 0.7 * math.sin(2 * math.pi * 53.5 * t) + 0.35 * math.sin(2 * math.pi * 100 * t)
         long_throb.append(math.tanh(2.2 * s) * wobble * env(i, n, 0.03, 0.85) * 0.7)
     siren = tone(260, 0.7, 0.18, 0.02, 0.6, sweep_to=170, harmonics=(1.0, 0.4))
-    penalty = mix(crack, hit, long_throb, siren, offsets=[0, 0, 0.08, 0.12])
-    write("penalty", [math.tanh(1.6 * s) for s in penalty], peak=0.98)
+
+    # Phone speakers can't play the 40-55 Hz body, so the same throb is also
+    # played at 2x and 3x pitch (100-160 Hz). The ear hears the deep note
+    # through these overtones, which makes the sound much louder on a phone.
+    overtones = []
+    for i in range(n):
+        t = i / RATE
+        wobble = 0.55 + 0.45 * math.sin(2 * math.pi * 3.0 * t)
+        s = (math.sin(2 * math.pi * 100 * t) + 0.7 * math.sin(2 * math.pi * 107 * t)
+             + 0.5 * math.sin(2 * math.pi * 150 * t) + 0.35 * math.sin(2 * math.pi * 160.5 * t))
+        overtones.append(math.tanh(2.0 * s) * wobble * env(i, n, 0.03, 0.85) * 0.55)
+    hit_bright = tone(180, 0.35, 0.6, 0.001, 0.45, sweep_to=90, harmonics=(1.0, 0.5, 0.3))
+
+    penalty = mix(crack, hit, hit_bright, long_throb, overtones, siren,
+                  offsets=[0, 0, 0, 0.08, 0.08, 0.12])
+    write("penalty", [math.tanh(2.6 * s) for s in penalty], peak=0.98)
 
     # Panel pop (tab switch): a window popping up in front of you. Short air
     # rush rising into a bright pop, then a soft low "landing" thump.
