@@ -204,6 +204,33 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
   DateTime? get releaseEndsAt =>
       lockReleased ? state.lock!.releasedUntil : null;
 
+  /// Why RESTART TRIAL is unavailable right now, or null if it's available.
+  /// Never reveals when a scheduled lock will start.
+  String? get restartBlockedReason {
+    if (!service.penaltyInEffect) return null;
+    final parts = <String>[];
+    final debt = state.debt;
+    if (debt != null && debt.dueDay == service.today && !debt.isPaid) {
+      parts.add(
+        [
+          if (debt.pushupsRemaining > 0) '${debt.pushupsRemaining} push-ups',
+          if (debt.squatsRemaining > 0) '${debt.squatsRemaining} squats',
+        ].join(' and '),
+      );
+    }
+    final lock = state.lock;
+    final lockLeft = lock != null && lock.end.isAfter(now);
+    final owes = parts.isNotEmpty;
+    if (owes && lockLeft) {
+      return "Finish today's ${parts.single} and wait for today's lock to end to unlock restart.";
+    }
+    if (owes) return "Finish today's ${parts.single} to unlock restart.";
+    if (lockLeft && lock.inWindowAt(now)) {
+      return "Restart unlocks when today's lock ends at ${_hm(lock.end)}.";
+    }
+    return "Restart unlocks after today's lock ends.";
+  }
+
   /// Releases taken during today's lock.
   int get releasesUsed {
     final lock = state.lock;

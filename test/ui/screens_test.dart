@@ -42,13 +42,75 @@ void main() {
         theme: Hud.theme(HudPalette.system),
         home: MediaQuery(
           data: const MediaQueryData(disableAnimations: true),
-          child: AppShell(model: model, blocker: NoopAppBlocker()),
+          child: AppShell(
+            model: model,
+            blocker: NoopAppBlocker(),
+            onRestarted: (_) {},
+          ),
         ),
       ),
     );
     await tester.pump(const Duration(milliseconds: 500));
     return model;
   }
+
+  /// True if [finder]'s widget is fully on screen and its centre is the
+  /// widget actually hit by a tap there (not hidden in a scroll area).
+  bool reallyVisible(WidgetTester tester, Finder finder) {
+    final rect = tester.getRect(finder);
+    final screen =
+        Offset.zero & tester.view.physicalSize / tester.view.devicePixelRatio;
+    if (!screen.contains(rect.topLeft) || !screen.contains(rect.bottomRight)) {
+      return false;
+    }
+    final hits = tester.hitTestOnBinding(rect.center).path.map((e) => e.target);
+    final box = tester.renderObject(finder);
+    return hits.contains(box);
+  }
+
+  testWidgets(
+    'with no penalty, RESTART TRIAL is visible on Status without scrolling',
+    (tester) async {
+      await pumpShell(tester);
+      await tester.tap(find.text('STATUS'));
+      await tester.pump(const Duration(milliseconds: 600));
+      final button = find.text('HOLD 3S · RESTART TRIAL');
+      expect(button, findsOneWidget);
+      expect(reallyVisible(tester, button), isTrue);
+      await tester.pump(const Duration(seconds: 1)); // let title animations end
+    },
+  );
+
+  testWidgets(
+    'while push-ups are owed, Status says exactly what blocks the restart',
+    (tester) async {
+      final clock = FixedClock(DateTime(2026, 10, 19, 10));
+      final model = await pumpShell(tester, clock: clock);
+      clock.set(
+        DateTime(2026, 10, 20, 6, 30),
+      ); // Monday failed, before any lock
+      await model.tick();
+      await tester.pump(const Duration(milliseconds: 600));
+      // The failed day's [ WARNING ] notice covers the screen until acknowledged.
+      await tester.tap(find.text('ACKNOWLEDGE'));
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.tap(find.text('STATUS'));
+      await tester.pump(const Duration(milliseconds: 600));
+
+      expect(find.text('HOLD 3S · RESTART TRIAL'), findsNothing);
+      final reason = find.text(
+        "Finish today's 50 push-ups and wait for today's lock to end to unlock restart.",
+      );
+      expect(reason, findsOneWidget);
+      expect(reallyVisible(tester, reason), isTrue);
+      // The message must not give away when the scheduled lock starts.
+      final start = model.state.lock!.start;
+      final startHm =
+          '${start.hour.toString().padLeft(2, '0')}:${start.minute.toString().padLeft(2, '0')}';
+      expect(find.textContaining(startHm), findsNothing);
+      await tester.pump(const Duration(seconds: 1)); // let title animations end
+    },
+  );
 
   testWidgets('the study clock ticks on its own, with no taps', (tester) async {
     final clock = FixedClock(DateTime(2026, 10, 20, 15, 0, 0));

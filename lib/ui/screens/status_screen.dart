@@ -41,54 +41,78 @@ class StatusScreen extends StatelessWidget {
               child: SystemWindow(
                 expand: true,
                 title: '[ STATUS ]',
-                child: FillColumn(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Column(
-                      children: [
-                        Text(
-                          model.rank.name.toUpperCase(),
-                          textAlign: TextAlign.center,
-                          style: Hud.head(
-                            96,
-                            p.hi,
-                            spacing: 0,
-                          ).copyWith(height: 1, shadows: p.textGlow(2.4)),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'RANK',
-                          textAlign: TextAlign.center,
-                          style: Hud.mono(12, p.dim, spacing: .2),
-                        ),
-                      ],
-                    ),
-                    Column(
-                      children: [
-                        _kv(p, 'LEVEL', '${s.level}'),
-                        _kv(p, 'EXPERIENCE', '${s.xp} / ${model.xpToNext}'),
-                        _kv(p, 'QUESTS CLEARED', '$cleared'),
-                        _kv(p, 'CURRENT STREAK', '${_streak(model)} days'),
-                        _kv(p, 'PENALTIES SERVED', '$penalties'),
-                        _kv(p, 'TRIAL DAY', '${model.service.trialDay} / 30'),
-                        _kv(p, 'PENALTIES', model.trialMode),
-                        if (onRestartTrial != null) ...[
-                          const SizedBox(height: 10),
-                          if (model.service.penaltyInEffect)
-                            Text(
-                              'Restart unavailable while a penalty is in effect.',
-                              textAlign: TextAlign.center,
-                              style: Hud.mono(11, p.dim),
-                            )
-                          else
-                            HoldButton(
-                              label: 'HOLD 3S · RESTART TRIAL',
-                              doneLabel: 'RESTARTING',
-                              holdFor: const Duration(seconds: 3),
-                              onConfirmed: onRestartTrial!,
-                            ),
+                    Expanded(
+                      child: FillColumn(
+                        children: [
+                          Column(
+                            children: [
+                              Text(
+                                model.rank.name.toUpperCase(),
+                                textAlign: TextAlign.center,
+                                style: Hud.head(
+                                  84,
+                                  p.hi,
+                                  spacing: 0,
+                                ).copyWith(height: 1, shadows: p.textGlow(2.4)),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'RANK',
+                                textAlign: TextAlign.center,
+                                style: Hud.mono(12, p.dim, spacing: .2),
+                              ),
+                            ],
+                          ),
+                          Column(
+                            children: [
+                              _kv(p, 'LEVEL', '${s.level}'),
+                              _kv(
+                                p,
+                                'EXPERIENCE',
+                                '${s.xp} / ${model.xpToNext}',
+                              ),
+                              _kv(p, 'QUESTS CLEARED', '$cleared'),
+                              _kv(
+                                p,
+                                'CURRENT STREAK',
+                                '${_streak(model)} days',
+                              ),
+                              _kv(p, 'PENALTIES SERVED', '$penalties'),
+                              _kv(
+                                p,
+                                'TRIAL DAY',
+                                '${model.service.trialDay} / 30',
+                              ),
+                              _kv(p, 'PENALTIES', model.trialMode),
+                            ],
+                          ),
                         ],
-                      ],
+                      ),
                     ),
+                    // Pinned below the scrollable rows so it's never hidden.
+                    if (onRestartTrial != null) ...[
+                      Container(
+                        height: 1,
+                        margin: const EdgeInsets.only(top: 8, bottom: 10),
+                        color: p.sys.withValues(alpha: p.lineAlpha * .6),
+                      ),
+                      if (model.restartBlockedReason case final reason?)
+                        Text(
+                          reason,
+                          textAlign: TextAlign.center,
+                          style: Hud.mono(11, Hud.warn),
+                        )
+                      else
+                        HoldButton(
+                          label: 'HOLD 3S · RESTART TRIAL',
+                          doneLabel: 'RESTARTING',
+                          holdFor: const Duration(seconds: 3),
+                          onConfirmed: onRestartTrial!,
+                        ),
+                    ],
                   ],
                 ),
               ),
