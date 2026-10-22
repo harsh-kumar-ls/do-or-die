@@ -94,8 +94,8 @@ class _BlockerSpikeScreenState extends State<BlockerSpikeScreen>
                 Text('Emergency stops: ${s.emergencyStops}', style: mono),
                 const Divider(height: 32),
                 FilledButton(
-                  onPressed: widget.blocker.openAccessibilitySettings,
-                  child: const Text('1. Open Accessibility settings'),
+                  onPressed: widget.blocker.requestUsageAccess,
+                  child: const Text('1. Open Usage access settings'),
                 ),
                 const SizedBox(height: 8),
                 OutlinedButton(

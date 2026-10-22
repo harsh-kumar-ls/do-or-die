@@ -180,5 +180,9 @@ Each prompt is what I'd run for that iteration of the loop.
   - **On the phone:** a plain `adb install -r` kept the blocker service on, twice (no force-stop); battery exemption granted; the user confirmed the Status layout fits. Auto-repair not granted (optional, user's choice).
   - TestSprite credits used this month: 14.5 of 150.
 
+- [x] **Fix (2026-10-22): UPI apps stopped working.** Indian UPI and banking apps refuse to run while any accessibility service is enabled (anti-fraud: they block every accessibility service regardless of what it does). We did not try to evade that check. The accessibility service was **removed** and replaced by `WatcherService`: a foreground service (permanent notification) that reads app switches via **usage access** and shows the Penalty Zone using **display over other apps**. Same rules as before (locks, releases, judgement redirect). Auto-repair (WRITE_SECURE_SETTINGS) was removed: the watcher restarts itself when the app opens and on boot or update, so it isn't needed. System Check now lists usage access, display over apps and watcher running.
+  - Trade-off: detection can lag up to about 0.7 s while a lock is active (it polls every 0.7 s then; every 5 s when idle, without reading usage data).
+  - Verified on the phone: no accessibility service enabled; UPI app works (user); watcher started and blocked BGMI and YouTube during a test lock (logs). 106/106 tests, analyze clean.
+
 **All milestones (M0–M8) complete. The 30-day trial is running: day 1 was 2026-10-21; dry run days 1–3; penalties live from day 4 (2026-10-24).**
   - Covers the web UI only; Android blocking, notifications and reboot behaviour stay in T3/T5.

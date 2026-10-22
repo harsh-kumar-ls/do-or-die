@@ -62,27 +62,36 @@ class BlockerStatus {
 class SystemStatus {
   const SystemStatus({
     this.serviceEnabled = false,
+    this.usageAccess = false,
+    this.overlay = false,
+    this.watcherRunning = false,
     this.batteryExempt = false,
-    this.canSelfRepair = false,
     this.autoTime = true,
   });
 
   factory SystemStatus.fromMap(Map<Object?, Object?> m) => SystemStatus(
     serviceEnabled: m['serviceEnabled'] as bool? ?? false,
+    usageAccess: m['usageAccess'] as bool? ?? false,
+    overlay: m['overlay'] as bool? ?? false,
+    watcherRunning: m['watcherRunning'] as bool? ?? false,
     batteryExempt: m['batteryExempt'] as bool? ?? false,
-    canSelfRepair: m['canSelfRepair'] as bool? ?? false,
     autoTime: m['autoTime'] as bool? ?? true,
   );
 
-  /// The Penalty Zone accessibility service is on.
+  /// Locks can be enforced: both permissions granted and the watcher running.
   final bool serviceEnabled;
+
+  /// "Usage access": the watcher can see which app is in front.
+  final bool usageAccess;
+
+  /// "Display over other apps": the Penalty Zone can appear over a locked app.
+  final bool overlay;
+
+  /// The Penalty Zone watcher service is alive.
+  final bool watcherRunning;
 
   /// Exempt from battery optimisation, so the OS won't stop the blocker.
   final bool batteryExempt;
-
-  /// The user granted the optional permission that lets the app turn its own
-  /// blocker service back on.
-  final bool canSelfRepair;
 
   /// Automatic date and time is on.
   final bool autoTime;
@@ -134,16 +143,20 @@ abstract class AppBlocker {
   /// Diagnostics: end the lock now.
   Future<void> stopLock();
 
-  Future<void> openAccessibilitySettings();
   Future<void> openAppSettings();
 
   Future<SystemStatus> systemStatus();
   Future<void> requestBatteryExemption();
 
-  /// Turns the blocker service back on if it was switched off. Only works
-  /// once the user has granted the optional permission; returns whether the
-  /// service is on afterwards.
-  Future<bool> repairService();
+  /// Opens the "Usage access" settings page.
+  Future<void> requestUsageAccess();
+
+  /// Opens the "Display over other apps" page for this app.
+  Future<void> requestOverlay();
+
+  /// Starts the watcher if its permissions are granted (it stops on a force
+  /// stop). Returns whether locks can be enforced afterwards.
+  Future<bool> startWatcher();
 }
 
 /// Web and other platforms: no app blocking yet.
@@ -181,9 +194,6 @@ class NoopAppBlocker implements AppBlocker {
   Future<void> stopLock() async {}
 
   @override
-  Future<void> openAccessibilitySettings() async {}
-
-  @override
   Future<void> openAppSettings() async {}
 
   @override
@@ -193,7 +203,13 @@ class NoopAppBlocker implements AppBlocker {
   Future<void> requestBatteryExemption() async {}
 
   @override
-  Future<bool> repairService() async => false;
+  Future<void> requestUsageAccess() async {}
+
+  @override
+  Future<void> requestOverlay() async {}
+
+  @override
+  Future<bool> startWatcher() async => false;
 }
 
 class AndroidAppBlocker implements AppBlocker {
@@ -253,10 +269,6 @@ class AndroidAppBlocker implements AppBlocker {
   Future<void> stopLock() => _channel.invokeMethod('stopLock');
 
   @override
-  Future<void> openAccessibilitySettings() =>
-      _channel.invokeMethod('openAccessibilitySettings');
-
-  @override
   Future<void> openAppSettings() => _channel.invokeMethod('openAppSettings');
 
   @override
@@ -270,6 +282,13 @@ class AndroidAppBlocker implements AppBlocker {
       _channel.invokeMethod('requestBatteryExemption');
 
   @override
-  Future<bool> repairService() async =>
-      await _channel.invokeMethod<bool>('repairService') ?? false;
+  Future<void> requestUsageAccess() =>
+      _channel.invokeMethod('requestUsageAccess');
+
+  @override
+  Future<void> requestOverlay() => _channel.invokeMethod('requestOverlay');
+
+  @override
+  Future<bool> startWatcher() async =>
+      await _channel.invokeMethod<bool>('startWatcher') ?? false;
 }

@@ -1,6 +1,5 @@
 package com.doordie.do_or_die
 
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -13,8 +12,9 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.provider.Telephony
 import android.telecom.TelecomManager
-import com.doordie.do_or_die.blocker.BlockerAccessibilityService
 import com.doordie.do_or_die.blocker.BlockerState
+import com.doordie.do_or_die.blocker.Permissions
+import com.doordie.do_or_die.blocker.WatcherService
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -26,16 +26,17 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        // Opening the app always (re)starts the watcher if it's allowed to run.
+        WatcherService.startIfAllowed(this)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "doordie/blocker")
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "status" -> result.success(
-                        BlockerState.status(this) + ("serviceEnabled" to isServiceEnabled()),
+                        BlockerState.status(this) + ("serviceEnabled" to watcherReady()),
                     )
                     "setBlockedPackages" -> {
                         val packages = call.argument<List<String>>("packages").orEmpty().toSet()
                         BlockerState.setBlockedPackages(this, packages)
-                        BlockerAccessibilityService.instance?.applyWatchedPackages()
                         result.success(null)
                     }
                     "setLockWindow" -> {
@@ -66,9 +67,11 @@ class MainActivity : FlutterActivity() {
                     }
                     "systemStatus" -> result.success(
                         mapOf(
-                            "serviceEnabled" to isServiceEnabled(),
+                            "serviceEnabled" to watcherReady(),
+                            "usageAccess" to Permissions.usageAccess(this),
+                            "overlay" to Permissions.overlay(this),
+                            "watcherRunning" to WatcherService.running,
                             "batteryExempt" to isBatteryExempt(),
-                            "canSelfRepair" to canSelfRepair(),
                             "autoTime" to TrustedTime.autoTimeEnabled(this),
                         ),
                     )
@@ -81,17 +84,30 @@ class MainActivity : FlutterActivity() {
                         )
                         result.success(null)
                     }
-                    "repairService" -> result.success(repairService())
+                    "startWatcher" -> {
+                        WatcherService.startIfAllowed(this)
+                        // Give the service a moment to report itself running.
+                        main.postDelayed({ result.success(watcherReady()) }, 400)
+                    }
+                    "requestUsageAccess" -> {
+                        startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+                        result.success(null)
+                    }
+                    "requestOverlay" -> {
+                        startActivity(
+                            Intent(
+                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                Uri.parse("package:$packageName"),
+                            ),
+                        )
+                        result.success(null)
+                    }
                     "startLock" -> {
                         BlockerState.startLock(this, call.argument<Int>("minutes") ?: 0)
                         result.success(null)
                     }
                     "stopLock" -> {
                         BlockerState.stopLock(this)
-                        result.success(null)
-                    }
-                    "openAccessibilitySettings" -> {
-                        startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                         result.success(null)
                     }
                     "openAppSettings" -> {
@@ -112,45 +128,9 @@ class MainActivity : FlutterActivity() {
         (getSystemService(Context.POWER_SERVICE) as PowerManager)
             .isIgnoringBatteryOptimizations(packageName)
 
-    /**
-     * True only if the user granted WRITE_SECURE_SETTINGS themselves, once,
-     * with: adb shell pm grant com.doordie.do_or_die android.permission.WRITE_SECURE_SETTINGS
-     */
-    private fun canSelfRepair(): Boolean =
-        checkSelfPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS) ==
-            PackageManager.PERMISSION_GRANTED
-
-    /**
-     * Turns the blocker service back on after something (such as a force
-     * stop) switched it off. Only possible with the user-granted permission
-     * above; adds only this app's own service and leaves others untouched.
-     */
-    private fun repairService(): Boolean {
-        if (isServiceEnabled()) return true
-        if (!canSelfRepair()) return false
-        return try {
-            val me = ComponentName(this, BlockerAccessibilityService::class.java).flattenToString()
-            val current = Settings.Secure.getString(
-                contentResolver,
-                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
-            ).orEmpty()
-            val updated = (current.split(':').filter { it.isNotBlank() } + me).distinct().joinToString(":")
-            Settings.Secure.putString(contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, updated)
-            Settings.Secure.putInt(contentResolver, Settings.Secure.ACCESSIBILITY_ENABLED, 1)
-            isServiceEnabled()
-        } catch (e: SecurityException) {
-            false
-        }
-    }
-
-    private fun isServiceEnabled(): Boolean {
-        val enabled = Settings.Secure.getString(
-            contentResolver,
-            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
-        ) ?: return false
-        val me = ComponentName(this, BlockerAccessibilityService::class.java)
-        return enabled.split(':').any { ComponentName.unflattenFromString(it) == me }
-    }
+    /** Both permissions granted and the watcher alive: locks can be enforced. */
+    private fun watcherReady(): Boolean =
+        Permissions.usageAccess(this) && Permissions.overlay(this) && WatcherService.running
 
     /** Launchable apps with label and a small PNG icon, minus protected ones. */
     private fun installedApps(): List<Map<String, Any>> {

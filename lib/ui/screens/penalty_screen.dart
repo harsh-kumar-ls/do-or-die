@@ -260,13 +260,18 @@ class _EnforcementStatusState extends State<_EnforcementStatus> {
             Text('ENFORCEMENT OFFLINE', style: Hud.head(12, p.hi, spacing: .2)),
             const SizedBox(height: 6),
             Text(
-              'The Penalty Zone service is off, so locks cannot be enforced.',
+              'The Penalty Zone watcher is off, so locks cannot be enforced.',
               style: Hud.mono(11, p.text),
             ),
             const SizedBox(height: 10),
             HudButton(
-              'TURN ON IN ACCESSIBILITY SETTINGS',
-              onPressed: widget.blocker.openAccessibilitySettings,
+              'FIX',
+              onPressed: () async {
+                final st = await widget.blocker.systemStatus();
+                if (!st.usageAccess) return widget.blocker.requestUsageAccess();
+                if (!st.overlay) return widget.blocker.requestOverlay();
+                await widget.blocker.startWatcher();
+              },
             ),
           ],
         ),

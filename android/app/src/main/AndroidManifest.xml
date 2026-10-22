@@ -10,12 +10,16 @@
     <!-- Lets the user exempt the app from battery optimisation, so OriginOS
          doesn't stop the blocker or delay notices. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-    <!-- Optional auto-repair of the blocker service. Never granted by
-         installing: only if the user runs, themselves,
-         adb shell pm grant com.doordie.do_or_die android.permission.WRITE_SECURE_SETTINGS -->
+    <!-- The Penalty Zone watcher. No accessibility service is used: payment and
+         banking apps refuse to run while any accessibility service is on. -->
+    <!-- "Usage access": see which app is in front. Granted by the user in Settings. -->
     <uses-permission
-        android:name="android.permission.WRITE_SECURE_SETTINGS"
+        android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
+    <!-- "Display over other apps": show the Penalty Zone over a locked app. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <application
         android:label="Do or Die"
         android:name="${applicationName}"
@@ -33,17 +37,22 @@
             </intent-filter>
         </receiver>
         <service
-            android:name=".blocker.BlockerAccessibilityService"
-            android:label="@string/blocker_label"
+            android:name=".blocker.WatcherService"
             android:exported="false"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/blocker_service" />
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Locks apps the user chose, during a self-imposed penalty they set up" />
         </service>
+        <receiver
+            android:name=".blocker.BootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
         <activity
             android:name=".blocker.BlockActivity"
             android:exported="false"

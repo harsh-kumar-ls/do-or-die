@@ -78,7 +78,9 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     try {
       var status = await blocker.systemStatus();
       if (!status.serviceEnabled) {
-        final repaired = await blocker.repairService();
+        // A force stop kills the watcher; restarting it needs no special
+        // permission, only the two the user already granted.
+        final repaired = await blocker.startWatcher();
         if (_blockerWasOn != false) {
           await service.recordBlockerOffline(repaired: repaired);
         }

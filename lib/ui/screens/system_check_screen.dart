@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../platform/blocker.dart';
 import '../game_model.dart';
@@ -20,9 +19,6 @@ class SystemCheckScreen extends StatefulWidget {
 
   final GameModel model;
   final AppBlocker blocker;
-
-  static const grantCommand =
-      'adb shell pm grant com.doordie.do_or_die android.permission.WRITE_SECURE_SETTINGS';
 
   @override
   State<SystemCheckScreen> createState() => _SystemCheckScreenState();
@@ -82,11 +78,29 @@ class _SystemCheckScreenState extends State<SystemCheckScreen>
 
     final checks = <_Check>[
       _Check(
-        'PENALTY ZONE SERVICE',
-        'Locks your chosen apps. A force stop switches it off.',
-        s?.serviceEnabled,
-        'TURN ON',
-        widget.blocker.openAccessibilitySettings,
+        'USAGE ACCESS',
+        'Lets the watcher see when a locked app opens. '
+            'No accessibility service is used, so payment apps keep working.',
+        s?.usageAccess,
+        'ALLOW',
+        widget.blocker.requestUsageAccess,
+      ),
+      _Check(
+        'DISPLAY OVER APPS',
+        'Lets the Penalty Zone appear over a locked app.',
+        s?.overlay,
+        'ALLOW',
+        widget.blocker.requestOverlay,
+      ),
+      _Check(
+        'WATCHER RUNNING',
+        'A force stop stops it; opening Do or Die starts it again.',
+        s?.watcherRunning,
+        'START',
+        () async {
+          await widget.blocker.startWatcher();
+          await widget.model.refreshSystem();
+        },
       ),
       _Check(
         'NOTIFICATIONS',
@@ -130,54 +144,6 @@ class _SystemCheckScreenState extends State<SystemCheckScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [for (final c in checks) _CheckRow(check: c)],
-          ),
-        ),
-        const SizedBox(height: 14),
-        SystemWindow(
-          title: 'AUTO-REPAIR (OPTIONAL)',
-          delay: const Duration(milliseconds: 100),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _CheckRow(
-                check: _Check(
-                  s?.canSelfRepair == true ? 'ON' : 'OFF',
-                  'When on, Do or Die turns the Penalty Zone service back on '
-                  'by itself whenever it opens. It needs a developer '
-                  'permission that you grant once, from your Mac:',
-                  s?.canSelfRepair,
-                  null,
-                  null,
-                ),
-              ),
-              const SizedBox(height: 8),
-              GestureDetector(
-                onTap: () async {
-                  await Clipboard.setData(
-                    const ClipboardData(text: SystemCheckScreen.grantCommand),
-                  );
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Command copied.')),
-                    );
-                  }
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(border: Border.all(color: p.line)),
-                  child: Text(
-                    SystemCheckScreen.grantCommand,
-                    style: Hud.mono(10, p.hi),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Tap to copy. This changes a security setting on your phone, '
-                'so it is your choice to run it.',
-                style: Hud.mono(10, p.dim),
-              ),
-            ],
           ),
         ),
         const SizedBox(height: 14),

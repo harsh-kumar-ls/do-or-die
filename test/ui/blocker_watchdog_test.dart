@@ -9,7 +9,7 @@ import 'package:do_or_die/platform/blocker.dart';
 import 'package:do_or_die/ui/game_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// A phone whose blocker service can be switched off, as a force stop does.
+/// A phone whose watcher can be stopped, as a force stop does.
 class SwitchableBlocker extends NoopAppBlocker {
   @override
   bool get canBlock => true;
@@ -22,11 +22,13 @@ class SwitchableBlocker extends NoopAppBlocker {
   Future<SystemStatus> systemStatus() async => SystemStatus(
     serviceEnabled: serviceOn,
     batteryExempt: true,
-    canSelfRepair: canRepair,
+    usageAccess: true,
+    overlay: true,
+    watcherRunning: serviceOn,
   );
 
   @override
-  Future<bool> repairService() async {
+  Future<bool> startWatcher() async {
     repairAttempts++;
     if (canRepair) serviceOn = true;
     return serviceOn;
@@ -100,20 +102,23 @@ void main() {
     expect(incidents(m), 2);
   });
 
-  test('with auto-repair granted, the service is turned back on and that is logged', () async {
-    final m = await model();
-    blocker
-      ..canRepair = true
-      ..serviceOn = false;
-    await m.tick();
-    expect(blocker.repairAttempts, 1);
-    expect(blocker.serviceOn, isTrue);
-    expect(m.blockerOffline, isFalse);
-    final entry = m.service.game.log.lastWhere(
-      (e) => e.type == 'blocker_offline',
-    );
-    expect(entry.data['repaired'], isTrue);
-  });
+  test(
+    'a stopped watcher is restarted automatically, and the outage is logged',
+    () async {
+      final m = await model();
+      blocker
+        ..canRepair = true
+        ..serviceOn = false;
+      await m.tick();
+      expect(blocker.repairAttempts, 1);
+      expect(blocker.serviceOn, isTrue);
+      expect(m.blockerOffline, isFalse);
+      final entry = m.service.game.log.lastWhere(
+        (e) => e.type == 'blocker_offline',
+      );
+      expect(entry.data['repaired'], isTrue);
+    },
+  );
 
   test('an outage during a penalty is flagged as such', () async {
     final m = await model();
