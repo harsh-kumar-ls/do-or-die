@@ -1,6 +1,6 @@
 # Do or Die — Systems & Dungeons PRD
 
-**Status:** Draft v0.1 · **Date:** 2026-10-27 · **Platform:** Android only (web and iOS paused)
+**Status:** Draft v0.2 · **Date:** 2026-10-27 · **Platform:** Android only (web and iOS paused)
 **Builds on:** [PROJECT.md](PROJECT.md) (penalty rules), [BUILD_LOOP.md](BUILD_LOOP.md) (how we build), [COMPETITOR_ANALYSIS.md](COMPETITOR_ANALYSIS.md) (incl. the 2026-10-27 addendum)
 **Theme:** the feel of a cold game "System" (windows, daily quests, ranks, gates, boss trials, penalties). All names, quests, text, art and sound are original to Do or Die.
 
@@ -14,7 +14,7 @@
 | **Who** | People who want a guided path, not a blank to-do list: fitness beginners, people trying to grow socially or intellectually, and people trying to beat phone addiction. |
 | **Why** | User-written quests stall: people set them too easy or too hard and never change them. A System that sets the quest, scales it by rank, and makes rank-ups a real fight gives structure and a reason to keep going. |
 | **Differentiator** | Rank-ups are earned by clearing a **Dungeon with a boss trial**, and failure has a real cost. Competitors are fitness-only and rank by streak or XP. |
-| **Decided** | One active System per user; System-written quests replace user-written ones; 21/30 opens a Gate; Dungeon failure = double lock + double reps in a separate zone, Gate closed 7 days; **no rank loss**. |
+| **Decided** | One active System per user, no switching, next System only after completing the current one; System-written quests replace user-written ones; 21/30 opens a Gate; Dungeon failure = double lock + double reps in a separate zone, Gate closed 7 days; **no rank loss**. |
 | **Biggest risks** | Quest difficulty wrong for a user; physical safety at higher Fitness ranks; automatic checks (Health Connect, usage access) being unreliable on OriginOS. |
 
 ---
@@ -84,7 +84,7 @@ A System that **writes the quest**, **raises it with rank**, and makes each rank
 
 | Term | Meaning |
 |---|---|
-| **System** | A training path: **Fitness** (STR, VIT), **Personality** (INT, new CHA stat) or **Focus** (DIS). One is active at a time. |
+| **System** | A training path: **Fitness** (STR, VIT), **Personality** (INT, new CHA stat) or **Focus** (DIS). One is active at a time, with **no switching**; the next can be chosen only after the current one is complete. |
 | **Rank** | E, D, C, B, A, S within the active System. Never lost. |
 | **Daily quest** | Written by the System for your System and rank. Replaces user-written objectives. |
 | **Gate** | Opens when **21 of the last 30 days** in the active System are cleared. Must be entered within 48 hours or it closes (no penalty, re-opens after 3 days if still eligible). |
@@ -120,10 +120,11 @@ A System that **writes the quest**, **raises it with rank**, and makes each rank
 7. **Clear:** rank up, +5 stat points, a Gatebreaker title for that rank, rank badge colour change, the 30-day window resets.
 8. **Fail any floor:** Dungeon Penalty Zone the next day; Gate closed 7 days; the 21-of-30 window continues (no reset, no rank loss).
 
-### 5.4 Switching System *(assumption, confirm)*
-- Allowed only when no penalty is in effect and no Dungeon is in progress.
-- The old System's rank and history are kept and paused; the new System starts at its own rank (placement test the first time).
-- **7-day cooldown** between switches, so switching can't dodge a hard rank.
+### 5.4 One System until it's complete (decided 2026-10-27)
+- **No switching.** The user chooses one System and stays in it.
+- A System is **complete** when its S-rank Rank Trial is cleared (hold S for 30 consecutive cleared days).
+- Only then can the user choose a **second System**, which starts with its own placement test. The completed System keeps its S rank for good and appears on the Status screen as completed.
+- Reason: clearing two Systems at once isn't realistic for a normal person; focus beats breadth.
 
 ---
 
@@ -259,8 +260,8 @@ Generated every 30 days and at the end of each Dungeon:
 
 | # | Question | Blocking? |
 |---|---|---|
-| 1 | **Switching System:** confirm the rules in 5.4 (allowed outside penalties/Dungeons, 7-day cooldown, progress kept) | Before S1 |
-| 2 | Is the 20% quest-reduction valve acceptable, or should System quests be fixed? | Before S1 |
+| 1 | ~~Switching System~~ **Decided:** no switching; the next System only after the current one is complete (5.4) | Done |
+| 2 | ~~Quest-reduction valve~~ **Decided:** keep it (up to 20%, next day, logged, XP capped at 50% that day) | Done |
 | 3 | Should the S rank have its own final Dungeon, or is "hold S for 30 days" the end? | No |
 | 4 | Health Connect for steps: add in S6 or later? | No |
 | 5 | Report: share as an image outside the app, or keep it private only? | No |
@@ -268,4 +269,5 @@ Generated every 30 days and at the end of each Dungeon:
 ---
 
 ## Changelog
+- **v0.2 (2026-10-27):** no switching between Systems; a second System only after the current one is complete (S-rank trial cleared). The 20% reduction valve is kept.
 - **v0.1 (2026-10-27):** first draft from the user's decisions: Systems (one active), System-written quests, 21/30 Gate rule, 3-floor Dungeons with a Rank Trial boss, Dungeon Penalty Zone (double lock + double reps, 7-day Gate cooldown), no rank loss, 30-day report.

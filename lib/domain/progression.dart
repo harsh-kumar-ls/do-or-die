@@ -2,7 +2,7 @@ import 'config.dart';
 
 enum Rank { e, d, c, b, a, s }
 
-enum Stat { strength, intellect, discipline, vitality }
+enum Stat { strength, intellect, discipline, vitality, charisma }
 
 class Progression {
   const Progression(this.config);

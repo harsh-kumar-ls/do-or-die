@@ -186,3 +186,16 @@ Each prompt is what I'd run for that iteration of the loop.
 
 **All milestones (M0–M8) complete. The 30-day trial is running: day 1 was 2026-10-21; dry run days 1–3; penalties live from day 4 (2026-10-24).**
   - Covers the web UI only; Android blocking, notifications and reboot behaviour stay in T3/T5.
+
+---
+
+## Phase 2: Systems & Dungeons ([SYSTEMS_PRD.md](SYSTEMS_PRD.md))
+
+- [x] **S1 Systems catalogue + rank state (2026-10-27).**
+  - `lib/domain/systems.dart`: `SystemKind` (Fitness, Personality, Focus), `QuestKind` (checkbox, timer, counter, distance, screen-time cap where lower is better, phone-free block), `QuestItem`, `RankTrial` (S rank: hold 30 days), `SystemProgress`.
+  - `lib/domain/system_catalogue.dart`: every System's daily quests and Rank Trials for E to S, as data (PRD 6.1). Planks counted in seconds to match the PRD.
+  - Rules as tested code: one System at a time with **no switching**; a new System only after the current one is **complete** (S trial cleared, S kept for good); **ranks never decrease**; placement E, D or C only; reduction valve up to 20%, from tomorrow, raising caps and lowering targets, reset when a new System starts.
+  - New stat **CHA** (Personality).
+  - Gates: format and analyze clean, **123/123 tests** (17 new).
+  - Not yet wired into the app: the existing daily engine still uses the trial's objectives. Hooking System quests into day judging comes with S2.
+- [ ] **Next: S2 Gate & Dungeon engine** (21/30 window, 48 h entry, three floors with deadlines, clear/fail outcomes, 7-day cooldown).

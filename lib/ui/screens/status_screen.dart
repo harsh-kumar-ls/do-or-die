@@ -268,6 +268,7 @@ class _StatTile extends StatelessWidget {
     Stat.intellect: 'INT',
     Stat.discipline: 'DIS',
     Stat.vitality: 'VIT',
+    Stat.charisma: 'CHA',
   };
 
   @override
