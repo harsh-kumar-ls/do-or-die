@@ -202,3 +202,25 @@ Source: the user's own Play Store screenshots. Ratings and download counts are a
 - [Opal pricing (AisoTools)](https://aisotools.com/pricing/opal-screen-time)
 - [Opal community: pricing](https://community.opal.so/t/unfortunate-pricing/3246)
 - [Forest pricing (Toolradar)](https://toolradar.com/tools/forest/pricing)
+
+---
+
+## Addendum (2026-10-27): Systems, Dungeons and rank trials
+
+Desk research for the Systems & Dungeons PRD ([SYSTEMS_PRD.md](SYSTEMS_PRD.md)). Store-listing and maker claims, not independently verified.
+
+| App | Ranks | How you rank up | Dungeons / gates | Penalty for failing |
+|---|---|---|---|---|
+| **SelfQuest** | E-rank to "National level" (by streak); gear tiers E-SS | Streak length | Dungeons and gate bosses cleared through real exercise; fitness only | Not found |
+| **RankUp** (Product Hunt) | E to S | XP from logged workouts with photo proof | None found | **Demotes you if you skip a day** |
+| **Level Up** (gamified fitness) | E to SSS | XP from daily workout quests | "Training dungeons" for tracked runs | Not found |
+| **GymLevels / Liftoff** | Per-muscle or per-lift ranks | XP or comparison with other users | None | None |
+| **ASCEND AI** | Bronze to Diamond | Rank-based missions across life areas | None | None |
+
+**What this means for Do or Die**
+1. **Nobody gates a rank-up behind a Dungeon** with floors and a boss trial, where failing has a real cost. That is our core difference.
+2. **Competitors are fitness-only.** Personality and Focus Systems are open ground.
+3. **Demotion exists elsewhere (RankUp).** We deliberately do **not** demote: ranks are earned for good, and failure only delays the next Gate.
+4. **Proof varies:** RankUp uses photo proof; we use automatic checks where Android allows (usage access for screen time, Health Connect for steps) and the honour system elsewhere.
+
+Sources: [SelfQuest (App Store)](https://apps.apple.com/app/selfquest/id6498150329), [SelfQuest (mwm.ai)](https://mwm.ai/apps/selfquest/6498150329), [Solo Hunter: Level Up](https://apps.apple.com/us/app/-/id6758021041), [RankUp (Product Hunt)](https://www.producthunt.com/p/rankup-3/rankup-4), [RepQuest](https://mwm.ai/apps/repquest-ranked-gym/6759474575), [GymLevels](https://apps.apple.com/app/id6755731464), [ASCEND AI](https://apps.apple.com/us/app/-/id6748349056).
