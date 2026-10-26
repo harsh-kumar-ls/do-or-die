@@ -198,4 +198,24 @@ Each prompt is what I'd run for that iteration of the loop.
   - New stat **CHA** (Personality).
   - Gates: format and analyze clean, **123/123 tests** (17 new).
   - Not yet wired into the app: the existing daily engine still uses the trial's objectives. Hooking System quests into day judging comes with S2.
-- [ ] **Next: S2 Gate & Dungeon engine** (21/30 window, 48 h entry, three floors with deadlines, clear/fail outcomes, 7-day cooldown).
+- [x] **S2 Gate & Dungeon engine (2026-10-27).** `lib/domain/dungeon.dart` (21/30 window, 48 h Gate, 3-day expiry block, three floors, Floor 2 18:00 deadline, 7-day fail cooldown, titles, S hold of 30 days). `GameService.tick` now judges days one at a time and feeds each verdict to the System, so a rank-up or a Gate shapes the next day's quest. Screen-time caps are measured from usage access (`UsageMeter.kt`), with an honour confirmation only when the phone can't measure. Phone-free blocks count the longest single block and lock the chosen apps while they run (a separate native "focus" window, so it can never erase a scheduled penalty).
+- [x] **S3 Dungeon Penalty (2026-10-27).** A failed floor doubles the lock and the reps through the existing engine (push-up cap kept, excess as squats); the block screen, Penalty tab, banner and sound switch to the Dungeon look (crimson and gold).
+- [x] **S4 Awakening (2026-10-27).** New first-run flow: accept, choose a System, placement test (E to C only, `lib/domain/placement.dart`), rank assigned with the daily quest, lock targets, rest period, terms. Older trials are archived with their log and replaced, unless a penalty is still in effect (then they wait). Restart returns to the Awakening.
+- [x] **S5 UI (2026-10-27).** Status: System rank badge (colour per rank), titles, NEXT GATE, reduction valve (0/10/20%), five attributes incl. CHA, choose next System. Quest: Gate banner with hold to enter, Dungeon floor titles, Floor 2 countdown to 18:00, Rank Trial, distance/cap/phone-free controls. Notices and sounds for every System event (`gate_open`, `rank_up`, `dungeon_penalty`, original synthesis). Planner: Floor 2 warning at 17:00, Gate closing 6 h before expiry.
+- [x] **S6 Automatic checks (2026-10-27).** Usage-access screen time for caps (native, needs the device check below). Health Connect for steps was left out: distance is entered with +100 m / +500 m buttons (honour), to avoid a new permission.
+- [x] **S7 Report (2026-10-27).** `lib/app/report.dart` + `ReportScreen`: clear rate, streaks, rank journey, then and now, attributes, 30-day calendar, honesty (Penalty Zones, Dungeon Penalties, releases, outages, honour confirmations, reduced days), verdict. Built live from the log; a notice every 30 days. Sharing as an image is not built (it would need a new share package).
+- [x] **S8 QA (2026-10-27).**
+  - Independent adversarial review of the whole change set found 9 defects (3 wrongful-penalty risks); all fixed with regression tests (see the S8 commit and SYSTEMS_PRD v0.3).
+  - Gates: format and analyze clean, **192/192 tests**.
+  - TestSprite (web build, test mode): plans rewritten for the Awakening, 3 new tests (phone-free block, reduction valve, report). **13/13 passed.** One first-run failure was the plan: a programmatic fill doesn't reach a Flutter web text field; the plan now types with keys.
+  - Release APK `dist/DoOrDie-0.2.0.apk` (version 0.2.0+2, same signing key as the installed build, so it updates in place).
+  - TestSprite covers the web UI only. Blocking, the Dungeon block screen, usage-access measurement, phone-free locking and notifications need the device checklist below.
+
+### Device checklist for 0.2.0 (manual, on the phone)
+1. Install the APK over the old app; the old trial is archived and the Awakening appears (if a penalty was in effect, the old trial stays until it ends).
+2. Complete the Awakening; Status shows the System, rank and 0 / 21.
+3. System Check: all green (usage access, overlay, watcher, notifications, alarms, battery).
+4. Focus System only: a phone-free block locks Instagram while running and unlocks when ended.
+5. Focus caps: the social-media reading rises after using a locked app for a few minutes.
+6. Penalty and Dungeon Penalty block screens look right (needs a failed day; check when it happens).
+7. UPI / SBI YONO still work with Developer options off.

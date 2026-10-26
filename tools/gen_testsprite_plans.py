@@ -40,7 +40,14 @@ def awakening(system="FITNESS SYSTEM", answers=None):
         act("Click 'CONFIRM SYSTEM'"),
     ]
     for question, value in answers or []:
-        steps.append(act(f"On the '[ PLACEMENT TEST ]' window, clear the number box for '{question}' and type {value}"))
+        # Type with the keyboard: Flutter web ignores a value set directly
+        # on the input element (a programmatic fill).
+        steps += [
+            act(f"On the '[ PLACEMENT TEST ]' window, click inside the number box for '{question}'"),
+            act("Press the Backspace key three times to empty that box"),
+            act(f"Type {value} with the keyboard (key presses, not a programmatic fill)"),
+            check(f"The number box for '{question}' now shows {value}"),
+        ]
     steps += [
         act("Click 'SUBMIT' on the '[ PLACEMENT TEST ]' window"),
         act("Click 'CONTINUE' on the '[ RANK ASSIGNED ]' window"),

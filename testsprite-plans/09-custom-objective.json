@@ -21,11 +21,35 @@
     },
     {
       "type": "action",
-      "description": "On the '[ PLACEMENT TEST ]' window, clear the number box for 'Most push-ups you can do in one set' and type 80"
+      "description": "On the '[ PLACEMENT TEST ]' window, click inside the number box for 'Most push-ups you can do in one set'"
     },
     {
       "type": "action",
-      "description": "On the '[ PLACEMENT TEST ]' window, clear the number box for 'Minutes to walk or jog 1 km' and type 4"
+      "description": "Press the Backspace key three times to empty that box"
+    },
+    {
+      "type": "action",
+      "description": "Type 80 with the keyboard (key presses, not a programmatic fill)"
+    },
+    {
+      "type": "assertion",
+      "description": "The number box for 'Most push-ups you can do in one set' now shows 80"
+    },
+    {
+      "type": "action",
+      "description": "On the '[ PLACEMENT TEST ]' window, click inside the number box for 'Minutes to walk or jog 1 km'"
+    },
+    {
+      "type": "action",
+      "description": "Press the Backspace key three times to empty that box"
+    },
+    {
+      "type": "action",
+      "description": "Type 4 with the keyboard (key presses, not a programmatic fill)"
+    },
+    {
+      "type": "assertion",
+      "description": "The number box for 'Minutes to walk or jog 1 km' now shows 4"
     },
     {
       "type": "action",

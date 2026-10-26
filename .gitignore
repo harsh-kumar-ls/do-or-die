@@ -49,3 +49,4 @@ app.*.map.json
 
 # TestSprite local run artifacts
 .testsprite/
+dist/
