@@ -19,6 +19,7 @@ void main() {
     Clock? clock,
     VoidCallback? onAbandoned,
     SystemKind system = SystemKind.fitness,
+    Future<void> Function(GameService)? prepare,
   }) async {
     tester.view.physicalSize = const Size(1080, 2340);
     tester.view.devicePixelRatio = 3;
@@ -32,6 +33,7 @@ void main() {
       clock: clock ?? const SystemClock(),
       random: Random(1),
     );
+    if (prepare != null) await prepare(service);
     final model = GameModel(service, pollEvery: null);
     addTearDown(model.dispose);
     await tester.pumpWidget(
@@ -392,5 +394,127 @@ void main() {
     expect(find.text('FITNESS SYSTEM'), findsNothing);
     expect(find.text('FOCUS SYSTEM'), findsOneWidget);
     expect(find.text('PERSONALITY SYSTEM'), findsOneWidget);
+  });
+
+  /// Clears [n] days in a row on [clock], ending at 09:00 the day after.
+  Future<void> clearDays(GameService g, FixedClock clock, int n) async {
+    for (var i = 0; i < n; i++) {
+      for (final t in g.todaysTasks) {
+        await g.setProgress(t.id, t.goal);
+      }
+      clock.set(g.today.addDays(1).at(9 * 60));
+      await g.tick();
+    }
+    g.takeSystemEvents();
+  }
+
+  testWidgets('an open Gate is shown with a hold to enter', (tester) async {
+    final clock = FixedClock(DateTime(2026, 10, 19, 9));
+    final model = await pumpShell(
+      tester,
+      clock: clock,
+      prepare: (g) => clearDays(g, clock, 21),
+    );
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('RANK E GATE OPEN'), findsOneWidget);
+    final hold = find.text('HOLD TO ENTER THE GATE');
+    await tester.ensureVisible(hold);
+    await tester.pump();
+    final gesture = await tester.startGesture(tester.getCenter(hold));
+    await tester.pump(const Duration(milliseconds: 150));
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 200));
+    }
+    await gesture.up();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(model.systems!.dungeon, isNotNull);
+    expect(find.text('You have entered the Dungeon.'), findsOneWidget);
+    await tester.tap(find.text('ACKNOWLEDGE'));
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('DUNGEON AHEAD'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 1));
+  });
+
+  testWidgets('a Dungeon floor is titled as such, with the 18:00 deadline', (
+    tester,
+  ) async {
+    final clock = FixedClock(DateTime(2026, 10, 19, 9));
+    await pumpShell(
+      tester,
+      clock: clock,
+      prepare: (g) async {
+        await clearDays(g, clock, 21);
+        await g.enterGate();
+        await clearDays(g, clock, 2);
+        g.takeSystemEvents();
+      },
+    );
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('[ DUNGEON · FLOOR 2 ]'), findsOneWidget);
+    expect(find.text('UNTIL 18:00'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 1));
+  });
+
+  testWidgets('the day after a failed floor, the Penalty tab is the Dungeon '
+      'Penalty', (tester) async {
+    final clock = FixedClock(DateTime(2026, 10, 19, 9));
+    await pumpShell(
+      tester,
+      clock: clock,
+      prepare: (g) async {
+        await clearDays(g, clock, 21);
+        await g.enterGate();
+        await clearDays(g, clock, 1);
+        clock.set(g.today.addDays(1).at(9 * 60));
+        await g.tick(); // floor 1 failed
+        g.takeSystemEvents();
+      },
+    );
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('DUNGEON PENALTY ACTIVE'), findsOneWidget);
+    await tester.tap(find.text('PENALTY').last);
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('[ DUNGEON PENALTY ]'), findsOneWidget);
+    expect(find.text('DUNGEON PENALTY'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 1));
+  });
+
+  testWidgets('the report opens from Status', (tester) async {
+    final clock = FixedClock(DateTime(2026, 10, 19, 9));
+    await pumpShell(
+      tester,
+      clock: clock,
+      prepare: (g) => clearDays(g, clock, 3),
+    );
+    await tester.pump(const Duration(milliseconds: 600));
+    await openStatus(tester);
+    await tester.tap(find.text('REPORT'));
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+    expect(find.text('[ REPORT ]'), findsOneWidget);
+    expect(find.text('100%'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('HONESTY'), 200);
+    expect(find.text('HONESTY'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 1));
+  });
+
+  testWidgets('Status shows the Gate progress and the reduction valve', (
+    tester,
+  ) async {
+    final clock = FixedClock(DateTime(2026, 10, 19, 9));
+    final model = await pumpShell(
+      tester,
+      clock: clock,
+      prepare: (g) => clearDays(g, clock, 4),
+    );
+    await tester.pump(const Duration(milliseconds: 600));
+    await openStatus(tester);
+    expect(find.text('4 / 21 CLEARED'), findsOneWidget);
+    await tester.tap(find.text('20%'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(model.reductionTomorrow, 20);
+    expect(find.text('Tomorrow 20% · half XP'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 1));
   });
 }

@@ -484,6 +484,23 @@ class GameService {
     return true;
   }
 
+  /// Every 30 days of the trial (days 31, 61, ...) a report is issued once.
+  bool get reportDue {
+    final d = trialDay;
+    if (d <= 1 || (d - 1) % 30 != 0) return false;
+    return !_game.log.any(
+      (e) => e.type == 'report_issued' && e.data['day'] == today.toString(),
+    );
+  }
+
+  Future<void> markReportIssued() => _commit(
+    _game.copyWith(
+      newLogEntries: [
+        LogEntry(now, 'report_issued', {'day': today.toString()}),
+      ],
+    ),
+  );
+
   /// A Dungeon Penalty applies today (the day after a failed floor).
   bool get dungeonPenaltyToday =>
       _game.systems?.dungeonPenaltyDay == today && penaltyInEffect;

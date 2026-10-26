@@ -272,6 +272,19 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       await service.measureCaps();
     }
     await _sync();
+    if (service.reportDue) {
+      await service.markReportIssued();
+      _queue(
+        SystemNotice(
+          title: '[ REPORT ]',
+          lines: [
+            '${service.trialDay - 1} days have passed.',
+            'The report is ready. Open it from the Status tab.',
+          ],
+        ),
+      );
+      notifyListeners();
+    }
     final systemEvents = service.takeSystemEvents();
     if (events.isEmpty && systemEvents.isEmpty) {
       notifyListeners(); // clock or permission state may have changed

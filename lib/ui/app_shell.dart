@@ -9,6 +9,7 @@ import 'screens/app_picker_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/penalty_screen.dart';
 import 'screens/quest_screen.dart';
+import 'screens/report_screen.dart';
 import 'screens/status_screen.dart';
 import 'screens/system_check_screen.dart';
 import 'theme.dart';
@@ -106,6 +107,13 @@ class _AppShellState extends State<AppShell> {
                                               widget.onAbandoned!();
                                             }
                                           },
+                                    onOpenReport: () => Navigator.of(context)
+                                        .push(
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                ReportScreen(model: m),
+                                          ),
+                                        ),
                                     onChooseSystem: () =>
                                         Navigator.of(context).push(
                                           MaterialPageRoute(
@@ -267,20 +275,27 @@ class _TopBar extends StatelessWidget {
               ),
             ],
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: p.sys.withValues(alpha: p.lineAlpha + .2),
+          const SizedBox(width: 10),
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerRight,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: p.sys.withValues(alpha: p.lineAlpha + .2),
+                  ),
+                ),
+                child: Text(
+                  !penalty
+                      ? 'RANK ${model.rank.name.toUpperCase()}'
+                      : model.dungeonPenalty
+                      ? 'DUNGEON PENALTY'
+                      : 'PENALTY',
+                  style: Hud.head(11, p.hi, spacing: .15),
+                ),
               ),
-            ),
-            child: Text(
-              !penalty
-                  ? 'RANK ${model.rank.name.toUpperCase()}'
-                  : model.dungeonPenalty
-                  ? 'DUNGEON PENALTY'
-                  : 'PENALTY',
-              style: Hud.head(11, p.hi, spacing: .15),
             ),
           ),
         ],
