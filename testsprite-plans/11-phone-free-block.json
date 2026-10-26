@@ -1,0 +1,63 @@
+{
+  "projectId": "d37f7ffc-2ffc-4da9-88ea-8ee0106eba69",
+  "type": "frontend",
+  "name": "Quest: a Focus phone-free block starts and ends from its objective",
+  "planSteps": [
+    {
+      "type": "action",
+      "description": "Open the app at / and wait up to 30 seconds for the '[ SYSTEM ]' window to appear (a Flutter web app; it can take a while to load, and controls are exposed in the accessibility tree)"
+    },
+    {
+      "type": "action",
+      "description": "Click 'ACCEPT' on the '[ SYSTEM ]' window"
+    },
+    {
+      "type": "action",
+      "description": "On the '[ CHOOSE YOUR SYSTEM ]' window, click the card titled 'FOCUS SYSTEM'"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONFIRM SYSTEM'"
+    },
+    {
+      "type": "action",
+      "description": "Click 'SUBMIT' on the '[ PLACEMENT TEST ]' window"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONTINUE' on the '[ RANK ASSIGNED ]' window"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONFIRM APPS' on the '[ LOCK TARGETS ]' window (the web build lists no apps; that is expected)"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONFIRM' on the '[ REST PERIOD ]' window"
+    },
+    {
+      "type": "action",
+      "description": "Click 'HOLD TO ACCEPT' once on the '[ PENALTY TERMS ]' window (this test build accepts a click in place of the hold)"
+    },
+    {
+      "type": "assertion",
+      "description": "The '[ DAILY QUEST ]' window lists 'No phone after waking (minutes)' with a 'START BLOCK' button"
+    },
+    {
+      "type": "action",
+      "description": "Click 'START BLOCK'"
+    },
+    {
+      "type": "assertion",
+      "description": "The button now reads 'END BLOCK' and the text 'Chosen apps are locked until the block ends.' is shown under it"
+    },
+    {
+      "type": "action",
+      "description": "Click 'END BLOCK'"
+    },
+    {
+      "type": "assertion",
+      "description": "The button reads 'START BLOCK' again"
+    }
+  ]
+}

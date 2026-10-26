@@ -1,7 +1,7 @@
 {
   "projectId": "d37f7ffc-2ffc-4da9-88ea-8ee0106eba69",
   "type": "frontend",
-  "name": "Onboarding: an objective without a name is refused",
+  "name": "Awakening: continuing without choosing a System is refused",
   "planSteps": [
     {
       "type": "action",
@@ -9,19 +9,15 @@
     },
     {
       "type": "action",
-      "description": "Click 'BEGIN REGISTRATION'"
+      "description": "Click 'ACCEPT' on the '[ SYSTEM ]' window"
     },
     {
       "type": "action",
-      "description": "Click '+ ADD OBJECTIVE'"
-    },
-    {
-      "type": "action",
-      "description": "Click 'CONFIRM OBJECTIVES' without typing a name in the new, empty objective"
+      "description": "Click 'CONFIRM SYSTEM' without clicking any System card"
     },
     {
       "type": "assertion",
-      "description": "The error text 'Every task needs a name.' is shown and the '[ DAILY QUEST ]' setup window is still displayed (no '[ REST PERIOD ]' window)"
+      "description": "The error text 'Choose a System.' is shown and the '[ CHOOSE YOUR SYSTEM ]' window is still displayed (no '[ PLACEMENT TEST ]' window)"
     }
   ]
 }

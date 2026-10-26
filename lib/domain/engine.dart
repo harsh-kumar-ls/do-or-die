@@ -246,8 +246,12 @@ class QuestEngine {
 
     if (!cleared) {
       // A failed Dungeon floor multiplies the whole penalty (x2).
-      final pushups = penalties.pushupsForLevel(penaltyLevel) * multiplier;
-      final squats = penalties.squatsForLevel(penaltyLevel) * multiplier;
+      // The push-up cap still holds: anything above it becomes squats.
+      final doubled = penalties.pushupsForLevel(penaltyLevel) * multiplier;
+      final pushups = min(doubled, config.pushupCap);
+      final squats =
+          penalties.squatsForLevel(penaltyLevel) * multiplier +
+          (doubled - pushups);
       events.add(
         PenaltyIssued(
           day,

@@ -210,15 +210,19 @@ class SystemsState {
 
   /// The quest the System issues for [day]: a floor of the Dungeon, or the
   /// daily quest for the active System and rank.
+  ///
+  /// No quest before the System starts (a System chosen today starts
+  /// tomorrow). Floors are built on the full daily quest: the reduction valve
+  /// never applies inside a Dungeon.
   List<QuestItem> questFor(Map<SystemKind, SystemSpec> catalogue, DayKey day) {
+    final start = systemStartedOn;
+    if (start != null && day.isBefore(start)) return const [];
     final floor = floorOn(day);
     if (floor == 0) return progress.dailyQuest(catalogue, day);
     final spec = catalogue[active!]!.at(dungeon!.from);
     if (floor == 3) return spec.trial.items;
     final boost = DungeonRules.floorBoost[floor]!;
-    return [
-      for (final q in progress.dailyQuest(catalogue, day)) q.scaledUpBy(boost),
-    ];
+    return [for (final q in spec.daily) q.scaledUpBy(boost)];
   }
 
   /// Closes an open Gate whose 48 hours ran out.
@@ -237,10 +241,16 @@ class SystemsState {
 
   /// Enters the open Gate. Floor 1 is the next day. Returns null when no
   /// Gate is open (or it has expired).
-  (SystemsState, SystemEvent)? enter(DateTime now) {
+  ///
+  /// [firstOpenDay] is the first day not yet judged: floor 1 never lands on
+  /// a day already judged, even if the clock has been set back.
+  (SystemsState, SystemEvent)? enter(DateTime now, {DayKey? firstOpenDay}) {
     final g = gate;
     if (g == null || !now.isBefore(g.expiresAt)) return null;
-    final today = DayKey.fromDateTime(now);
+    var today = DayKey.fromDateTime(now);
+    if (firstOpenDay != null && today.isBefore(firstOpenDay)) {
+      today = firstOpenDay;
+    }
     final d = Dungeon(g.from, today.addDays(1));
     return (
       copyWith(gate: () => null, dungeon: () => d),

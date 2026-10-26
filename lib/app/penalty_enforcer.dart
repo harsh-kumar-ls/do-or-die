@@ -64,7 +64,10 @@ class PenaltyEnforcer {
     final block = game.focusBlock;
     if (block != null) {
       final day = DayKey.fromDateTime(block.startedAt);
-      final focus = (block.startedAt, day.addDays(1).at(0));
+      var end = day.addDays(1).at(0);
+      final deadline = game.systems?.deadlineOn(day);
+      if (deadline != null && deadline.isBefore(end)) end = deadline;
+      final focus = (block.startedAt, end);
       if (_sentFocus != focus) {
         await blocker.setFocusWindow(focus.$1, focus.$2);
         _sentFocus = focus;

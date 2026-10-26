@@ -1,7 +1,7 @@
 {
   "projectId": "d37f7ffc-2ffc-4da9-88ea-8ee0106eba69",
   "type": "frontend",
-  "name": "Status: the status screen shows rank, level and attributes",
+  "name": "Status: the System rank, Gate progress and five attributes are shown",
   "planSteps": [
     {
       "type": "action",
@@ -9,11 +9,23 @@
     },
     {
       "type": "action",
-      "description": "Click 'BEGIN REGISTRATION'"
+      "description": "Click 'ACCEPT' on the '[ SYSTEM ]' window"
     },
     {
       "type": "action",
-      "description": "Click 'CONFIRM OBJECTIVES'"
+      "description": "On the '[ CHOOSE YOUR SYSTEM ]' window, click the card titled 'FITNESS SYSTEM'"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONFIRM SYSTEM'"
+    },
+    {
+      "type": "action",
+      "description": "Click 'SUBMIT' on the '[ PLACEMENT TEST ]' window"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONTINUE' on the '[ RANK ASSIGNED ]' window"
     },
     {
       "type": "action",
@@ -25,11 +37,7 @@
     },
     {
       "type": "action",
-      "description": "Click 'HOLD TO ACCEPT' once (this test build accepts a click in place of the hold)"
-    },
-    {
-      "type": "assertion",
-      "description": "The '[ DAILY QUEST ]' screen is shown with a bottom bar containing 'QUEST', 'STATUS' and 'PENALTY'"
+      "description": "Click 'HOLD TO ACCEPT' once on the '[ PENALTY TERMS ]' window (this test build accepts a click in place of the hold)"
     },
     {
       "type": "action",
@@ -37,11 +45,11 @@
     },
     {
       "type": "assertion",
-      "description": "A '[ STATUS ]' window shows the rank letter 'E', the label 'RANK', and rows 'LEVEL' with value '1' and 'QUESTS CLEARED' with value '0'"
+      "description": "The '[ STATUS ]' window shows the rank letter 'E', the label 'FITNESS SYSTEM \u00b7 RANK', 'LEVEL' with value '1', and 'NEXT GATE' with value '0 / 21 CLEARED'"
     },
     {
       "type": "assertion",
-      "description": "An 'ATTRIBUTES' window shows four attributes labelled 'STR', 'INT', 'DIS' and 'VIT', and 'AVAILABLE POINTS' with value '0'"
+      "description": "An 'ATTRIBUTES' window shows five attributes labelled 'STR', 'VIT', 'INT', 'CHA' and 'DIS', and 'POINTS' with value '0'"
     }
   ]
 }

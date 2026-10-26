@@ -1,7 +1,7 @@
 {
   "projectId": "d37f7ffc-2ffc-4da9-88ea-8ee0106eba69",
   "type": "frontend",
-  "name": "Quest: the study timer clock runs live and pauses",
+  "name": "Quest: the walk timer clock runs live and pauses",
   "planSteps": [
     {
       "type": "action",
@@ -9,11 +9,23 @@
     },
     {
       "type": "action",
-      "description": "Click 'BEGIN REGISTRATION'"
+      "description": "Click 'ACCEPT' on the '[ SYSTEM ]' window"
     },
     {
       "type": "action",
-      "description": "Click 'CONFIRM OBJECTIVES'"
+      "description": "On the '[ CHOOSE YOUR SYSTEM ]' window, click the card titled 'FITNESS SYSTEM'"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONFIRM SYSTEM'"
+    },
+    {
+      "type": "action",
+      "description": "Click 'SUBMIT' on the '[ PLACEMENT TEST ]' window"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONTINUE' on the '[ RANK ASSIGNED ]' window"
     },
     {
       "type": "action",
@@ -25,19 +37,15 @@
     },
     {
       "type": "action",
-      "description": "Click 'HOLD TO ACCEPT' once (this test build accepts a click in place of the hold)"
+      "description": "Click 'HOLD TO ACCEPT' once on the '[ PENALTY TERMS ]' window (this test build accepts a click in place of the hold)"
     },
     {
       "type": "assertion",
-      "description": "The '[ DAILY QUEST ]' screen is shown with a bottom bar containing 'QUEST', 'STATUS' and 'PENALTY'"
-    },
-    {
-      "type": "assertion",
-      "description": "The 'Study' objective shows a clock reading '00:00:00', the label 'NOT STARTED' and a 'START' button"
+      "description": "The 'Walk' objective shows a clock reading '00:00:00' and a 'START' button"
     },
     {
       "type": "action",
-      "description": "Click 'START' in the 'Study' objective"
+      "description": "Click 'START' in the 'Walk' objective"
     },
     {
       "type": "action",
@@ -45,7 +53,7 @@
     },
     {
       "type": "assertion",
-      "description": "The Study clock shows at least '00:00:04' (it advanced on its own) and the label 'RUNNING' is visible"
+      "description": "The Walk clock shows at least '00:00:04' (it advanced on its own) and the label 'RUNNING' is visible"
     },
     {
       "type": "action",
@@ -53,7 +61,7 @@
     },
     {
       "type": "assertion",
-      "description": "The label under the Study clock reads 'PAUSED' and the button reads 'RESUME'"
+      "description": "The label under the Walk clock reads 'PAUSED' and the button reads 'RESUME'"
     }
   ]
 }

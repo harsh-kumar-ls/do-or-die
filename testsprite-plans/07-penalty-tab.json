@@ -9,11 +9,23 @@
     },
     {
       "type": "action",
-      "description": "Click 'BEGIN REGISTRATION'"
+      "description": "Click 'ACCEPT' on the '[ SYSTEM ]' window"
     },
     {
       "type": "action",
-      "description": "Click 'CONFIRM OBJECTIVES'"
+      "description": "On the '[ CHOOSE YOUR SYSTEM ]' window, click the card titled 'FITNESS SYSTEM'"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONFIRM SYSTEM'"
+    },
+    {
+      "type": "action",
+      "description": "Click 'SUBMIT' on the '[ PLACEMENT TEST ]' window"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONTINUE' on the '[ RANK ASSIGNED ]' window"
     },
     {
       "type": "action",
@@ -25,11 +37,7 @@
     },
     {
       "type": "action",
-      "description": "Click 'HOLD TO ACCEPT' once (this test build accepts a click in place of the hold)"
-    },
-    {
-      "type": "assertion",
-      "description": "The '[ DAILY QUEST ]' screen is shown with a bottom bar containing 'QUEST', 'STATUS' and 'PENALTY'"
+      "description": "Click 'HOLD TO ACCEPT' once on the '[ PENALTY TERMS ]' window (this test build accepts a click in place of the hold)"
     },
     {
       "type": "action",
@@ -38,10 +46,6 @@
     {
       "type": "assertion",
       "description": "A '[ PENALTY ZONE ]' window shows 'No penalty is in effect.', a clock '00:00:00' and 'NO LOCK TODAY'"
-    },
-    {
-      "type": "assertion",
-      "description": "The text 'No apps chosen. A failed day locks nothing until you choose some.' and an 'EDIT LOCKED APPS' button are shown"
     },
     {
       "type": "assertion",

@@ -269,5 +269,6 @@ Generated every 30 days and at the end of each Dungeon:
 ---
 
 ## Changelog
+- **v0.3 (2026-10-27, from the QA review):** a System chosen after completing one starts the next day (never judged on the day it is chosen); Dungeon floors are built on the full daily quest and ignore the reduction valve (full XP); the Dungeon Penalty keeps the 150 push-up cap, with the excess added as squats; Floor 2 screen-time caps are measured up to 18:00; a cap with no reading at judging is not kept unless it was confirmed on the honour system; the report is always available from Status (it is built live, so it covers the end of each Dungeon), and the 30-day notice is issued even if the app wasn't opened on day 31.
 - **v0.2 (2026-10-27):** no switching between Systems; a second System only after the current one is complete (S-rank trial cleared). The 20% reduction valve is kept.
 - **v0.1 (2026-10-27):** first draft from the user's decisions: Systems (one active), System-written quests, 21/30 Gate rule, 3-floor Dungeons with a Rank Trial boss, Dungeon Penalty Zone (double lock + double reps, 7-day Gate cooldown), no rank loss, 30-day report.

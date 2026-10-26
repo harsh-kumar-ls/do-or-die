@@ -1,7 +1,7 @@
 {
   "projectId": "d37f7ffc-2ffc-4da9-88ea-8ee0106eba69",
   "type": "frontend",
-  "name": "Quest: the Read counter adds pages with +5 and +10",
+  "name": "Quest: the push-up counter adds reps with +5 and +1",
   "planSteps": [
     {
       "type": "action",
@@ -9,11 +9,23 @@
     },
     {
       "type": "action",
-      "description": "Click 'BEGIN REGISTRATION'"
+      "description": "Click 'ACCEPT' on the '[ SYSTEM ]' window"
     },
     {
       "type": "action",
-      "description": "Click 'CONFIRM OBJECTIVES'"
+      "description": "On the '[ CHOOSE YOUR SYSTEM ]' window, click the card titled 'FITNESS SYSTEM'"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONFIRM SYSTEM'"
+    },
+    {
+      "type": "action",
+      "description": "Click 'SUBMIT' on the '[ PLACEMENT TEST ]' window"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONTINUE' on the '[ RANK ASSIGNED ]' window"
     },
     {
       "type": "action",
@@ -25,27 +37,19 @@
     },
     {
       "type": "action",
-      "description": "Click 'HOLD TO ACCEPT' once (this test build accepts a click in place of the hold)"
-    },
-    {
-      "type": "assertion",
-      "description": "The '[ DAILY QUEST ]' screen is shown with a bottom bar containing 'QUEST', 'STATUS' and 'PENALTY'"
-    },
-    {
-      "type": "assertion",
-      "description": "The 'Read' objective shows '0 / 30'"
+      "description": "Click 'HOLD TO ACCEPT' once on the '[ PENALTY TERMS ]' window (this test build accepts a click in place of the hold)"
     },
     {
       "type": "action",
-      "description": "In the 'Read' objective, click '+5'"
+      "description": "In the 'Push-ups (knees allowed)' objective, click '+5'"
     },
     {
       "type": "action",
-      "description": "In the 'Read' objective, click '+10'"
+      "description": "In the 'Push-ups (knees allowed)' objective, click '+1'"
     },
     {
       "type": "assertion",
-      "description": "The 'Read' objective now shows '15 / 30'"
+      "description": "The 'Push-ups (knees allowed)' objective now shows '6 / 10' while 'Squats' still shows '0 / 15'"
     }
   ]
 }

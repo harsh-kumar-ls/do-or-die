@@ -7,6 +7,7 @@ import 'package:do_or_die/domain/clock.dart';
 import 'package:do_or_die/domain/day.dart';
 import 'package:do_or_die/domain/dungeon.dart';
 import 'package:do_or_die/domain/engine.dart';
+import 'package:do_or_die/domain/penalty.dart';
 import 'package:do_or_die/domain/progression.dart';
 import 'package:do_or_die/domain/systems.dart';
 import 'package:do_or_die/domain/tasks.dart';
@@ -414,4 +415,199 @@ void main() {
       expect(g.systems!.active, SystemKind.fitness);
     });
   });
+
+  group('QA regressions', () {
+    test('a System chosen late in the day starts tomorrow: no wrongful '
+        'penalty tonight', () async {
+      // Complete Fitness through a hand-built state: S held for 30 days.
+      final g = await awaken(SystemKind.fitness);
+      final sys = g.systems!;
+      final done = sys.copyWith(
+        progress: SystemProgress(
+          active: SystemKind.fitness,
+          ranks: const {SystemKind.fitness: Rank.s},
+          completed: const {SystemKind.fitness},
+        ),
+      );
+      await store.save(g.game.copyWith(systems: done));
+      final h = (await GameService.load(
+        store: store,
+        clock: clock,
+        meter: meter,
+      ))!;
+      expect(h.todaysTasks, isEmpty);
+      clock.set(h.today.at(23 * 60 + 50));
+      expect(await h.chooseSystem(SystemKind.personality, Rank.e), isTrue);
+      expect(h.todaysTasks, isEmpty, reason: 'starts tomorrow');
+      final events = await nextDay(h);
+      expect(events.whereType<QuestFailed>(), isEmpty);
+      expect(h.state.debt, isNull);
+      expect(h.todaysTasks.map((t) => t.id), contains('pages'));
+    });
+
+    Future<GameService> focusFloor2() async {
+      final g = await awaken(SystemKind.focus, placement: Rank.d);
+      meter.minutes = 10;
+      for (var i = 0; i < 21; i++) {
+        await nextDay(g);
+      }
+      expect(await g.enterGate(), isTrue);
+      await nextDay(g); // floor 1 today
+      await nextDay(g); // floor 2 today
+      expect(g.systems!.floorOn(g.today), 2);
+      return g;
+    }
+
+    test('Floor 2 caps are measured only up to 18:00', () async {
+      final g = await focusFloor2();
+      final floorDay = g.today;
+      final seen = <DateTime>[];
+      final spy = _SpyMeter(seen, 20);
+      final h = (await GameService.load(
+        store: store,
+        clock: clock,
+        meter: spy,
+      ))!;
+      clock.set(h.today.addDays(1).at(9 * 60));
+      await h.tick();
+      expect(seen.last, floorDay.at(18 * 60));
+    });
+
+    test(
+      'a partial reading never stands when judging has no reading',
+      () async {
+        final g = await awaken(SystemKind.focus, placement: Rank.d);
+        meter.minutes = 5;
+        await g.measureCaps(); // 09:00 reading: 5 minutes
+        meter.minutes = null; // usage access revoked before midnight
+        final events = await nextDay(g);
+        expect(events.whereType<QuestFailed>(), hasLength(1));
+      },
+    );
+
+    test('a reading over the cap cannot be confirmed away', () async {
+      final g = await awaken(SystemKind.focus, placement: Rank.d);
+      meter.minutes = 90;
+      await g.measureCaps();
+      meter.minutes = null;
+      expect(await g.confirmCap('social'), isFalse);
+    });
+
+    test(
+      'the Dungeon Penalty keeps the 150 push-up cap; the rest is squats',
+      () {
+        final engine = QuestEngine();
+        final day = DayKey(2026, 10, 19);
+        final r = engine.closeDaysBefore(
+          state: GameState(startDay: day, level: 21),
+          today: day.addDays(1),
+          plan: QuestPlan.initial(day, const [
+            TaskDefinition(
+              id: 'a',
+              name: 'A',
+              type: TaskType.checkbox,
+              target: 1,
+            ),
+          ]),
+          progressFor: (_) => const {},
+          sleep: const SleepWindow(),
+          random: Random(1),
+          now: day.at(23 * 60),
+          penaltyMultiplier: (_) => 2,
+        );
+        final p = engine.penalties;
+        final issued = r.events.whereType<PenaltyIssued>().single;
+        expect(issued.pushups, 150);
+        expect(
+          issued.squats,
+          p.squatsForLevel(21) * 2 + p.pushupsForLevel(21) * 2 - 150,
+        );
+      },
+    );
+
+    test(
+      'with the clock set back, floor 1 never lands on a judged day',
+      () async {
+        final g = await awaken(SystemKind.fitness);
+        await clearDays(g, 21);
+        final firstOpen = g.state.nextDayToClose;
+        clock.set(firstOpen.addDays(-4).at(12 * 60));
+        // The Gate was opened "in the future" now; move to its window.
+        final gate = g.systems!.gate!;
+        clock.set(gate.openedAt.subtract(const Duration(days: 4)));
+        final sys = g.systems!.enter(
+          gate.openedAt
+              .add(const Duration(hours: 1))
+              .subtract(const Duration(days: 4)),
+          firstOpenDay: firstOpen,
+        );
+        expect(sys, isNotNull);
+        expect(sys!.$1.dungeon!.firstFloor, firstOpen.addDays(1));
+      },
+    );
+
+    test('floors ignore the reduction valve and earn full XP', () async {
+      final g = await awaken(SystemKind.fitness);
+      await clearDays(g, 21);
+      await g.enterGate();
+      await g.setReduction(20);
+      await clearToday(g);
+      await nextDay(g); // floor 1
+      expect(g.todaysTasks.firstWhere((t) => t.id == 'pushups').target, 13);
+      await clearToday(g);
+      final events = await nextDay(g);
+      expect(
+        events.whereType<QuestCleared>().single.xpGained,
+        g.engine.config.xpPerClear,
+      );
+    });
+
+    test('a running phone-free block on Floor 2 unlocks at 18:00', () async {
+      final g = await awaken(SystemKind.focus);
+      // Focus B, on Floor 2 today.
+      final sys = g.systems!.copyWith(
+        progress: const SystemProgress(
+          active: SystemKind.focus,
+          ranks: {SystemKind.focus: Rank.b},
+        ),
+        dungeon: () => Dungeon(Rank.b, g.today.addDays(-1)),
+      );
+      await store.save(g.game.copyWith(systems: sys));
+      final f = (await GameService.load(
+        store: store,
+        clock: clock,
+        meter: meter,
+      ))!;
+      expect(f.systems!.floorOn(f.today), 2);
+      clock.set(f.today.at(17 * 60));
+      final block = f.todaysTasks.firstWhere(
+        (t) => t.type == TaskType.phoneFree,
+      );
+      await f.startTimer(block.id);
+      final blocker = FakeBlocker();
+      await PenaltyEnforcer(blocker, clock: clock).sync(f);
+      expect(blocker.focus!.$2, f.today.at(18 * 60));
+    });
+
+    test('a report missed on day 31 is still issued later', () async {
+      final g = await awaken(SystemKind.fitness);
+      await clearDays(g, 32);
+      expect(g.trialDay, 33);
+      expect(g.reportDue, isTrue);
+      await g.markReportIssued();
+      expect(g.reportDue, isFalse);
+    });
+  });
+}
+
+class _SpyMeter implements UsageMeter {
+  _SpyMeter(this.ends, this.minutes);
+  final List<DateTime> ends;
+  final int minutes;
+
+  @override
+  Future<int?> minutesUsed(Set<String> p, DateTime from, DateTime to) async {
+    ends.add(to);
+    return minutes;
+  }
 }

@@ -1,0 +1,71 @@
+{
+  "projectId": "d37f7ffc-2ffc-4da9-88ea-8ee0106eba69",
+  "type": "frontend",
+  "name": "Status: the report opens and shows the honesty section",
+  "planSteps": [
+    {
+      "type": "action",
+      "description": "Open the app at / and wait up to 30 seconds for the '[ SYSTEM ]' window to appear (a Flutter web app; it can take a while to load, and controls are exposed in the accessibility tree)"
+    },
+    {
+      "type": "action",
+      "description": "Click 'ACCEPT' on the '[ SYSTEM ]' window"
+    },
+    {
+      "type": "action",
+      "description": "On the '[ CHOOSE YOUR SYSTEM ]' window, click the card titled 'FITNESS SYSTEM'"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONFIRM SYSTEM'"
+    },
+    {
+      "type": "action",
+      "description": "Click 'SUBMIT' on the '[ PLACEMENT TEST ]' window"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONTINUE' on the '[ RANK ASSIGNED ]' window"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONFIRM APPS' on the '[ LOCK TARGETS ]' window (the web build lists no apps; that is expected)"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONFIRM' on the '[ REST PERIOD ]' window"
+    },
+    {
+      "type": "action",
+      "description": "Click 'HOLD TO ACCEPT' once on the '[ PENALTY TERMS ]' window (this test build accepts a click in place of the hold)"
+    },
+    {
+      "type": "action",
+      "description": "Click 'STATUS' in the bottom bar"
+    },
+    {
+      "type": "action",
+      "description": "Click 'REPORT' on the '[ STATUS ]' window"
+    },
+    {
+      "type": "assertion",
+      "description": "A '[ REPORT ]' window is shown with 'No day has been judged yet.'"
+    },
+    {
+      "type": "action",
+      "description": "Scroll down the report page"
+    },
+    {
+      "type": "assertion",
+      "description": "Windows titled 'HONESTY' (with a 'RELEASES TAKEN' row) and '[ VERDICT ]' (with 'Insufficient data. Continue.') are shown"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CLOSE'"
+    },
+    {
+      "type": "assertion",
+      "description": "The '[ STATUS ]' window is shown again"
+    }
+  ]
+}

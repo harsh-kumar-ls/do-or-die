@@ -121,8 +121,9 @@ object BlockerState {
     /** Diagnostics escape: ends the lock now and counts it. */
     fun stopLock(ctx: Context) {
         val p = prefs(ctx)
-        val wasLocked = isLocked(ctx)
+        val wasLocked = isPenaltyLocked(ctx)
         clearLockWindow(ctx)
+        setFocusWindow(ctx, 0L, 0L)
         if (wasLocked) p.edit().putInt(KEY_EMERGENCY_STOPS, p.getInt(KEY_EMERGENCY_STOPS, 0) + 1).commit()
     }
 

@@ -1,7 +1,7 @@
 {
   "projectId": "d37f7ffc-2ffc-4da9-88ea-8ee0106eba69",
   "type": "frontend",
-  "name": "Quest: breakfast is confirmed with the hold button",
+  "name": "Quest: a checkbox objective is confirmed with the hold button",
   "planSteps": [
     {
       "type": "action",
@@ -9,11 +9,23 @@
     },
     {
       "type": "action",
-      "description": "Click 'BEGIN REGISTRATION'"
+      "description": "Click 'ACCEPT' on the '[ SYSTEM ]' window"
     },
     {
       "type": "action",
-      "description": "Click 'CONFIRM OBJECTIVES'"
+      "description": "On the '[ CHOOSE YOUR SYSTEM ]' window, click the card titled 'PERSONALITY SYSTEM'"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONFIRM SYSTEM'"
+    },
+    {
+      "type": "action",
+      "description": "Click 'SUBMIT' on the '[ PLACEMENT TEST ]' window"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONTINUE' on the '[ RANK ASSIGNED ]' window"
     },
     {
       "type": "action",
@@ -25,23 +37,19 @@
     },
     {
       "type": "action",
-      "description": "Click 'HOLD TO ACCEPT' once (this test build accepts a click in place of the hold)"
+      "description": "Click 'HOLD TO ACCEPT' once on the '[ PENALTY TERMS ]' window (this test build accepts a click in place of the hold)"
     },
     {
       "type": "assertion",
-      "description": "The '[ DAILY QUEST ]' screen is shown with a bottom bar containing 'QUEST', 'STATUS' and 'PENALTY'"
-    },
-    {
-      "type": "assertion",
-      "description": "The 'Have breakfast' objective shows '0 / 1' and a 'HOLD TO CONFIRM' button"
+      "description": "The 'Write one journal line' objective shows '0 / 1' and a 'HOLD TO CONFIRM' button"
     },
     {
       "type": "action",
-      "description": "Click 'HOLD TO CONFIRM' once (test build: a click confirms)"
+      "description": "Click 'HOLD TO CONFIRM' once in the 'Write one journal line' objective (test build: a click confirms)"
     },
     {
       "type": "assertion",
-      "description": "The button now reads 'CONFIRMED' and 'Have breakfast' shows '1 / 1'"
+      "description": "That button now reads 'CONFIRMED' and 'Write one journal line' shows '1 / 1'"
     }
   ]
 }

@@ -148,9 +148,12 @@ class TrialReport {
       stats: g.state.stats,
       level: g.state.level,
       releases: of('lock_released').length,
-      penaltyZones: of('penalty_issued')
-          .where((e) => e.data['enforced'] != false)
-          .length,
+      // Ordinary Penalty Zones only; Dungeon Penalties are counted apart.
+      penaltyZones:
+          of('penalty_issued')
+              .where((e) => e.data['enforced'] != false)
+              .length -
+          of('dungeon_failed').length,
       dungeonPenalties: of('dungeon_failed').length,
       watcherOutages: of('blocker_offline').length,
       honourConfirmations: of('progress')

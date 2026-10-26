@@ -16,19 +16,40 @@ object UsageMeter {
         val usm = ctx.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         // Look back a little so an app opened just before [from] is seen.
         val events = usm.queryEvents(from - LOOKBACK, to)
+        // Only one app is in front at a time: any other app coming to the
+        // front, the screen going off or the phone shutting down ends every
+        // open session. This stops a missing pause event (battery died with
+        // the app open) from counting hours that never happened.
         val openSince = HashMap<String, Long>()
         var total = 0L
+        fun closeAll(at: Long) {
+            for (start in openSince.values) total += overlap(start, at, from, to)
+            openSince.clear()
+        }
         val e = UsageEvents.Event()
         while (events.hasNextEvent()) {
             events.getNextEvent(e)
-            val pkg = e.packageName ?: continue
-            if (pkg !in packages) continue
+            val pkg = e.packageName
             when (e.eventType) {
-                UsageEvents.Event.ACTIVITY_RESUMED -> openSince.putIfAbsent(pkg, e.timeStamp)
-                UsageEvents.Event.ACTIVITY_PAUSED, UsageEvents.Event.ACTIVITY_STOPPED -> {
-                    val start = openSince.remove(pkg) ?: continue
-                    total += overlap(start, e.timeStamp, from, to)
+                UsageEvents.Event.ACTIVITY_RESUMED -> {
+                    if (pkg != null && pkg in packages) {
+                        // Close others; keep this app's session if already open.
+                        val mine = openSince.remove(pkg)
+                        closeAll(e.timeStamp)
+                        openSince[pkg] = mine ?: e.timeStamp
+                    } else {
+                        closeAll(e.timeStamp)
+                    }
                 }
+                UsageEvents.Event.ACTIVITY_PAUSED, UsageEvents.Event.ACTIVITY_STOPPED -> {
+                    if (pkg != null && pkg in packages) {
+                        val start = openSince.remove(pkg) ?: continue
+                        total += overlap(start, e.timeStamp, from, to)
+                    }
+                }
+                UsageEvents.Event.SCREEN_NON_INTERACTIVE,
+                UsageEvents.Event.DEVICE_SHUTDOWN,
+                UsageEvents.Event.KEYGUARD_SHOWN -> closeAll(e.timeStamp)
             }
         }
         for (start in openSince.values) total += overlap(start, to, from, to)

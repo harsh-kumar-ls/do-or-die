@@ -1,7 +1,7 @@
 {
   "projectId": "d37f7ffc-2ffc-4da9-88ea-8ee0106eba69",
   "type": "frontend",
-  "name": "Onboarding: a user-written objective appears on the Daily Quest",
+  "name": "Awakening: a strong placement test starts the Player at rank C, never higher",
   "planSteps": [
     {
       "type": "action",
@@ -9,19 +9,35 @@
     },
     {
       "type": "action",
-      "description": "Click 'BEGIN REGISTRATION'"
+      "description": "Click 'ACCEPT' on the '[ SYSTEM ]' window"
     },
     {
       "type": "action",
-      "description": "Click '+ ADD OBJECTIVE'"
+      "description": "On the '[ CHOOSE YOUR SYSTEM ]' window, click the card titled 'FITNESS SYSTEM'"
     },
     {
       "type": "action",
-      "description": "In the new empty 'Objective name' text box (the fourth one), type 'Meditate'"
+      "description": "Click 'CONFIRM SYSTEM'"
     },
     {
       "type": "action",
-      "description": "Click 'CONFIRM OBJECTIVES'"
+      "description": "On the '[ PLACEMENT TEST ]' window, clear the number box for 'Most push-ups you can do in one set' and type 80"
+    },
+    {
+      "type": "action",
+      "description": "On the '[ PLACEMENT TEST ]' window, clear the number box for 'Minutes to walk or jog 1 km' and type 4"
+    },
+    {
+      "type": "action",
+      "description": "Click 'SUBMIT' on the '[ PLACEMENT TEST ]' window"
+    },
+    {
+      "type": "assertion",
+      "description": "The '[ RANK ASSIGNED ]' window shows 'FITNESS SYSTEM \u00b7 RANK C' and the line 'Ranks above C are earned only through Dungeons.'"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONTINUE' on the '[ RANK ASSIGNED ]' window"
     },
     {
       "type": "action",
@@ -33,11 +49,11 @@
     },
     {
       "type": "action",
-      "description": "Click 'HOLD TO ACCEPT' once (this test build accepts a click in place of the hold)"
+      "description": "Click 'HOLD TO ACCEPT' once on the '[ PENALTY TERMS ]' window (this test build accepts a click in place of the hold)"
     },
     {
       "type": "assertion",
-      "description": "The '[ DAILY QUEST ]' screen lists four objectives including 'Meditate' with '0 / 1' and its own 'HOLD TO CONFIRM' button"
+      "description": "The '[ DAILY QUEST ]' window lists 'Jog' showing '0.0 / 2.0 km' and 'Push-ups' showing '0 / 30'"
     }
   ]
 }

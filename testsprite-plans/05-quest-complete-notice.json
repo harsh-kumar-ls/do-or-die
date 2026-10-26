@@ -9,15 +9,23 @@
     },
     {
       "type": "action",
-      "description": "Click 'BEGIN REGISTRATION'"
+      "description": "Click 'ACCEPT' on the '[ SYSTEM ]' window"
     },
     {
       "type": "action",
-      "description": "In the second objective row (named 'Study'), clear the 'Target minutes' text box and type 1"
+      "description": "On the '[ CHOOSE YOUR SYSTEM ]' window, click the card titled 'PERSONALITY SYSTEM'"
     },
     {
       "type": "action",
-      "description": "Click 'CONFIRM OBJECTIVES'"
+      "description": "Click 'CONFIRM SYSTEM'"
+    },
+    {
+      "type": "action",
+      "description": "Click 'SUBMIT' on the '[ PLACEMENT TEST ]' window"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONTINUE' on the '[ RANK ASSIGNED ]' window"
     },
     {
       "type": "action",
@@ -29,27 +37,19 @@
     },
     {
       "type": "action",
-      "description": "Click 'HOLD TO ACCEPT' once (this test build accepts a click in place of the hold)"
+      "description": "Click 'HOLD TO ACCEPT' once on the '[ PENALTY TERMS ]' window (this test build accepts a click in place of the hold)"
+    },
+    {
+      "type": "action",
+      "description": "In the 'Read (pages)' objective, click '+5' twice"
+    },
+    {
+      "type": "action",
+      "description": "Click 'HOLD TO CONFIRM' once in the 'Write one journal line' objective"
     },
     {
       "type": "assertion",
-      "description": "The '[ DAILY QUEST ]' screen is shown with a bottom bar containing 'QUEST', 'STATUS' and 'PENALTY'"
-    },
-    {
-      "type": "action",
-      "description": "Click 'HOLD TO CONFIRM' once for 'Have breakfast'"
-    },
-    {
-      "type": "action",
-      "description": "In the 'Read' objective, click '+10' three times"
-    },
-    {
-      "type": "action",
-      "description": "Click 'START' in the 'Study' objective, then wait 70 seconds without clicking"
-    },
-    {
-      "type": "assertion",
-      "description": "A '[ NOTIFICATION ]' window appears containing the text 'The daily quest has been completed.' and 'Reward: +100 XP'"
+      "description": "A '[ NOTIFICATION ]' window appears containing 'The daily quest has been completed.' and 'Reward: +100 XP'"
     },
     {
       "type": "action",

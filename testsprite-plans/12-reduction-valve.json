@@ -1,0 +1,67 @@
+{
+  "projectId": "d37f7ffc-2ffc-4da9-88ea-8ee0106eba69",
+  "type": "frontend",
+  "name": "Status: lowering the quest by 20% applies from tomorrow at half XP",
+  "planSteps": [
+    {
+      "type": "action",
+      "description": "Open the app at / and wait up to 30 seconds for the '[ SYSTEM ]' window to appear (a Flutter web app; it can take a while to load, and controls are exposed in the accessibility tree)"
+    },
+    {
+      "type": "action",
+      "description": "Click 'ACCEPT' on the '[ SYSTEM ]' window"
+    },
+    {
+      "type": "action",
+      "description": "On the '[ CHOOSE YOUR SYSTEM ]' window, click the card titled 'FITNESS SYSTEM'"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONFIRM SYSTEM'"
+    },
+    {
+      "type": "action",
+      "description": "Click 'SUBMIT' on the '[ PLACEMENT TEST ]' window"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONTINUE' on the '[ RANK ASSIGNED ]' window"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONFIRM APPS' on the '[ LOCK TARGETS ]' window (the web build lists no apps; that is expected)"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONFIRM' on the '[ REST PERIOD ]' window"
+    },
+    {
+      "type": "action",
+      "description": "Click 'HOLD TO ACCEPT' once on the '[ PENALTY TERMS ]' window (this test build accepts a click in place of the hold)"
+    },
+    {
+      "type": "action",
+      "description": "Click 'STATUS' in the bottom bar"
+    },
+    {
+      "type": "assertion",
+      "description": "The 'QUEST REDUCTION' row on the '[ STATUS ]' window shows 'Full quest'"
+    },
+    {
+      "type": "action",
+      "description": "In the 'QUEST REDUCTION' row, click '20%'"
+    },
+    {
+      "type": "assertion",
+      "description": "The 'QUEST REDUCTION' row now shows 'Tomorrow 20% \u00b7 half XP'"
+    },
+    {
+      "type": "action",
+      "description": "Click 'QUEST' in the bottom bar"
+    },
+    {
+      "type": "assertion",
+      "description": "The 'Push-ups (knees allowed)' objective still shows '0 / 10' today (the reduction is not applied until tomorrow)"
+    }
+  ]
+}

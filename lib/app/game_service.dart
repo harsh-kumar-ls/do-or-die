@@ -228,6 +228,9 @@ class GameService {
   /// Archives this game and removes it, so the next launch begins a new
   /// Awakening. Refused (false) while a penalty or a Dungeon is in effect.
   Future<bool> abandon({String reason = 'trial_restarted'}) async {
+    // Judge any finished day first, so a failure from just before midnight
+    // can't be escaped in the seconds before the next check.
+    await tick();
     if (penaltyInEffect || dungeonInProgress) return false;
     if (_game.timer != null) await stopTimer();
     await _store.archive(
@@ -298,7 +301,9 @@ class GameService {
             : 1,
         xpPercent: (d) => tasks.isEmpty
             ? 0 // no quest (no System chosen yet): nothing to earn
-            : sys != null && sys.progress.reductionOn(d) > 0
+            : sys != null &&
+                  !sys.isDungeonDay(d) &&
+                  sys.progress.reductionOn(d) > 0
             ? 50 // the reduction valve halves the day's XP
             : 100,
       );
@@ -338,6 +343,12 @@ class GameService {
         systems: nextSys,
       );
     }
+    // A Dungeon whose floors all lie in already-judged days (only possible
+    // after clock changes) is closed, so it can't block Gates for good.
+    final stale = g.systems?.dungeon;
+    if (stale != null && stale.bossDay.isBefore(g.state.nextDayToClose)) {
+      g = g.copyWith(systems: g.systems!.copyWith(dungeon: () => null));
+    }
     final sys = g.systems;
     if (sys != null) {
       final (after, expired) = sys.expireGate(now);
@@ -366,14 +377,35 @@ class GameService {
     ];
     if (caps.isEmpty) return g;
     final now = _clock.now();
-    final midnight = day.addDays(1).at(0);
-    final to = final_ || now.isAfter(midnight) ? midnight : now;
+    // A floor with a deadline is measured only up to its deadline.
+    var end = day.addDays(1).at(0);
+    final deadline = g.systems?.deadlineOn(day);
+    if (deadline != null && deadline.isBefore(end)) end = deadline;
+    final to = final_ || now.isAfter(end) ? end : now;
     final minutes = await meter.minutesUsed(
       g.blockList.packagesOn(day),
       day.at(0),
       to,
     );
-    if (minutes == null) return g;
+    if (minutes == null) {
+      if (!final_) return g;
+      // No reading at judging: a partial reading from earlier in the day
+      // must not stand. Only an honour confirmation does.
+      final kept = {...?g.progress[day]};
+      var changed = false;
+      for (final t in caps) {
+        if (!kept.containsKey(t.id) || _honoured(g, day, t.id)) continue;
+        kept.remove(t.id);
+        changed = true;
+      }
+      if (!changed) return g;
+      return g.copyWith(
+        progress: {...g.progress, day: kept},
+        newLogEntries: [
+          LogEntry(now, 'cap_unmeasured', {'day': day.toString()}),
+        ],
+      );
+    }
     final dayProgress = {
       ...?g.progress[day],
       for (final t in caps) t.id: minutes,
@@ -391,6 +423,15 @@ class GameService {
     );
   }
 
+  /// Whether the user confirmed [taskId] on [day] on the honour system.
+  static bool _honoured(SavedGame g, DayKey day, String taskId) => g.log.any(
+    (e) =>
+        e.type == 'progress' &&
+        e.data['day'] == day.toString() &&
+        e.data['taskId'] == taskId &&
+        e.data['honour'] == true,
+  );
+
   /// Re-reads today's screen time for any cap in today's quest.
   Future<void> measureCaps() async {
     final next = await _withCapsMeasured(_game, today);
@@ -407,6 +448,9 @@ class GameService {
     final task = todaysTasks.where((t) => t.id == taskId).firstOrNull;
     if (task == null || !task.isCap) return false;
     if (await canMeasureCaps()) return false;
+    // A reading already over the cap today can't be confirmed away.
+    final read = todaysProgress[taskId];
+    if (read != null && read > task.target) return false;
     await _setProgress(task, task.target, honour: true);
     return true;
   }
@@ -416,7 +460,7 @@ class GameService {
   Future<bool> enterGate() async {
     await tick();
     final sys = _game.systems;
-    final entered = sys?.enter(now);
+    final entered = sys?.enter(now, firstOpenDay: _game.state.nextDayToClose);
     if (entered == null) return false;
     final (next, event) = entered;
     _systemEvents.add(event);
@@ -467,7 +511,9 @@ class GameService {
     if (sys == null || !sys.progress.canChooseSystem) return false;
     if (sys.progress.completed.contains(kind)) return false;
     if (placement.index > highestPlacement.index) return false;
-    final next = sys.choose(kind, placement, today);
+    // The new quest starts tomorrow, so it is never judged on a day the
+    // user had no chance to do it.
+    final next = sys.choose(kind, placement, today.addDays(1));
     await _commit(
       _game.copyWith(
         systems: next,
@@ -477,6 +523,7 @@ class GameService {
             'system': kind.name,
             'placement': placement.name,
             'answers': answers,
+            'startsOn': today.addDays(1).toString(),
           }),
         ],
       ),
@@ -484,13 +531,12 @@ class GameService {
     return true;
   }
 
-  /// Every 30 days of the trial (days 31, 61, ...) a report is issued once.
+  /// Every 30 days of the trial (from day 31, 61, ...) a report is issued
+  /// once, even if the app wasn't opened on that exact day.
   bool get reportDue {
-    final d = trialDay;
-    if (d <= 1 || (d - 1) % 30 != 0) return false;
-    return !_game.log.any(
-      (e) => e.type == 'report_issued' && e.data['day'] == today.toString(),
-    );
+    final owed = (trialDay - 1) ~/ 30;
+    final issued = _game.log.where((e) => e.type == 'report_issued').length;
+    return issued < owed;
   }
 
   Future<void> markReportIssued() => _commit(
