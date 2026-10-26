@@ -9,6 +9,17 @@ enum TaskType {
 
   /// A count, such as pages read. Target is the count.
   counter,
+
+  /// Metres covered. Target is metres.
+  distance,
+
+  /// Minutes of social-media use, measured, never above the target. Lower is
+  /// better; with no measurement the item is not complete.
+  screenCap,
+
+  /// A phone-free block run with the in-app timer. Target is minutes;
+  /// progress is seconds, like [timer].
+  phoneFree,
 }
 
 class TaskDefinition {
@@ -17,7 +28,7 @@ class TaskDefinition {
     required this.name,
     required this.type,
     required this.target,
-  }) : assert(target > 0);
+  }) : assert(target > 0 || (type == TaskType.screenCap && target >= 0));
 
   final String id;
   final String name;
@@ -28,9 +39,19 @@ class TaskDefinition {
 
   /// What progress is measured against. Timer progress is stored in seconds
   /// so pausing never loses time.
-  int get goal => type == TaskType.timer ? target * 60 : target;
+  int get goal => type == TaskType.timer || type == TaskType.phoneFree
+      ? target * 60
+      : target;
 
-  bool isComplete(int progress) => progress >= goal;
+  /// Whether lower progress is better (a cap, not a goal).
+  bool get isCap => type == TaskType.screenCap;
+
+  /// [progress] is null when nothing was recorded that day. A cap with no
+  /// measurement is never complete: an unknown can't count as a clear.
+  bool isComplete(int? progress) {
+    if (isCap) return progress != null && progress <= target;
+    return (progress ?? 0) >= goal;
+  }
 }
 
 /// Progress for one day, keyed by task id.

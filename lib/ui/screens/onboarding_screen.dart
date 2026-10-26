@@ -369,6 +369,7 @@ class _TaskEditorState extends State<_TaskEditor> {
       TaskType.checkbox => 'once',
       TaskType.timer => 'minutes',
       TaskType.counter => 'count',
+      _ => '',
     };
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -408,13 +409,18 @@ class _TaskEditorState extends State<_TaskEditor> {
           const SizedBox(height: 8),
           Row(
             children: [
-              for (final type in TaskType.values) ...[
+              for (final type in const [
+                TaskType.checkbox,
+                TaskType.timer,
+                TaskType.counter,
+              ]) ...[
                 Expanded(
                   child: _TypeChip(
                     label: switch (type) {
                       TaskType.checkbox => 'CHECK',
                       TaskType.timer => 'TIMER',
                       TaskType.counter => 'COUNT',
+                      _ => '',
                     },
                     selected: d.type == type,
                     onTap: () {

@@ -153,12 +153,36 @@ class _TaskRow extends StatelessWidget {
   final GameModel model;
   final TaskDefinition task;
 
+  bool get _isClock =>
+      task.type == TaskType.timer || task.type == TaskType.phoneFree;
+
+  /// The figure on the right of the row.
+  String _reading(int progress) {
+    switch (task.type) {
+      case TaskType.timer:
+      case TaskType.phoneFree:
+        return '${(progress * 100 / task.goal).floor().clamp(0, 100)}%';
+      case TaskType.distance:
+        return '${_km(progress.clamp(0, task.goal))} / ${_km(task.goal)} km';
+      case TaskType.screenCap:
+        return model.isMeasured(task)
+            ? '$progress / ${task.target} min'
+            : '— / ${task.target} min';
+      case TaskType.checkbox:
+      case TaskType.counter:
+        return '${progress.clamp(0, task.goal)} / ${task.goal}';
+    }
+  }
+
+  static String _km(int metres) => (metres / 1000).toStringAsFixed(1);
+
   @override
   Widget build(BuildContext context) {
     final p = HudScope.of(context);
     final progress = model.progress(task);
     final done = model.isDone(task);
-    final isTimer = task.type == TaskType.timer;
+    final cap = task.isCap;
+    final over = cap && model.isMeasured(task) && !done;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Column(
@@ -174,32 +198,50 @@ class _TaskRow extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
+              const SizedBox(width: 8),
               Text(
-                isTimer
-                    ? '${(progress * 100 / task.goal).floor().clamp(0, 100)}%'
-                    : '${progress.clamp(0, task.goal)} / ${task.goal}',
+                _reading(progress),
                 style: Hud.mono(
                   15,
-                  done ? Hud.gold : p.hi,
+                  over
+                      ? Hud.warn
+                      : done
+                      ? Hud.gold
+                      : p.hi,
                   weight: FontWeight.w500,
                 ),
               ),
             ],
           ),
-          if (isTimer) ...[
+          if (_isClock) ...[
             const SizedBox(height: 10),
             _TimerClock(model: model, task: task),
           ],
           const SizedBox(height: 10),
-          HudBar(value: progress / task.goal, done: done),
+          HudBar(
+            value: cap
+                ? (task.target == 0
+                      ? (progress > 0 ? 1 : 0)
+                      : progress / task.target)
+                : progress / task.goal,
+            done: done,
+          ),
           const SizedBox(height: 10),
-          _controls(done),
+          if (model.pastDeadline && !done)
+            Text(
+              'Deadline passed. This floor can no longer be cleared.',
+              textAlign: TextAlign.center,
+              style: Hud.mono(11, Hud.warn),
+            )
+          else
+            _controls(context, done),
         ],
       ),
     );
   }
 
-  Widget _controls(bool done) {
+  Widget _controls(BuildContext context, bool done) {
+    final p = HudScope.of(context);
     switch (task.type) {
       case TaskType.checkbox:
         return HoldButton(
@@ -221,23 +263,62 @@ class _TaskRow extends StatelessWidget {
               : 'START',
           onPressed: () => model.toggleTimer(task),
         );
+      case TaskType.phoneFree:
+        final running = model.isTimerRunning(task);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            HudButton(
+              running
+                  ? 'END BLOCK'
+                  : done
+                  ? 'TARGET REACHED · NEW BLOCK'
+                  : 'START BLOCK',
+              onPressed: () => model.toggleTimer(task),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              running ? 'Chosen apps are locked until the block ends.' : 'Only the longest single block counts. Chosen apps lock while it runs.',
+              textAlign: TextAlign.center,
+              style: Hud.mono(10, p.dim),
+            ),
+          ],
+        );
       case TaskType.counter:
         final steps = task.target >= 20 ? [1, 5, 10] : [1];
-        return Row(
-          children: [
-            for (final (i, s) in steps.indexed) ...[
-              if (i > 0) const SizedBox(width: 8),
-              Expanded(
-                child: HudButton(
-                  '+$s',
-                  onPressed: done ? null : () => model.addProgress(task, s),
-                ),
-              ),
-            ],
-          ],
+        return _steps(steps, done, (s) => '+$s');
+      case TaskType.distance:
+        return _steps(const [100, 500], done, (s) => '+$s m');
+      case TaskType.screenCap:
+        if (model.capsMeasurable) {
+          return Text(
+            'Measured from usage access on the chosen apps. Lower is better.',
+            textAlign: TextAlign.center,
+            style: Hud.mono(10, p.dim),
+          );
+        }
+        return HoldButton(
+          label: 'HOLD TO CONFIRM UNDER LIMIT',
+          doneLabel: 'CONFIRMED · HONOUR',
+          done: done,
+          onConfirmed: () => model.confirmCap(task),
         );
     }
   }
+
+  Widget _steps(List<int> steps, bool done, String Function(int) label) => Row(
+    children: [
+      for (final (i, s) in steps.indexed) ...[
+        if (i > 0) const SizedBox(width: 8),
+        Expanded(
+          child: HudButton(
+            label(s),
+            onPressed: done ? null : () => model.addProgress(task, s),
+          ),
+        ),
+      ],
+    ],
+  );
 }
 
 /// Large HH:MM:SS clock for timer objectives, ticking while it runs.

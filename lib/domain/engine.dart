@@ -147,15 +147,22 @@ class QuestEngine {
   /// [isEnforced] decides, per failed day, whether its penalty is real. A
   /// dry-run day still gets the full penalty and lock window worked out and
   /// reported, but nothing is owed and nothing is locked.
+  ///
+  /// [tasksFor], when given, replaces [plan] as the source of each day's
+  /// quest (System games). [penaltyMultiplier] scales a failed day's penalty
+  /// (2 on a Dungeon floor); [xpPercent] scales its XP.
   EngineResult closeDaysBefore({
     required GameState state,
     required DayKey today,
     required QuestPlan plan,
     required DayProgress Function(DayKey day) progressFor,
+    List<TaskDefinition> Function(DayKey day)? tasksFor,
     required SleepWindow sleep,
     required Random random,
     required DateTime now,
     bool Function(DayKey failedDay) isEnforced = _always,
+    int Function(DayKey day) penaltyMultiplier = _one,
+    int Function(DayKey day) xpPercent = _hundred,
   }) {
     final events = <GameEvent>[];
     var s = state;
@@ -164,12 +171,14 @@ class QuestEngine {
       s = _closeDay(
         s,
         day,
-        plan.tasksFor(day),
+        tasksFor != null ? tasksFor(day) : plan.tasksFor(day),
         progressFor(day),
         sleep,
         random,
         now,
         isEnforced(day),
+        penaltyMultiplier(day),
+        xpPercent(day),
         events,
       );
     }
@@ -177,6 +186,8 @@ class QuestEngine {
   }
 
   static bool _always(DayKey _) => true;
+  static int _one(DayKey _) => 1;
+  static int _hundred(DayKey _) => 100;
 
   GameState _closeDay(
     GameState s,
@@ -187,11 +198,13 @@ class QuestEngine {
     Random random,
     DateTime now,
     bool enforced,
+    int multiplier,
+    int xpPercent,
     List<GameEvent> events,
   ) {
     final failedIds = [
       for (final t in tasks)
-        if (!t.isComplete(progress[t.id] ?? 0)) t.id,
+        if (!t.isComplete(progress[t.id])) t.id,
     ];
     final cleared = failedIds.isEmpty;
 
@@ -203,8 +216,9 @@ class QuestEngine {
     final penaltyLevel = level;
 
     if (cleared) {
-      xp += config.xpPerClear;
-      events.add(QuestCleared(day, config.xpPerClear));
+      final gained = config.xpPerClear * xpPercent ~/ 100;
+      xp += gained;
+      events.add(QuestCleared(day, gained));
       while (xp >= progression.xpToNextLevel(level)) {
         xp -= progression.xpToNextLevel(level);
         level++;
@@ -231,8 +245,9 @@ class QuestEngine {
     final tomorrow = day.addDays(1);
 
     if (!cleared) {
-      final pushups = penalties.pushupsForLevel(penaltyLevel);
-      final squats = penalties.squatsForLevel(penaltyLevel);
+      // A failed Dungeon floor multiplies the whole penalty (x2).
+      final pushups = penalties.pushupsForLevel(penaltyLevel) * multiplier;
+      final squats = penalties.squatsForLevel(penaltyLevel) * multiplier;
       events.add(
         PenaltyIssued(
           day,
@@ -244,7 +259,8 @@ class QuestEngine {
 
       final window = scheduler.schedule(
         day: tomorrow,
-        durationMinutes: penalties.lockMinutesForLevel(penaltyLevel),
+        durationMinutes:
+            penalties.lockMinutesForLevel(penaltyLevel) * multiplier,
         sleep: sleep,
         random: random,
         notBefore: now,

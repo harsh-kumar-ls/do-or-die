@@ -1,5 +1,6 @@
 import '../domain/block_list.dart';
 import '../domain/day.dart';
+import '../domain/dungeon.dart';
 import '../domain/engine.dart';
 import '../domain/penalty.dart';
 import '../domain/tasks.dart';
@@ -35,6 +36,7 @@ class SavedGame {
     required this.log,
     this.timer,
     this.liveFrom,
+    this.systems,
   });
 
   factory SavedGame.fromJson(Map<String, Object?> j) => SavedGame(
@@ -53,6 +55,9 @@ class SavedGame {
         ? null
         : RunningTimer.fromJson((j['timer'] as Map).cast<String, Object?>()),
     liveFrom: j['liveFrom'] == null ? null : dayFromJson(j['liveFrom']),
+    systems: j['systems'] == null
+        ? null
+        : systemsFromJson((j['systems'] as Map).cast<String, Object?>()),
   );
 
   static const schemaVersion = 1;
@@ -74,6 +79,10 @@ class SavedGame {
   /// Null (games saved before dry-run mode existed) means always enforced.
   final DayKey? liveFrom;
 
+  /// The user's System, rank, Gate and Dungeon. Null for games saved before
+  /// Systems existed: those keep their own written objectives.
+  final SystemsState? systems;
+
   /// Whether a failure on [day] brings a real penalty.
   bool isEnforced(DayKey day) => liveFrom == null || !day.isBefore(liveFrom!);
 
@@ -87,6 +96,7 @@ class SavedGame {
     'log': [for (final e in log) e.toJson()],
     'timer': timer?.toJson(),
     'liveFrom': liveFrom == null ? null : dayToJson(liveFrom!),
+    'systems': systems == null ? null : systemsToJson(systems!),
   };
 
   /// Returns a copy. [newLogEntries] are appended; existing entries can't be
@@ -98,6 +108,7 @@ class SavedGame {
     BlockList? blockList,
     SleepWindow? sleep,
     RunningTimer? Function()? timer,
+    SystemsState? systems,
     List<LogEntry> newLogEntries = const [],
   }) => SavedGame(
     state: state ?? this.state,
@@ -107,6 +118,7 @@ class SavedGame {
     sleep: sleep ?? this.sleep,
     timer: timer != null ? timer() : this.timer,
     liveFrom: liveFrom,
+    systems: systems ?? this.systems,
     log: newLogEntries.isEmpty
         ? log
         : List.unmodifiable([...log, ...newLogEntries]),

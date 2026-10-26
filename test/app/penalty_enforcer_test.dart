@@ -16,6 +16,14 @@ class FakeBlocker extends NoopAppBlocker {
   DateTime? releasedUntil;
   int releases = 0;
   String? judgeDue;
+  LockMode? mode;
+  (DateTime, DateTime)? focus;
+
+  @override
+  Future<void> setFocusWindow(DateTime? s, DateTime? e) async {
+    calls.add('focus');
+    focus = s == null || e == null ? null : (s, e);
+  }
 
   @override
   Future<void> setBlockedPackages(Set<String> p) async {
@@ -29,8 +37,10 @@ class FakeBlocker extends NoopAppBlocker {
     DateTime e, {
     DateTime? releasedUntil,
     int releases = 0,
+    LockMode mode = LockMode.penalty,
   }) async {
     calls.add('window');
+    this.mode = mode;
     window = (s, e);
     this.releasedUntil = releasedUntil;
     this.releases = releases;

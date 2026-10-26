@@ -30,7 +30,11 @@ class BlockActivity : Activity() {
                 finish()
                 return
             }
-            countdown.text = format(BlockerState.lockEndsAt(ctx) - TrustedTime.nowMillis())
+            val penalty = BlockerState.isPenaltyLocked(ctx)
+            countdown.textSize = if (penalty) 40f else 16f
+            countdown.text = if (penalty)
+                format(BlockerState.lockEndsAt(ctx) - TrustedTime.nowMillis())
+            else "Pause the block in Do or Die to end it."
             val used = BlockerState.releases(ctx)
             releaseLine.text = if (used == 0) "" else
                 "Releases used: $used (${used * 15} min)"
@@ -41,18 +45,33 @@ class BlockActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val red = Color.parseColor("#FF3B4A")
+        val mode = BlockerState.mode(this)
+        val red = Color.parseColor(
+            when (mode) {
+                "dungeon" -> "#E0B44C"
+                "focus" -> "#4FC3F7"
+                else -> "#FF3B4A"
+            },
+        )
         val dim = Color.parseColor("#8A93A6")
 
         val title = TextView(this).apply {
-            text = "[ PENALTY ZONE ]"
+            text = when (mode) {
+                "dungeon" -> "[ DUNGEON PENALTY ]"
+                "focus" -> "[ PHONE-FREE BLOCK ]"
+                else -> "[ PENALTY ZONE ]"
+            }
             setTextColor(red)
             textSize = 26f
             typeface = Typeface.MONOSPACE
             gravity = Gravity.CENTER
         }
         val body = TextView(this).apply {
-            text = "Access denied.\nThe quest was not completed."
+            text = when (mode) {
+                "dungeon" -> "Access denied.\nThe Dungeon was not cleared."
+                "focus" -> "Access denied.\nA phone-free block is running."
+                else -> "Access denied.\nThe quest was not completed."
+            }
             setTextColor(dim)
             textSize = 16f
             typeface = Typeface.MONOSPACE
@@ -81,7 +100,7 @@ class BlockActivity : Activity() {
             LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
-                setBackgroundColor(Color.parseColor("#07080C"))
+                setBackgroundColor(Color.parseColor(if (mode == "dungeon") "#0E0406" else "#07080C"))
                 setPadding(48, 48, 48, 48)
                 addView(title)
                 addView(body)

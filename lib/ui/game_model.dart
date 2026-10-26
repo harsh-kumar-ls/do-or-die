@@ -153,8 +153,13 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
 
   GameState get state => service.state;
   List<TaskDefinition> get tasks => service.todaysTasks;
-  int progress(TaskDefinition t) => service.liveProgress(t.id);
-  bool isDone(TaskDefinition t) => t.isComplete(progress(t));
+
+  /// Progress for display; 0 when nothing is recorded yet.
+  int progress(TaskDefinition t) => service.liveProgress(t.id) ?? 0;
+
+  /// Whether a cap has a reading (measured or confirmed) today.
+  bool isMeasured(TaskDefinition t) => service.liveProgress(t.id) != null;
+  bool isDone(TaskDefinition t) => t.isComplete(service.liveProgress(t.id));
   bool get isQuestComplete => tasks.isNotEmpty && tasks.every(isDone);
   Rank get rank => service.engine.progression.rankForLevel(state.level);
   int get xpToNext => service.engine.progression.xpToNextLevel(state.level);
@@ -174,9 +179,22 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
 
   bool get inPenalty => hasDebt || lockActive || lockPending || lockReleased;
 
+  /// Whether screen-time caps are read automatically (usage access).
+  bool capsMeasurable = false;
+
+  /// Floor 2's deadline has passed today.
+  bool get pastDeadline => service.pastDeadline;
+
+  Future<void> confirmCap(TaskDefinition t) =>
+      _run(() => service.confirmCap(t.id));
+
   Future<void> tick() async {
     await _refreshClock();
     final events = await service.tick();
+    if (tasks.any((t) => t.isCap)) {
+      capsMeasurable = await service.canMeasureCaps();
+      await service.measureCaps();
+    }
     await _sync();
     if (events.isEmpty) {
       notifyListeners(); // clock or permission state may have changed

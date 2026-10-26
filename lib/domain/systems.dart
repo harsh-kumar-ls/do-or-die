@@ -49,6 +49,16 @@ class QuestItem {
     return QuestItem(id, label, kind, next);
   }
 
+  /// The item made harder by [percent], for Dungeon floors: targets rise,
+  /// caps drop. A checkbox stays as it is.
+  QuestItem scaledUpBy(int percent) {
+    if (percent <= 0 || kind == QuestKind.checkbox) return this;
+    final next = lowerIsBetter
+        ? max(0, (target * (100 - percent) / 100).floor())
+        : (target * (100 + percent) / 100).ceil();
+    return QuestItem(id, label, kind, next);
+  }
+
   @override
   bool operator ==(Object other) =>
       other is QuestItem &&

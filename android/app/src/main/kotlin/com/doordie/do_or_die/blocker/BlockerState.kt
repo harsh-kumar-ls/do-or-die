@@ -18,6 +18,9 @@ object BlockerState {
     private const val KEY_LOCK_ENDS_AT = "lockEndsAt"
     private const val KEY_RELEASED_UNTIL = "releasedUntil"
     private const val KEY_RELEASES = "releases"
+    private const val KEY_MODE = "lockMode"
+    private const val KEY_FOCUS_STARTS_AT = "focusStartsAt"
+    private const val KEY_FOCUS_ENDS_AT = "focusEndsAt"
     private const val KEY_JUDGE_DUE_FROM = "judgeDueFrom"
     private const val KEY_LAST_CONNECTED_AT = "lastConnectedAt"
     private const val KEY_LAST_DISCONNECTED_AT = "lastDisconnectedAt"
@@ -48,11 +51,29 @@ object BlockerState {
     /** Short releases taken during the current lock. */
     fun releases(ctx: Context): Int = prefs(ctx).getInt(KEY_RELEASES, 0)
 
-    /** Inside the window and not in a short release. */
-    fun isLocked(ctx: Context): Boolean {
+    /** Inside the penalty window and not in a short release. */
+    fun isPenaltyLocked(ctx: Context): Boolean {
         val now = TrustedTime.nowMillis()
         val inWindow = now >= lockStartsAt(ctx) && now < lockEndsAt(ctx)
         return inWindow && now >= releasedUntil(ctx)
+    }
+
+    /** A phone-free block the user started is running. */
+    fun isFocusLocked(ctx: Context): Boolean {
+        val p = prefs(ctx)
+        val now = TrustedTime.nowMillis()
+        return now >= p.getLong(KEY_FOCUS_STARTS_AT, 0L) && now < p.getLong(KEY_FOCUS_ENDS_AT, 0L)
+    }
+
+    /** Chosen apps are locked right now, by a penalty or a phone-free block. */
+    fun isLocked(ctx: Context): Boolean = isPenaltyLocked(ctx) || isFocusLocked(ctx)
+
+    /** Kept apart from the penalty window so neither can erase the other. */
+    fun setFocusWindow(ctx: Context, startsAt: Long, endsAt: Long) {
+        prefs(ctx).edit()
+            .putLong(KEY_FOCUS_STARTS_AT, startsAt)
+            .putLong(KEY_FOCUS_ENDS_AT, endsAt)
+            .commit()
     }
 
     /** The window the rules engine scheduled. Its start is never shown to the user. */
@@ -62,8 +83,10 @@ object BlockerState {
         endsAt: Long,
         releasedUntil: Long = 0L,
         releases: Int = 0,
+        mode: String = "penalty",
     ) {
         prefs(ctx).edit()
+            .putString(KEY_MODE, mode)
             .putLong(KEY_LOCK_STARTS_AT, startsAt)
             .putLong(KEY_LOCK_ENDS_AT, endsAt)
             .putLong(KEY_RELEASED_UNTIL, releasedUntil)
@@ -71,8 +94,17 @@ object BlockerState {
             .commit()
     }
 
+    /**
+     * What the block screen shows: "penalty", "dungeon" (the day after a
+     * failed Dungeon floor) or "focus" (only a phone-free block is running).
+     */
+    fun mode(ctx: Context): String =
+        if (!isPenaltyLocked(ctx) && isFocusLocked(ctx)) "focus"
+        else prefs(ctx).getString(KEY_MODE, "penalty") ?: "penalty"
+
     fun clearLockWindow(ctx: Context) {
         prefs(ctx).edit()
+            .putString(KEY_MODE, "penalty")
             .putLong(KEY_LOCK_STARTS_AT, 0L)
             .putLong(KEY_LOCK_ENDS_AT, 0L)
             .putLong(KEY_RELEASED_UNTIL, 0L)
@@ -143,7 +175,9 @@ object BlockerState {
             "lockEndsAt" to lockEndsAt(ctx),
             "releasedUntil" to releasedUntil(ctx),
             "releases" to releases(ctx),
+            "mode" to mode(ctx),
             "locked" to isLocked(ctx),
+            "focusLocked" to isFocusLocked(ctx),
             "blockedPackages" to blockedPackages(ctx).sorted(),
             "needsJudgement" to needsJudgement(ctx),
             "lastConnectedAt" to p.getLong(KEY_LAST_CONNECTED_AT, 0L),

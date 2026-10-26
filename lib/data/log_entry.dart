@@ -1,3 +1,4 @@
+import '../domain/dungeon.dart';
 import '../domain/engine.dart';
 
 /// One line of the trial log. The log is append-only: nothing in the app can
@@ -64,6 +65,41 @@ class LogEntry {
         },
       ),
       LockMissed() => LogEntry(at, 'lock_missed', {'day': day}),
+    };
+  }
+
+  /// Converts a System event into a log entry recorded at [at].
+  factory LogEntry.fromSystemEvent(DateTime at, SystemEvent e) {
+    final day = e.day.toString();
+    return switch (e) {
+      GateOpened(:final gate) => LogEntry(at, 'gate_opened', {
+        'day': day,
+        'from': gate.from.name,
+        'expiresAt': gate.expiresAt.toIso8601String(),
+      }),
+      GateExpired() => LogEntry(at, 'gate_expired', {'day': day}),
+      DungeonEntered(:final dungeon) => LogEntry(at, 'dungeon_entered', {
+        'day': day,
+        'from': dungeon.from.name,
+        'firstFloor': dungeon.firstFloor.toString(),
+      }),
+      FloorCleared(:final floor) => LogEntry(at, 'floor_cleared', {
+        'day': day,
+        'floor': floor,
+      }),
+      DungeonCleared(:final newRank, :final title) => LogEntry(
+        at,
+        'dungeon_cleared',
+        {'day': day, 'newRank': newRank.name, 'title': title},
+      ),
+      DungeonFailed(:final floor) => LogEntry(at, 'dungeon_failed', {
+        'day': day,
+        'floor': floor,
+      }),
+      SystemCompleted(:final system) => LogEntry(at, 'system_completed', {
+        'day': day,
+        'system': system.name,
+      }),
     };
   }
 }

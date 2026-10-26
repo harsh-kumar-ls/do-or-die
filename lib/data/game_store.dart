@@ -11,6 +11,9 @@ abstract class GameStore {
 
   /// Keeps a finished or abandoned game (with its full log) for later review.
   Future<void> archive(SavedGame game);
+
+  /// Removes the current game (after it has been archived).
+  Future<void> clear();
 }
 
 /// Stores the game as a JSON string. Works on Android and web.
@@ -31,6 +34,9 @@ class PrefsGameStore implements GameStore {
   @override
   Future<void> save(SavedGame game) =>
       _prefs.setString(_key, jsonEncode(game.toJson()));
+
+  @override
+  Future<void> clear() => _prefs.remove(_key);
 
   /// Each archive gets its own key; nothing is ever overwritten.
   @override
@@ -58,6 +64,9 @@ class MemoryGameStore implements GameStore {
     _raw = jsonEncode(game.toJson());
     saves++;
   }
+
+  @override
+  Future<void> clear() async => _raw = null;
 
   /// Archived games, oldest first.
   final archived = <SavedGame>[];

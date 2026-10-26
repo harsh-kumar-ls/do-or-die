@@ -1,8 +1,10 @@
 import '../domain/block_list.dart';
 import '../domain/day.dart';
+import '../domain/dungeon.dart';
 import '../domain/engine.dart';
 import '../domain/penalty.dart';
 import '../domain/progression.dart';
+import '../domain/systems.dart';
 import '../domain/tasks.dart';
 
 /// Hand-written JSON conversion for everything that is saved. Kept explicit
@@ -158,3 +160,110 @@ Map<DayKey, DayProgress> progressFromJson(Map<String, Object?> j) => {
   for (final e in j.entries)
     dayFromJson(e.key): Map<String, int>.from(e.value as Map),
 };
+
+// ---- Systems & Dungeons -------------------------------------------------
+
+Map<String, Object?> questItemToJson(QuestItem q) => {
+  'id': q.id,
+  'label': q.label,
+  'kind': q.kind.name,
+  'target': q.target,
+};
+
+Map<String, Object?> systemsToJson(SystemsState s) => {
+  'active': s.progress.active?.name,
+  'ranks': {for (final e in s.progress.ranks.entries) e.key.name: e.value.name},
+  'completed': [for (final k in s.progress.completed) k.name],
+  'reductions': [
+    for (final (from, pct) in s.progress.reductions)
+      {'from': dayToJson(from), 'percent': pct},
+  ],
+  'history': {for (final e in s.history.entries) dayToJson(e.key): e.value},
+  'countFrom': s.countFrom == null ? null : dayToJson(s.countFrom!),
+  'gate': s.gate == null
+      ? null
+      : {
+          'from': s.gate!.from.name,
+          'openedAt': s.gate!.openedAt.toIso8601String(),
+        },
+  'dungeon': s.dungeon == null
+      ? null
+      : {
+          'from': s.dungeon!.from.name,
+          'firstFloor': dayToJson(s.dungeon!.firstFloor),
+        },
+  'gateBlockedUntil': s.gateBlockedUntil == null
+      ? null
+      : dayToJson(s.gateBlockedUntil!),
+  'dungeonPenaltyDay': s.dungeonPenaltyDay == null
+      ? null
+      : dayToJson(s.dungeonPenaltyDay!),
+  'titles': s.titles,
+  'sHold': s.sHold,
+  'systemStartedOn': s.systemStartedOn == null
+      ? null
+      : dayToJson(s.systemStartedOn!),
+};
+
+SystemsState systemsFromJson(Map<String, Object?> j) {
+  DayKey? day(String k) => j[k] == null ? null : dayFromJson(j[k]);
+  final active = j['active'] as String?;
+  final gate = (j['gate'] as Map?)?.cast<String, Object?>();
+  final dungeon = (j['dungeon'] as Map?)?.cast<String, Object?>();
+  return SystemsState(
+    progress: SystemProgress(
+      active: active == null ? null : SystemKind.values.byName(active),
+      ranks: {
+        for (final e in (j['ranks'] as Map).cast<String, String>().entries)
+          SystemKind.values.byName(e.key): Rank.values.byName(e.value),
+      },
+      completed: {
+        for (final k in (j['completed'] as List).cast<String>())
+          SystemKind.values.byName(k),
+      },
+      reductions: [
+        for (final r in (j['reductions'] as List).cast<Map>())
+          (dayFromJson(r['from']), r['percent'] as int),
+      ],
+    ),
+    history: {
+      for (final e in (j['history'] as Map).cast<String, bool>().entries)
+        dayFromJson(e.key): e.value,
+    },
+    countFrom: day('countFrom'),
+    gate: gate == null
+        ? null
+        : Gate(
+            Rank.values.byName(gate['from'] as String),
+            DateTime.parse(gate['openedAt'] as String),
+          ),
+    dungeon: dungeon == null
+        ? null
+        : Dungeon(
+            Rank.values.byName(dungeon['from'] as String),
+            dayFromJson(dungeon['firstFloor']),
+          ),
+    gateBlockedUntil: day('gateBlockedUntil'),
+    dungeonPenaltyDay: day('dungeonPenaltyDay'),
+    titles: (j['titles'] as List).cast<String>(),
+    sHold: j['sHold'] as int,
+    systemStartedOn: day('systemStartedOn'),
+  );
+}
+
+/// A System quest item as an engine task.
+TaskDefinition questTask(QuestItem q) => TaskDefinition(
+  id: q.id,
+  name: q.label,
+  type: switch (q.kind) {
+    QuestKind.checkbox => TaskType.checkbox,
+    QuestKind.timer => TaskType.timer,
+    QuestKind.counter => TaskType.counter,
+    QuestKind.distance => TaskType.distance,
+    QuestKind.screenCap => TaskType.screenCap,
+    QuestKind.phoneFree => TaskType.phoneFree,
+  },
+  // A 0-minute cap (a full fast) is a valid target; TaskDefinition requires
+  // a positive target only for goals.
+  target: q.target,
+);

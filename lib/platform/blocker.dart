@@ -97,6 +97,15 @@ class SystemStatus {
   final bool autoTime;
 }
 
+/// What the block screen says during a lock.
+enum LockMode {
+  /// A failed daily quest.
+  penalty,
+
+  /// The day after a failed Dungeon floor: double lock, its own look.
+  dungeon,
+}
+
 /// An installed app the user can choose to lock.
 class InstalledApp {
   const InstalledApp(this.package, this.label, this.icon);
@@ -108,7 +117,7 @@ class InstalledApp {
   final Uint8List? icon;
 }
 
-/// Locks distracting apps. Android uses an accessibility service; other
+/// Locks distracting apps. Android uses a usage-access watcher service; other
 /// platforms get a stub until they have their own implementation.
 abstract class AppBlocker {
   /// Whether this platform can actually lock apps (false on web).
@@ -127,8 +136,13 @@ abstract class AppBlocker {
     DateTime endsAt, {
     DateTime? releasedUntil,
     int releases = 0,
+    LockMode mode = LockMode.penalty,
   });
   Future<void> clearLockWindow();
+
+  /// A phone-free block the user is running: the chosen apps stay locked
+  /// until it is paused. Kept apart from the penalty window. Null clears it.
+  Future<void> setFocusWindow(DateTime? startsAt, DateTime? endsAt);
 
   /// First day not yet judged, as yyyy-MM-dd. If it's before today, opening
   /// a locked app sends the user to Do or Die to get the verdict first.
@@ -176,10 +190,14 @@ class NoopAppBlocker implements AppBlocker {
     DateTime endsAt, {
     DateTime? releasedUntil,
     int releases = 0,
+    LockMode mode = LockMode.penalty,
   }) async {}
 
   @override
   Future<void> clearLockWindow() async {}
+
+  @override
+  Future<void> setFocusWindow(DateTime? startsAt, DateTime? endsAt) async {}
 
   @override
   Future<void> setJudgeDueFrom(String isoDay) async {}
@@ -233,15 +251,24 @@ class AndroidAppBlocker implements AppBlocker {
     DateTime endsAt, {
     DateTime? releasedUntil,
     int releases = 0,
+    LockMode mode = LockMode.penalty,
   }) => _channel.invokeMethod('setLockWindow', {
     'startsAt': startsAt.millisecondsSinceEpoch,
     'endsAt': endsAt.millisecondsSinceEpoch,
     'releasedUntil': releasedUntil?.millisecondsSinceEpoch ?? 0,
     'releases': releases,
+    'mode': mode.name,
   });
 
   @override
   Future<void> clearLockWindow() => _channel.invokeMethod('clearLockWindow');
+
+  @override
+  Future<void> setFocusWindow(DateTime? startsAt, DateTime? endsAt) =>
+      _channel.invokeMethod('setFocusWindow', {
+        'startsAt': startsAt?.millisecondsSinceEpoch ?? 0,
+        'endsAt': endsAt?.millisecondsSinceEpoch ?? 0,
+      });
 
   @override
   Future<void> setJudgeDueFrom(String isoDay) =>

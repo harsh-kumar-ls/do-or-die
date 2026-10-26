@@ -44,7 +44,8 @@ class MainActivity : FlutterActivity() {
                         val end = call.argument<Number>("endsAt")?.toLong() ?: 0L
                         val releasedUntil = call.argument<Number>("releasedUntil")?.toLong() ?: 0L
                         val releases = call.argument<Number>("releases")?.toInt() ?: 0
-                        BlockerState.setLockWindow(this, start, end, releasedUntil, releases)
+                        val mode = call.argument<String>("mode") ?: "penalty"
+                        BlockerState.setLockWindow(this, start, end, releasedUntil, releases, mode)
                         result.success(null)
                     }
                     "clearLockWindow" -> {
@@ -101,6 +102,22 @@ class MainActivity : FlutterActivity() {
                             ),
                         )
                         result.success(null)
+                    }
+                    "setFocusWindow" -> {
+                        BlockerState.setFocusWindow(
+                            this,
+                            call.argument<Number>("startsAt")?.toLong() ?: 0L,
+                            call.argument<Number>("endsAt")?.toLong() ?: 0L,
+                        )
+                        result.success(null)
+                    }
+                    "minutesUsed" -> thread {
+                        val packages = call.argument<List<String>>("packages").orEmpty().toSet()
+                        val from = call.argument<Number>("from")?.toLong() ?: 0L
+                        val to = call.argument<Number>("to")?.toLong() ?: 0L
+                        val ms = com.doordie.do_or_die.blocker.UsageMeter
+                            .foregroundMillis(this, packages, from, to)
+                        main.post { result.success(if (ms < 0) null else (ms / 60_000L).toInt()) }
                     }
                     "startLock" -> {
                         BlockerState.startLock(this, call.argument<Int>("minutes") ?: 0)

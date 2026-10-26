@@ -10,8 +10,12 @@ import '../domain/day.dart';
 import '../domain/engine.dart';
 import '../domain/penalty.dart';
 import '../domain/progression.dart';
+import '../domain/dungeon.dart';
+import '../domain/system_catalogue.dart';
+import '../domain/systems.dart';
 import '../domain/tasks.dart';
 import '../data/codec.dart';
+import '../platform/usage_meter.dart';
 
 /// The single entry point the UI uses. Every change is logged and saved.
 class GameService {
@@ -20,13 +24,20 @@ class GameService {
     this._clock,
     this._random,
     this.engine,
-    this._game,
-  );
+    this._game, {
+    this.meter = const NoUsageMeter(),
+  });
 
   final GameStore _store;
   final Clock _clock;
   final Random _random;
   final QuestEngine engine;
+
+  /// Reads screen time for caps (Android usage access).
+  final UsageMeter meter;
+
+  /// Quests and Rank Trials for every System.
+  final Map<SystemKind, SystemSpec> catalogue = systemCatalogue;
   SavedGame _game;
 
   SavedGame get game => _game;
@@ -35,7 +46,19 @@ class GameService {
 
   /// The current time on the game's clock (network-corrected on Android).
   DateTime get now => _clock.now();
-  List<TaskDefinition> get todaysTasks => _game.plan.tasksFor(today);
+  List<TaskDefinition> get todaysTasks => _tasksFor(_game, today);
+
+  /// The user's System, or null for a game with its own written objectives.
+  SystemsState? get systems => _game.systems;
+
+  /// The quest for [day]: the System's (a Dungeon floor or the daily quest)
+  /// or, in an older game, the user's own objectives.
+  List<TaskDefinition> _tasksFor(SavedGame g, DayKey day) {
+    final sys = g.systems;
+    if (sys == null) return g.plan.tasksFor(day);
+    return [for (final q in sys.questFor(catalogue, day)) questTask(q)];
+  }
+
   DayProgress get todaysProgress => _game.progress[today] ?? const {};
   Set<String> get blockedToday => _game.blockList.packagesOn(today);
 
@@ -45,6 +68,7 @@ class GameService {
     Clock clock = const SystemClock(),
     Random? random,
     QuestEngine? engine,
+    UsageMeter meter = const NoUsageMeter(),
   }) async {
     final saved = await store.load();
     if (saved == null) return null;
@@ -54,6 +78,7 @@ class GameService {
       random ?? Random(),
       engine ?? QuestEngine(),
       saved,
+      meter: meter,
     );
     await service.tick();
     return service;
@@ -72,6 +97,7 @@ class GameService {
     Clock clock = const SystemClock(),
     Random? random,
     QuestEngine? engine,
+    UsageMeter meter = const NoUsageMeter(),
   }) async {
     final now = clock.now();
     final day = DayKey.fromDateTime(now);
@@ -100,6 +126,58 @@ class GameService {
       random ?? Random(),
       engine ?? QuestEngine(),
       game,
+      meter: meter,
+    );
+  }
+
+  /// Starts a new game in [system] at the [placement] rank (E to C): the
+  /// System writes the quests from now on. [placementAnswers] are logged.
+  static Future<GameService> awaken({
+    required GameStore store,
+    required SystemKind system,
+    required Rank placement,
+    required Set<String> blockedPackages,
+    SleepWindow sleep = const SleepWindow(),
+    int dryRunDays = 3,
+    Map<String, Object?> placementAnswers = const {},
+    Clock clock = const SystemClock(),
+    Random? random,
+    QuestEngine? engine,
+    UsageMeter meter = const NoUsageMeter(),
+  }) async {
+    final now = clock.now();
+    final day = DayKey.fromDateTime(now);
+    final liveFrom = dryRunDays > 0 ? day.addDays(dryRunDays) : null;
+    final systems = const SystemsState(progress: SystemProgress())
+        .choose(system, placement, day);
+    final game = SavedGame(
+      state: GameState.start(day),
+      plan: QuestPlan.initial(day, const []),
+      progress: const {},
+      blockList: BlockList.initial(day, blockedPackages),
+      sleep: sleep,
+      liveFrom: liveFrom,
+      systems: systems,
+      log: List.unmodifiable([
+        LogEntry(now, 'awakened', {
+          'day': day.toString(),
+          'system': system.name,
+          'placement': placement.name,
+          'answers': placementAnswers,
+          'blocked': blockedPackages.toList()..sort(),
+          'sleep': {'start': sleep.startMinute, 'end': sleep.endMinute},
+          'liveFrom': liveFrom?.toString(),
+        }),
+      ]),
+    );
+    await store.save(game);
+    return GameService._(
+      store,
+      clock,
+      random ?? Random(),
+      engine ?? QuestEngine(),
+      game,
+      meter: meter,
     );
   }
 
@@ -126,6 +204,9 @@ class GameService {
   /// restart can never be used to escape one. Returns null when refused.
   Future<GameService?> restartTrial({int dryRunDays = 3}) async {
     if (penaltyInEffect) return null;
+    if (_game.systems != null) {
+      throw StateError('A System game restarts through abandon().');
+    }
     if (_game.timer != null) await stopTimer();
     final archived = _game.copyWith(
       newLogEntries: [LogEntry(now, 'trial_restarted')],
@@ -140,48 +221,300 @@ class GameService {
       clock: _clock,
       random: _random,
       engine: engine,
+      meter: meter,
     );
+  }
+
+  /// Archives this game and removes it, so the next launch begins a new
+  /// Awakening. Refused (false) while a penalty or a Dungeon is in effect.
+  Future<bool> abandon({String reason = 'trial_restarted'}) async {
+    if (penaltyInEffect || dungeonInProgress) return false;
+    if (_game.timer != null) await stopTimer();
+    await _store.archive(
+      _game.copyWith(newLogEntries: [LogEntry(now, reason)]),
+    );
+    await _store.clear();
+    return true;
+  }
+
+  /// A game from before Systems existed. It is archived (with its log) and
+  /// replaced by an Awakening, unless a penalty is still in effect: then it
+  /// waits until that is over.
+  bool get needsMigration => _game.systems == null && !penaltyInEffect;
+
+  /// A Dungeon floor is today or still to come.
+  bool get dungeonInProgress {
+    final d = _game.systems?.dungeon;
+    return d != null && !d.bossDay.isBefore(today);
+  }
+
+  /// System events since the UI last asked, oldest first.
+  final List<SystemEvent> _systemEvents = [];
+
+  /// Returns and forgets System events (Gate opened, floor cleared, ...).
+  List<SystemEvent> takeSystemEvents() {
+    final out = [..._systemEvents];
+    _systemEvents.clear();
+    return out;
   }
 
   /// Judges any finished days. Call on app start, on resume, and at midnight.
+  ///
+  /// Days are judged one at a time, oldest first, so the System's verdict on
+  /// one day (a Gate opening, a rank-up) shapes the quest of the next.
   Future<List<GameEvent>> tick() async {
     final now = _clock.now();
+    final today = DayKey.fromDateTime(now);
     // A timer left running past midnight counts only up to midnight, and
     // must be credited before that day is judged.
+    // So does one still running at a Dungeon floor's deadline.
     final timer = _game.timer;
     if (timer != null &&
-        DayKey.fromDateTime(timer.startedAt)
-            .isBefore(DayKey.fromDateTime(now))) {
+        (DayKey.fromDateTime(timer.startedAt).isBefore(today) ||
+            pastDeadline)) {
       await _commit(_withTimerCredited(now));
     }
-    final result = engine.closeDaysBefore(
-      state: _game.state,
-      today: DayKey.fromDateTime(now),
-      plan: _game.plan,
-      progressFor: (d) => _game.progress[d] ?? const {},
-      sleep: _game.sleep,
-      random: _random,
-      now: now,
-      isEnforced: _game.isEnforced,
+    final events = <GameEvent>[];
+    final log = <LogEntry>[];
+    var g = _game;
+    while (g.state.nextDayToClose.isBefore(today)) {
+      final day = g.state.nextDayToClose;
+      g = await _withCapsMeasured(g, day, final_: true);
+      final sys = g.systems;
+      final tasks = _tasksFor(g, day);
+      final result = engine.closeDaysBefore(
+        state: g.state,
+        today: day.addDays(1),
+        plan: g.plan,
+        tasksFor: (_) => tasks,
+        progressFor: (d) => g.progress[d] ?? const {},
+        sleep: g.sleep,
+        random: _random,
+        now: now,
+        isEnforced: g.isEnforced,
+        // A failed Dungeon floor: double lock, double reps.
+        penaltyMultiplier: (d) => sys != null && sys.isDungeonDay(d)
+            ? DungeonRules.failMultiplier
+            : 1,
+        xpPercent: (d) => tasks.isEmpty
+            ? 0 // no quest (no System chosen yet): nothing to earn
+            : sys != null && sys.progress.reductionOn(d) > 0
+            ? 50 // the reduction valve halves the day's XP
+            : 100,
+      );
+      var state = result.state;
+      events.addAll(result.events);
+      log.addAll([for (final e in result.events) LogEntry.fromEvent(now, e)]);
+      var nextSys = sys;
+      if (sys != null) {
+        final cleared = result.events.any((e) => e is QuestCleared);
+        final (after, sysEvents) = sys.afterDayClosed(
+          day: day,
+          cleared: cleared,
+          dryRun: !g.isEnforced(day),
+          now: now,
+        );
+        nextSys = after;
+        for (final e in sysEvents) {
+          if (e is DungeonCleared) {
+            state = state.copyWith(
+              unspentStatPoints:
+                  state.unspentStatPoints + DungeonRules.clearStatPoints,
+            );
+          }
+          _systemEvents.add(e);
+          log.add(LogEntry.fromSystemEvent(now, e));
+        }
+      }
+      g = SavedGame(
+        state: state,
+        plan: g.plan,
+        progress: g.progress,
+        blockList: g.blockList,
+        sleep: g.sleep,
+        log: g.log,
+        timer: g.timer,
+        liveFrom: g.liveFrom,
+        systems: nextSys,
+      );
+    }
+    final sys = g.systems;
+    if (sys != null) {
+      final (after, expired) = sys.expireGate(now);
+      if (expired.isNotEmpty) {
+        g = g.copyWith(systems: after);
+        _systemEvents.addAll(expired);
+        log.addAll([for (final e in expired) LogEntry.fromSystemEvent(now, e)]);
+      }
+    }
+    if (log.isEmpty && identical(g, _game)) return const [];
+    await _commit(g.copyWith(newLogEntries: log));
+    return events;
+  }
+
+  /// Measures screen-time caps on [day] from the phone's usage data: up to
+  /// now, or the whole day when [final_]. Without usage access nothing is
+  /// changed, so an honour confirmation (see [confirmCap]) stands.
+  Future<SavedGame> _withCapsMeasured(
+    SavedGame g,
+    DayKey day, {
+    bool final_ = false,
+  }) async {
+    final caps = [
+      for (final t in _tasksFor(g, day))
+        if (t.isCap) t,
+    ];
+    if (caps.isEmpty) return g;
+    final now = _clock.now();
+    final midnight = day.addDays(1).at(0);
+    final to = final_ || now.isAfter(midnight) ? midnight : now;
+    final minutes = await meter.minutesUsed(
+      g.blockList.packagesOn(day),
+      day.at(0),
+      to,
     );
-    if (result.events.isEmpty) return const [];
+    if (minutes == null) return g;
+    final dayProgress = {
+      ...?g.progress[day],
+      for (final t in caps) t.id: minutes,
+    };
+    return g.copyWith(
+      progress: {...g.progress, day: dayProgress},
+      newLogEntries: final_
+          ? [
+              LogEntry(now, 'cap_measured', {
+                'day': day.toString(),
+                'minutes': minutes,
+              }),
+            ]
+          : const [],
+    );
+  }
+
+  /// Re-reads today's screen time for any cap in today's quest.
+  Future<void> measureCaps() async {
+    final next = await _withCapsMeasured(_game, today);
+    if (!identical(next, _game)) await _commit(next);
+  }
+
+  /// Whether today's screen time can be measured automatically.
+  Future<bool> canMeasureCaps() async =>
+      await meter.minutesUsed(const {}, today.at(0), now) != null;
+
+  /// Honour-system confirmation that a cap was kept, for phones without
+  /// usage access. Ignored when the phone can measure it.
+  Future<bool> confirmCap(String taskId) async {
+    final task = todaysTasks.where((t) => t.id == taskId).firstOrNull;
+    if (task == null || !task.isCap) return false;
+    if (await canMeasureCaps()) return false;
+    await _setProgress(task, task.target, honour: true);
+    return true;
+  }
+
+  /// Enters the open Gate: Floor 1 is tomorrow. Returns false when no Gate
+  /// is open (or it has just expired).
+  Future<bool> enterGate() async {
+    await tick();
+    final sys = _game.systems;
+    final entered = sys?.enter(now);
+    if (entered == null) return false;
+    final (next, event) = entered;
+    _systemEvents.add(event);
     await _commit(
       _game.copyWith(
-        state: result.state,
+        systems: next,
+        newLogEntries: [LogEntry.fromSystemEvent(now, event)],
+      ),
+    );
+    return true;
+  }
+
+  /// Sets the reduction valve (0-20%) from tomorrow. While it is above zero
+  /// each cleared day earns half XP. Logged every time.
+  Future<void> setReduction(int percent) async {
+    final sys = _game.systems;
+    if (sys == null || sys.active == null) return;
+    final value = percent.clamp(0, maxQuestReduction);
+    if (sys.progress.reductionOn(today.addDays(1)) == value) return;
+    await _commit(
+      _game.copyWith(
+        systems: sys.copyWith(
+          progress: sys.progress.setReduction(today, value),
+        ),
         newLogEntries: [
-          for (final e in result.events) LogEntry.fromEvent(now, e),
+          LogEntry(now, 'reduction_set', {
+            'percent': value,
+            'effectiveFrom': today.addDays(1).toString(),
+          }),
         ],
       ),
     );
-    return result.events;
   }
 
-  /// Sets today's progress on [taskId]. Ignored for unknown tasks.
+  /// The reduction in force today, and the one set for tomorrow.
+  int get reductionToday => _game.systems?.progress.reductionOn(today) ?? 0;
+  int get reductionTomorrow =>
+      _game.systems?.progress.reductionOn(today.addDays(1)) ?? 0;
+
+  /// Chooses the next System once the current one is complete. Its quests
+  /// start today. Returns false when choosing isn't allowed.
+  Future<bool> chooseSystem(
+    SystemKind kind,
+    Rank placement, {
+    Map<String, Object?> answers = const {},
+  }) async {
+    final sys = _game.systems;
+    if (sys == null || !sys.progress.canChooseSystem) return false;
+    if (sys.progress.completed.contains(kind)) return false;
+    if (placement.index > highestPlacement.index) return false;
+    final next = sys.choose(kind, placement, today);
+    await _commit(
+      _game.copyWith(
+        systems: next,
+        newLogEntries: [
+          LogEntry(now, 'system_chosen', {
+            'day': today.toString(),
+            'system': kind.name,
+            'placement': placement.name,
+            'answers': answers,
+          }),
+        ],
+      ),
+    );
+    return true;
+  }
+
+  /// A Dungeon Penalty applies today (the day after a failed floor).
+  bool get dungeonPenaltyToday =>
+      _game.systems?.dungeonPenaltyDay == today && penaltyInEffect;
+
+  /// Floor 2's 18:00 deadline today, if today is Floor 2.
+  DateTime? get deadlineToday => _game.systems?.deadlineOn(today);
+
+  /// Today's deadline has passed: progress can no longer be recorded.
+  bool get pastDeadline {
+    final d = deadlineToday;
+    return d != null && !now.isBefore(d);
+  }
+
+  /// Sets today's progress on [taskId]. Ignored for unknown tasks, for caps
+  /// (they are measured, or confirmed with [confirmCap]) and after a
+  /// Dungeon floor's deadline.
   Future<void> setProgress(String taskId, int value) async {
     await tick();
+    final task = todaysTasks.where((t) => t.id == taskId).firstOrNull;
+    if (task == null || task.isCap) return;
+    await _setProgress(task, value);
+  }
+
+  Future<void> _setProgress(
+    TaskDefinition task,
+    int value, {
+    bool honour = false,
+  }) async {
+    final taskId = task.id;
     final day = today;
-    if (!_game.state.isOpen(day)) return;
-    if (!todaysTasks.any((t) => t.id == taskId)) return;
+    if (!_game.state.isOpen(day) || pastDeadline) return;
     final clamped = max(0, value);
     final dayProgress = {...todaysProgress, taskId: clamped};
     await _commit(
@@ -192,6 +525,7 @@ class GameService {
             'day': day.toString(),
             'taskId': taskId,
             'value': clamped,
+            if (honour) 'honour': true,
           }),
         ],
       ),
@@ -204,27 +538,68 @@ class GameService {
   bool isTimerRunning(String taskId) => _game.timer?.taskId == taskId;
 
   /// Today's progress, including time on a timer that is still running
-  /// (seconds for timer tasks).
-  int liveProgress(String taskId) {
-    final saved = todaysProgress[taskId] ?? 0;
+  /// (seconds for timer tasks). Null when nothing is recorded for a cap:
+  /// an unmeasured cap is not kept.
+  int? liveProgress(String taskId) {
+    final recorded = todaysProgress[taskId];
+    final saved = recorded ?? 0;
     final timer = _game.timer;
-    if (timer == null || timer.taskId != taskId) return saved;
+    if (timer == null || timer.taskId != taskId) {
+      return recorded ?? _zero(taskId);
+    }
     if (DayKey.fromDateTime(timer.startedAt) != today) return saved;
-    return saved + max(0, _clock.now().difference(timer.startedAt).inSeconds);
+    final running = _timerEnd(
+      timer,
+      _clock.now(),
+    ).difference(timer.startedAt).inSeconds;
+    // A phone-free block counts the longest single block, not the total.
+    return _isPhoneFree(taskId)
+        ? max(saved, max(0, running))
+        : saved + max(0, running);
+  }
+
+  int? _zero(String taskId) {
+    final t = todaysTasks.where((t) => t.id == taskId).firstOrNull;
+    return t != null && t.isCap ? null : 0;
+  }
+
+  bool _isPhoneFree(String taskId) =>
+      todaysTasks.any((t) => t.id == taskId && t.type == TaskType.phoneFree);
+
+  /// Where a timer stops counting: now, but never past its day's midnight
+  /// or a Dungeon floor's deadline.
+  DateTime _timerEnd(RunningTimer timer, DateTime now) {
+    final day = DayKey.fromDateTime(timer.startedAt);
+    var end = day.addDays(1).at(0);
+    final deadline = _game.systems?.deadlineOn(day);
+    if (deadline != null && deadline.isBefore(end)) end = deadline;
+    return now.isAfter(end) ? end : now;
+  }
+
+  /// The phone-free block running now, if any: the chosen apps stay locked
+  /// until it is paused.
+  RunningTimer? get focusBlock {
+    final timer = _game.timer;
+    if (timer == null || !_isPhoneFree(timer.taskId)) return null;
+    return timer;
   }
 
   /// Seconds elapsed on the running timer for [taskId], for a live display.
   int runningSeconds(String taskId) {
     final timer = _game.timer;
     if (timer == null || timer.taskId != taskId) return 0;
-    return max(0, _clock.now().difference(timer.startedAt).inSeconds);
+    return max(
+      0,
+      _timerEnd(timer, _clock.now()).difference(timer.startedAt).inSeconds,
+    );
   }
 
   Future<void> startTimer(String taskId) async {
     await tick();
     final task = todaysTasks.where((t) => t.id == taskId).firstOrNull;
-    if (task == null || task.type != TaskType.timer) return;
-    if (!_game.state.isOpen(today)) return;
+    if (task == null) return;
+    if (task.type != TaskType.timer && task.type != TaskType.phoneFree) return;
+    if (!_game.state.isOpen(today) || pastDeadline) return;
     if (_game.timer?.taskId == taskId) return;
     var next = _game.timer == null ? _game : _withTimerCredited(_clock.now());
     final now = _clock.now();
@@ -247,15 +622,20 @@ class GameService {
   }
 
   /// Stops the running timer and adds its seconds to the day it started,
-  /// counting no further than that day's midnight.
+  /// counting no further than that day's midnight (or a floor's deadline).
+  /// A phone-free block keeps the longest single block instead of a total.
   SavedGame _withTimerCredited(DateTime now) {
     final timer = _game.timer!;
     final day = DayKey.fromDateTime(timer.startedAt);
-    final midnight = day.addDays(1).at(0);
-    final end = now.isAfter(midnight) ? midnight : now;
+    final end = _timerEnd(timer, now);
     final seconds = max(0, end.difference(timer.startedAt).inSeconds);
     final credited = _game.state.isOpen(day);
     final dayProgress = _game.progress[day] ?? const {};
+    final before = dayProgress[timer.taskId] ?? 0;
+    final phoneFree = _tasksFor(
+      _game,
+      day,
+    ).any((t) => t.id == timer.taskId && t.type == TaskType.phoneFree);
     return _game.copyWith(
       timer: () => null,
       progress: credited
@@ -263,7 +643,9 @@ class GameService {
               ..._game.progress,
               day: {
                 ...dayProgress,
-                timer.taskId: (dayProgress[timer.taskId] ?? 0) + seconds,
+                timer.taskId: phoneFree
+                    ? max(before, seconds)
+                    : before + seconds,
               },
             }
           : null,
