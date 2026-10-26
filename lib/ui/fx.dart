@@ -13,7 +13,10 @@ enum Cue {
   rep('rep'),
   notice('notice'),
   levelUp('level_up'),
-  penalty('penalty');
+  penalty('penalty'),
+  gateOpen('gate_open'),
+  rankUp('rank_up'),
+  dungeonPenalty('dungeon_penalty');
 
   const Cue(this.file);
   final String file;
@@ -67,7 +70,8 @@ class Fx {
   static double _volume(Cue cue) => switch (cue) {
     Cue.tap => .45,
     Cue.window => .7,
-    Cue.penalty => 1.0,
+    Cue.penalty || Cue.dungeonPenalty => 1.0,
+    Cue.gateOpen || Cue.rankUp => .95,
     Cue.levelUp => .9,
     _ => .7,
   };
@@ -85,6 +89,8 @@ class Fx {
       case Cue.notice:
         HapticFeedback.mediumImpact();
       case Cue.levelUp:
+      case Cue.rankUp:
+      case Cue.gateOpen:
         HapticFeedback.heavyImpact();
         Future.delayed(
           const Duration(milliseconds: 160),
@@ -92,6 +98,12 @@ class Fx {
         );
       case Cue.penalty:
         HapticFeedback.vibrate();
+      case Cue.dungeonPenalty:
+        HapticFeedback.vibrate();
+        Future.delayed(
+          const Duration(milliseconds: 320),
+          HapticFeedback.vibrate,
+        );
     }
   }
 }

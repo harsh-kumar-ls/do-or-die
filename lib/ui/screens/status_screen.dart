@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
+import '../../domain/dungeon.dart';
 import '../../domain/progression.dart';
 import '../game_model.dart';
 import '../theme.dart';
@@ -14,42 +15,83 @@ class StatusScreen extends StatelessWidget {
     this.onOpenDiagnostics,
     this.onRestartTrial,
     this.onOpenSystemCheck,
+    this.onChooseSystem,
+    this.onOpenReport,
   });
 
   /// Opens the System Check screen.
   final VoidCallback? onOpenSystemCheck;
 
-  /// Archives this game and starts a fresh trial (with a dry run).
+  /// Archives this game and returns to the Awakening.
   final Future<void> Function()? onRestartTrial;
+
+  /// Opens the next-System choice (only once the current one is complete).
+  final VoidCallback? onChooseSystem;
+
+  /// Opens the 30-day report.
+  final VoidCallback? onOpenReport;
 
   final GameModel model;
   final VoidCallback? onOpenDiagnostics;
+
+  /// Where the user stands on the way to the next Gate.
+  static String gateLine(GameModel m) {
+    final sys = m.systems;
+    if (sys == null || sys.active == null) return '—';
+    if (sys.progress.completed.contains(sys.active)) return 'SYSTEM COMPLETE';
+    if (m.rank == Rank.s) {
+      return 'HOLD S · ${sys.sHold} / ${SystemsState.catalogueHoldDays}';
+    }
+    final floor = m.floorToday;
+    if (floor > 0) {
+      return floor == 3 ? 'RANK TRIAL TODAY' : 'FLOOR $floor TODAY';
+    }
+    if (sys.dungeon != null) return 'DUNGEON FROM TOMORROW';
+    if (m.gate != null) return 'OPEN · ENTER ON QUEST';
+    if (m.gateBlockedDays > 0) return 'SHUT · ${m.gateBlockedDays} DAYS';
+    return '${m.clearedInWindow} / ${DungeonRules.clearedNeeded} CLEARED';
+  }
 
   @override
   Widget build(BuildContext context) {
     final p = HudScope.of(context);
     final s = model.state;
-    final log = model.service.game.log;
-    final cleared = log.where((e) => e.type == 'quest_cleared').length;
-    final penalties = log.where((e) => e.type == 'penalty_issued').length;
+    final spec = model.systemSpec;
+    final sys = model.systems;
+    final rankColor = Hud.rankColor(model.rank);
 
     final rank = Column(
       children: [
         Text(
           model.rank.name.toUpperCase(),
           textAlign: TextAlign.center,
-          style: Hud.head(
-            84,
-            p.hi,
-            spacing: 0,
-          ).copyWith(height: 1, shadows: p.textGlow(2.4)),
+          style: Hud.head(76, sys == null ? p.hi : rankColor, spacing: 0)
+              .copyWith(
+                height: 1,
+                shadows: [
+                  Shadow(
+                    color: (sys == null ? p.sys : rankColor).withValues(
+                      alpha: .7,
+                    ),
+                    blurRadius: p.glow * 2.4,
+                  ),
+                ],
+              ),
         ),
         const SizedBox(height: 4),
         Text(
-          'RANK',
+          spec == null ? 'RANK' : '${spec.name.toUpperCase()} · RANK',
           textAlign: TextAlign.center,
           style: Hud.mono(12, p.dim, spacing: .2),
         ),
+        if (sys != null && sys.titles.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(
+            sys.titles.last,
+            textAlign: TextAlign.center,
+            style: Hud.mono(11, Hud.gold, spacing: .08),
+          ),
+        ],
       ],
     );
 
@@ -57,23 +99,45 @@ class StatusScreen extends StatelessWidget {
       children: [
         _kv(p, 'LEVEL', '${s.level}'),
         _kv(p, 'EXPERIENCE', '${s.xp} / ${model.xpToNext}'),
-        _kv(p, 'QUESTS CLEARED', '$cleared'),
+        if (sys != null) _kv(p, 'NEXT GATE', gateLine(model)),
         _kv(p, 'CURRENT STREAK', '${_streak(model)} days'),
-        _kv(p, 'PENALTIES SERVED', '$penalties'),
         _kv(p, 'TRIAL DAY', '${model.service.trialDay} / 30'),
         _kv(p, 'PENALTIES', model.trialMode),
+        if (sys != null && sys.active != null && !model.canChooseSystem)
+          _ReductionRow(model: model),
       ],
     );
 
     final footer = <Widget>[
-      if (onOpenSystemCheck != null) ...[
+      if (model.canChooseSystem && onChooseSystem != null) ...[
         const SizedBox(height: 8),
-        HudButton(
-          model.systemIssues == 0
-              ? 'SYSTEM CHECK'
-              : 'SYSTEM CHECK · ${model.systemIssues} TO FIX',
-          dense: true,
-          onPressed: onOpenSystemCheck,
+        HudButton('CHOOSE NEXT SYSTEM', onPressed: onChooseSystem),
+      ],
+      if (onOpenReport != null || onOpenSystemCheck != null) ...[
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            if (onOpenReport != null)
+              Expanded(
+                child: HudButton(
+                  'REPORT',
+                  dense: true,
+                  onPressed: onOpenReport,
+                ),
+              ),
+            if (onOpenReport != null && onOpenSystemCheck != null)
+              const SizedBox(width: 8),
+            if (onOpenSystemCheck != null)
+              Expanded(
+                child: HudButton(
+                  model.systemIssues == 0
+                      ? 'SYSTEM CHECK'
+                      : 'CHECK · ${model.systemIssues} TO FIX',
+                  dense: true,
+                  onPressed: onOpenSystemCheck,
+                ),
+              ),
+          ],
         ),
       ],
       if (onRestartTrial != null) ...[
@@ -98,38 +162,60 @@ class StatusScreen extends StatelessWidget {
       ],
     ];
 
+    Widget tile(Stat stat) => Expanded(
+      child: SizedBox(
+        height: 56,
+        child: _StatTile(
+          stat: stat,
+          value: s.stats[stat] ?? 0,
+          canSpend: s.unspentStatPoints > 0,
+          onSpend: () => model.allocateStat(stat),
+        ),
+      ),
+    );
+
     final attributes = SystemWindow(
       title: 'ATTRIBUTES',
       delay: const Duration(milliseconds: 120),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          for (final pair in const [
-            [Stat.strength, Stat.intellect],
-            [Stat.discipline, Stat.vitality],
-          ]) ...[
-            Row(
-              children: [
-                for (final (i, stat) in pair.indexed) ...[
-                  if (i > 0) const SizedBox(width: 10),
-                  Expanded(
-                    child: SizedBox(
-                      height: 64,
-                      child: _StatTile(
-                        stat: stat,
-                        value: s.stats[stat] ?? 0,
-                        canSpend: s.unspentStatPoints > 0,
-                        onSpend: () => model.allocateStat(stat),
+          Row(
+            children: [
+              tile(Stat.strength),
+              const SizedBox(width: 8),
+              tile(Stat.vitality),
+              const SizedBox(width: 8),
+              tile(Stat.intellect),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              tile(Stat.charisma),
+              const SizedBox(width: 8),
+              tile(Stat.discipline),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${s.unspentStatPoints}',
+                        style: Hud.head(
+                          22,
+                          s.unspentStatPoints > 0 ? Hud.gold : p.dim,
+                          spacing: 0,
+                        ),
                       ),
-                    ),
+                      Text('POINTS', style: Hud.mono(10, p.dim, spacing: .14)),
+                    ],
                   ),
-                ],
-              ],
-            ),
-            if (pair.first == Stat.strength) const SizedBox(height: 10),
-          ],
-          const SizedBox(height: 12),
-          _kv(p, 'AVAILABLE POINTS', '${s.unspentStatPoints}'),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -156,7 +242,7 @@ class StatusScreen extends StatelessWidget {
                         children: [
                           rank,
                           const Spacer(),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 10),
                           rows,
                           const Spacer(),
                           ...footer,
@@ -176,12 +262,20 @@ class StatusScreen extends StatelessWidget {
   }
 
   static Widget _kv(HudPalette p, String k, String v) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 6),
+    padding: const EdgeInsets.symmetric(vertical: 5),
     child: Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(k, style: Hud.mono(13, p.dim, spacing: .06)),
-        Text(v, style: Hud.mono(13, p.text, weight: FontWeight.w500)),
+        Text(k, style: Hud.mono(12, p.dim, spacing: .06)),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            v,
+            textAlign: TextAlign.right,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Hud.mono(12, p.text, weight: FontWeight.w500),
+          ),
+        ),
       ],
     ),
   );
@@ -317,6 +411,71 @@ class _StatTile extends StatelessWidget {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The reduction valve: lower tomorrow's quest by 0, 10 or 20 percent for an
+/// injury or illness. Those days earn half XP.
+class _ReductionRow extends StatelessWidget {
+  const _ReductionRow({required this.model});
+
+  final GameModel model;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    final tomorrow = model.reductionTomorrow;
+    final today = model.reductionToday;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'QUEST REDUCTION',
+                  style: Hud.mono(13, p.dim, spacing: .06),
+                ),
+                Text(
+                  today == tomorrow
+                      ? (today == 0 ? 'Full quest' : 'Today $today% · half XP')
+                      : 'Tomorrow $tomorrow%${tomorrow > 0 ? ' · half XP' : ''}',
+                  style: Hud.mono(10, tomorrow > 0 ? Hud.warn : p.dim),
+                ),
+              ],
+            ),
+          ),
+          for (final pct in const [0, 10, 20]) ...[
+            const SizedBox(width: 6),
+            Semantics(
+              button: true,
+              selected: tomorrow == pct,
+              label: 'Reduce quest by $pct percent from tomorrow',
+              child: GestureDetector(
+                onTap: () => model.setReduction(pct),
+                child: Container(
+                  width: 42,
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: tomorrow == pct
+                        ? p.sys.withValues(alpha: .18)
+                        : Colors.transparent,
+                    border: Border.all(color: tomorrow == pct ? p.sys : p.line),
+                  ),
+                  child: Text(
+                    '$pct%',
+                    style: Hud.mono(11, tomorrow == pct ? p.hi : p.dim),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

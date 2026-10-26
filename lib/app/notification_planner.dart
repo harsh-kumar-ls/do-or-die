@@ -35,6 +35,8 @@ abstract final class NoticeId {
   static const lockEngaged = 4;
   static const exercise = 5;
   static const lockReengaged = 6;
+  static const floor2Warning = 7;
+  static const gateClosing = 8;
 }
 
 /// Works out which notifications should be scheduled right now. Pure, so the
@@ -78,6 +80,28 @@ class NotificationPlanner {
         today.at(warnAt1h),
         '[ WARNING ] 1 hour remains',
         'Incomplete: $names. The Penalty Zone follows at midnight.',
+      );
+    }
+
+    // Floor 2: one hour before its 18:00 deadline.
+    final deadline = g.deadlineToday;
+    if (deadline != null && questOpen && incomplete.isNotEmpty) {
+      add(
+        NoticeId.floor2Warning,
+        deadline.subtract(const Duration(hours: 1)),
+        '[ DUNGEON ] 1 hour remains on Floor 2',
+        'Floor 2 must be cleared by 18:00. Failure brings the Dungeon Penalty.',
+      );
+    }
+
+    // An open Gate, six hours before it closes.
+    final gate = g.systems?.gate;
+    if (gate != null) {
+      add(
+        NoticeId.gateClosing,
+        gate.expiresAt.subtract(const Duration(hours: 6)),
+        '[ GATE ] Closing in 6 hours',
+        'Enter the Gate before ${_hm(gate.expiresAt)}, or it closes.',
       );
     }
 

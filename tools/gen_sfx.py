@@ -157,6 +157,39 @@ def main():
     land = tone(160, 0.12, 0.6, 0.001, 0.35, sweep_to=90)
     write("window", mix(rush, rise, pop, land, offsets=[0, 0.01, 0.075, 0.08]), peak=0.75)
 
+    # Gate opening: a low swell that rises, a rushing tear, then a cold,
+    # suspended chord (no third) left hanging.
+    swell = tone(70, 1.4, 0.7, 0.6, 0.9, sweep_to=140, harmonics=(1.0, 0.6, 0.3, 0.15))
+    tear = lowpass(noise(0.9, 0.55, 0.7, seed=21), 0.12)
+    sus = [tone(f, 1.6, 0.18, 0.15, 0.9, harmonics=(1.0, 0.3, 0.1)) for f in (220.0, 329.63, 440.0, 493.88)]
+    glint = tone(1760, 0.8, 0.06, 0.05, 0.8, harmonics=(1.0, 0.4))
+    write("gate_open", mix(swell, tear, *sus, glint, offsets=[0, 0.5, 0.9, 0.95, 1.0, 1.05, 1.2]), peak=0.85)
+
+    # Rank up: a drum hit, a rising run of fifths, then a wide bright chord.
+    drum = mix(tone(110, 0.4, 1.0, 0.001, 0.45, sweep_to=55, harmonics=(1.0, 0.4)), lowpass(noise(0.08, 0.6, 0.3, seed=3), 0.3))
+    run_notes = [392.0, 587.33, 783.99, 1174.66, 1567.98]
+    run = [tone(f, 0.16, 0.38, 0.002, 0.5, harmonics=(1.0, 0.35, 0.1)) for f in run_notes]
+    wide = [tone(f, 1.5, 0.2, 0.03, 0.85, harmonics=(1.0, 0.3, 0.1)) for f in (392.0, 493.88, 587.33, 783.99, 987.77, 1567.98)]
+    write("rank_up", mix(drum, *run, *wide, offsets=[0, 0.12, 0.2, 0.28, 0.36, 0.44] + [0.52] * 6), peak=0.85)
+
+    # Dungeon Penalty: two hard impacts, a metallic bell clang, and a deeper,
+    # slower throb than the normal Penalty Zone, with phone-speaker overtones.
+    hit1 = tone(80, 0.5, 1.0, 0.001, 0.5, sweep_to=35, harmonics=(1.0, 0.6, 0.3))
+    hit2 = tone(70, 0.6, 1.0, 0.001, 0.5, sweep_to=30, harmonics=(1.0, 0.6, 0.3))
+    crack2 = lowpass(noise(0.08, 1.0, 0.25, seed=13), 0.55)
+    bell = mix(*[tone(f, 1.8, a, 0.001, 0.92) for f, a in ((311.0, 0.3), (740.0, 0.18), (1187.0, 0.12), (1653.0, 0.08))])
+    deep = []
+    n = int(RATE * 2.2)
+    for i in range(n):
+        t = i / RATE
+        wobble = 0.55 + 0.45 * math.sin(2 * math.pi * 2.0 * t)
+        s = (math.sin(2 * math.pi * 45 * t) + 0.7 * math.sin(2 * math.pi * 47.5 * t)
+             + 0.6 * math.sin(2 * math.pi * 90 * t) + 0.5 * math.sin(2 * math.pi * 135 * t)
+             + 0.35 * math.sin(2 * math.pi * 142 * t))
+        deep.append(math.tanh(2.2 * s) * wobble * env(i, n, 0.03, 0.88) * 0.7)
+    dungeon = mix(crack2, hit1, hit2, bell, deep, offsets=[0, 0, 0.32, 0.05, 0.15])
+    write("dungeon_penalty", [math.tanh(2.6 * x) for x in dungeon], peak=0.98)
+
 
 if __name__ == "__main__":
     main()

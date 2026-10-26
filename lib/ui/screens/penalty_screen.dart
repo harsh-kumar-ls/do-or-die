@@ -58,8 +58,12 @@ class PenaltyScreen extends StatelessWidget {
               Expanded(
                 child: SystemWindow(
                   expand: true,
-                  title: '[ PENALTY ZONE ]',
-                  subtitle: model.inPenalty
+                  title: model.dungeonPenalty
+                      ? '[ DUNGEON PENALTY ]'
+                      : '[ PENALTY ZONE ]',
+                  subtitle: model.dungeonPenalty
+                      ? 'The Dungeon was not cleared. Double lock, double reps.'
+                      : model.inPenalty
                       ? "Yesterday's quest was not completed."
                       : 'No penalty is in effect.',
                   child: FillColumn(

@@ -3,7 +3,8 @@ import 'dart:math';
 import 'package:do_or_die/app/game_service.dart';
 import 'package:do_or_die/data/game_store.dart';
 import 'package:do_or_die/domain/clock.dart';
-import 'package:do_or_die/domain/tasks.dart';
+import 'package:do_or_die/domain/progression.dart';
+import 'package:do_or_die/domain/systems.dart';
 import 'package:do_or_die/platform/blocker.dart';
 import 'package:do_or_die/ui/app_shell.dart';
 import 'package:do_or_die/ui/game_model.dart';
@@ -12,29 +13,21 @@ import 'package:do_or_die/ui/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-const tasks = [
-  TaskDefinition(
-    id: 'breakfast',
-    name: 'Have breakfast',
-    type: TaskType.checkbox,
-    target: 1,
-  ),
-  TaskDefinition(id: 'study', name: 'Study', type: TaskType.timer, target: 120),
-  TaskDefinition(id: 'read', name: 'Read', type: TaskType.counter, target: 30),
-];
-
 void main() {
   Future<GameModel> pumpShell(
     WidgetTester tester, {
     Clock? clock,
-    ValueChanged<GameService>? onRestarted,
+    VoidCallback? onAbandoned,
+    SystemKind system = SystemKind.fitness,
   }) async {
     tester.view.physicalSize = const Size(1080, 2340);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
-    final service = await GameService.start(
+    final service = await GameService.awaken(
       store: MemoryGameStore(),
-      tasks: tasks,
+      system: system,
+      placement: Rank.e,
+      dryRunDays: 0,
       blockedPackages: const {'com.instagram.android'},
       clock: clock ?? const SystemClock(),
       random: Random(1),
@@ -49,7 +42,7 @@ void main() {
           child: AppShell(
             model: model,
             blocker: NoopAppBlocker(),
-            onRestarted: onRestarted ?? (_) {},
+            onAbandoned: onAbandoned ?? () {},
           ),
         ),
       ),
@@ -126,8 +119,8 @@ void main() {
   testWidgets('holding RESTART TRIAL restarts, and never opens diagnostics', (
     tester,
   ) async {
-    GameService? restarted;
-    await pumpShell(tester, onRestarted: (g) => restarted = g);
+    var restarted = false;
+    await pumpShell(tester, onAbandoned: () => restarted = true);
     await openStatus(tester);
 
     final hold = await tester.startGesture(
@@ -140,8 +133,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text(diagnosticsTitle), findsNothing);
-    expect(restarted, isNotNull);
-    expect(restarted!.trialDay, 1);
+    expect(restarted, isTrue);
     await tester.pump(const Duration(seconds: 1));
   });
 
@@ -210,7 +202,7 @@ void main() {
       for (final row in [
         'LEVEL',
         'EXPERIENCE',
-        'QUESTS CLEARED',
+        'NEXT GATE',
         'CURRENT STREAK',
       ]) {
         expect(reallyVisible(tester, find.text(row)), isTrue, reason: row);
@@ -225,10 +217,10 @@ void main() {
     },
   );
 
-  testWidgets('the study clock ticks on its own, with no taps', (tester) async {
+  testWidgets('the walk clock ticks on its own, with no taps', (tester) async {
     final clock = FixedClock(DateTime(2026, 10, 20, 15, 0, 0));
     final model = await pumpShell(tester, clock: clock);
-    await model.toggleTimer(tasks[1]);
+    await model.toggleTimer(model.tasks.first);
     await tester.pump();
     expect(find.text('00:00:00'), findsOneWidget);
 
@@ -241,33 +233,36 @@ void main() {
     expect(find.text('RUNNING'), findsOneWidget);
   });
 
-  testWidgets('quest screen shows every task the user wrote', (tester) async {
+  testWidgets('quest screen shows the quest the System issued', (tester) async {
     await pumpShell(tester);
     expect(find.text('[ DAILY QUEST ]'), findsOneWidget);
-    expect(find.text('Have breakfast'), findsOneWidget);
-    expect(find.text('Study'), findsOneWidget);
-    expect(find.text('Read'), findsOneWidget);
-    expect(find.text('0 / 30'), findsOneWidget);
+    expect(find.text('Walk'), findsOneWidget);
+    expect(find.text('Push-ups (knees allowed)'), findsOneWidget);
+    expect(find.text('Squats'), findsOneWidget);
+    expect(find.text('0 / 10'), findsOneWidget);
+    expect(find.text('0 / 15'), findsOneWidget);
   });
 
-  testWidgets('counter buttons add pages', (tester) async {
+  testWidgets('counter buttons add push-ups', (tester) async {
     await pumpShell(tester);
-    await tester.ensureVisible(find.text('+5'));
+    await tester.ensureVisible(find.text('+5').first);
     await tester.pump();
-    await tester.tap(find.text('+5'));
+    await tester.tap(find.text('+5').first);
     await tester.pump();
-    await tester.tap(find.text('+10'));
+    await tester.tap(find.text('+1').first);
     await tester.pump();
-    expect(find.text('15 / 30'), findsOneWidget);
+    expect(find.text('6 / 10'), findsOneWidget);
   });
 
-  testWidgets('a quick tap does not confirm breakfast; holding does', (
+  testWidgets('a quick tap does not confirm the journal line; holding does', (
     tester,
   ) async {
-    final model = await pumpShell(tester);
+    final model = await pumpShell(tester, system: SystemKind.personality);
+    final journal = model.tasks.firstWhere((t) => t.id == 'journal');
+    await tester.ensureVisible(find.text('HOLD TO CONFIRM'));
     await tester.tap(find.text('HOLD TO CONFIRM'));
     await tester.pump(const Duration(milliseconds: 200));
-    expect(model.isDone(tasks[0]), isFalse);
+    expect(model.isDone(journal), isFalse);
 
     final gesture = await tester.startGesture(
       tester.getCenter(find.text('HOLD TO CONFIRM')),
@@ -277,15 +272,15 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1000));
     await gesture.up();
     await tester.pump();
-    expect(model.isDone(tasks[0]), isTrue);
+    expect(model.isDone(journal), isTrue);
     expect(find.text('CONFIRMED'), findsOneWidget);
   });
 
   testWidgets('completing every task shows the System notice', (tester) async {
     final model = await pumpShell(tester);
-    await model.setProgress(tasks[0], 1);
-    await model.setProgress(tasks[1], 7200);
-    await model.setProgress(tasks[2], 30);
+    for (final t in model.tasks) {
+      await model.setProgress(t, t.goal);
+    }
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.text('[ NOTIFICATION ]'), findsOneWidget);
     expect(find.text('The daily quest has been completed.'), findsOneWidget);
@@ -308,11 +303,15 @@ void main() {
     expect(find.text('INSTAGRAM'), findsOneWidget);
   });
 
-  testWidgets('onboarding refuses an empty task name', (tester) async {
+  Future<void> pumpOnboarding(
+    WidgetTester tester,
+    ValueChanged<OnboardingResult> onDone, {
+    bool nextSystemOnly = false,
+    Set<SystemKind> completed = const {},
+  }) async {
     tester.view.physicalSize = const Size(1080, 2340);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
-    OnboardingResult? result;
     await tester.pumpWidget(
       MaterialApp(
         theme: Hud.theme(HudPalette.system),
@@ -321,20 +320,77 @@ void main() {
           child: Scaffold(
             body: OnboardingScreen(
               blocker: NoopAppBlocker(),
-              onDone: (r) => result = r,
+              onDone: onDone,
+              nextSystemOnly: nextSystemOnly,
+              completed: completed,
             ),
           ),
         ),
       ),
     );
     await tester.pump(const Duration(milliseconds: 500));
-    await tester.tap(find.text('BEGIN REGISTRATION'));
-    await tester.pump(const Duration(milliseconds: 500));
-    await tester.tap(find.text('+ ADD OBJECTIVE'));
-    await tester.pump();
-    await tester.tap(find.text('CONFIRM OBJECTIVES'));
-    await tester.pump();
-    expect(find.text('Every task needs a name.'), findsOneWidget);
+  }
+
+  Future<void> tapText(WidgetTester tester, String text) async {
+    await tester.ensureVisible(find.text(text));
+    await tester.tap(find.text(text));
+    await tester.pump(const Duration(milliseconds: 300));
+  }
+
+  testWidgets('the Awakening refuses to continue without a System', (
+    tester,
+  ) async {
+    OnboardingResult? result;
+    await pumpOnboarding(tester, (r) => result = r);
+    await tapText(tester, 'ACCEPT');
+    await tapText(tester, 'CONFIRM SYSTEM');
+    expect(find.text('Choose a System.'), findsOneWidget);
     expect(result, isNull);
+  });
+
+  testWidgets('the Awakening places a strong candidate at C, never higher', (
+    tester,
+  ) async {
+    OnboardingResult? result;
+    await pumpOnboarding(tester, (r) => result = r);
+    await tapText(tester, 'ACCEPT');
+    await tapText(tester, 'FITNESS SYSTEM');
+    await tapText(tester, 'CONFIRM SYSTEM');
+    expect(find.text('[ PLACEMENT TEST ]'), findsOneWidget);
+    final fields = find.byType(TextField);
+    await tester.enterText(fields.at(0), '80');
+    await tester.enterText(fields.at(1), '4');
+    await tester.pump();
+    await tapText(tester, 'SUBMIT');
+    expect(find.text('FITNESS SYSTEM · RANK C'), findsOneWidget);
+    await tapText(tester, 'CONTINUE');
+    await tapText(tester, 'CONFIRM APPS');
+    await tapText(tester, 'CONFIRM');
+    expect(find.text('[ PENALTY TERMS ]'), findsOneWidget);
+    await tester.ensureVisible(find.text('HOLD TO ACCEPT'));
+    await tester.pump();
+    final hold = await tester.startGesture(
+      tester.getCenter(find.text('HOLD TO ACCEPT')),
+    );
+    await tester.pump(const Duration(milliseconds: 150));
+    await tester.pump(const Duration(milliseconds: 1000));
+    await hold.up();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(result, isNotNull);
+    expect(result!.system, SystemKind.fitness);
+    expect(result!.placement, Rank.c);
+    expect(result!.answers, {'pushups': 80, 'km_minutes': 4});
+  });
+
+  testWidgets('choosing the next System hides completed ones', (tester) async {
+    await pumpOnboarding(
+      tester,
+      (_) {},
+      nextSystemOnly: true,
+      completed: const {SystemKind.fitness},
+    );
+    expect(find.text('FITNESS SYSTEM'), findsNothing);
+    expect(find.text('FOCUS SYSTEM'), findsOneWidget);
+    expect(find.text('PERSONALITY SYSTEM'), findsOneWidget);
   });
 }

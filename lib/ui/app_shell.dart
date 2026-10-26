@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../app/game_service.dart';
 import '../platform/blocker.dart';
 import '../spike/blocker_spike_screen.dart';
 import 'fx.dart';
 import 'game_model.dart';
 import 'screens/app_picker_screen.dart';
+import 'screens/onboarding_screen.dart';
 import 'screens/penalty_screen.dart';
 import 'screens/quest_screen.dart';
 import 'screens/status_screen.dart';
@@ -22,14 +22,15 @@ class AppShell extends StatefulWidget {
     super.key,
     required this.model,
     required this.blocker,
-    this.onRestarted,
+    this.onAbandoned,
   });
 
   final GameModel model;
   final AppBlocker blocker;
 
-  /// Receives the fresh game after the trial is restarted.
-  final ValueChanged<GameService>? onRestarted;
+  /// Called after the game is archived for a restart; the app returns to
+  /// the Awakening.
+  final VoidCallback? onAbandoned;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -40,7 +41,13 @@ class _AppShellState extends State<AppShell> {
 
   void _go(_Tab t) {
     if (t == _tab) return;
-    Fx.instance.play(t == _Tab.penalty ? Cue.penalty : Cue.window);
+    Fx.instance.play(
+      t != _Tab.penalty
+          ? Cue.window
+          : widget.model.dungeonPenalty
+          ? Cue.dungeonPenalty
+          : Cue.penalty,
+    );
     setState(() => _tab = t);
   }
 
@@ -50,9 +57,11 @@ class _AppShellState extends State<AppShell> {
       listenable: widget.model,
       builder: (context, _) {
         final m = widget.model;
-        final palette = _tab == _Tab.penalty
-            ? HudPalette.penalty
-            : HudPalette.system;
+        final palette = _tab != _Tab.penalty
+            ? HudPalette.system
+            : m.dungeonPenalty
+            ? HudPalette.dungeon
+            : HudPalette.penalty;
         final notice = m.notice;
         return HudScope(
           palette: palette,
@@ -90,15 +99,43 @@ class _AppShellState extends State<AppShell> {
                                             ),
                                           ),
                                         ),
-                                    onRestartTrial: widget.onRestarted == null
+                                    onRestartTrial: widget.onAbandoned == null
                                         ? null
                                         : () async {
-                                            final next = await m.service
-                                                .restartTrial();
-                                            if (next != null) {
-                                              widget.onRestarted!(next);
+                                            if (await m.service.abandon()) {
+                                              widget.onAbandoned!();
                                             }
                                           },
+                                    onChooseSystem: () =>
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (ctx) => HudScope(
+                                              palette: HudPalette.system,
+                                              child: Scaffold(
+                                                body: HudBackground(
+                                                  child: OnboardingScreen(
+                                                    blocker: widget.blocker,
+                                                    nextSystemOnly: true,
+                                                    completed: m
+                                                        .systems!
+                                                        .progress
+                                                        .completed,
+                                                    onDone: (r) async {
+                                                      await m.chooseSystem(
+                                                        r.system,
+                                                        r.placement,
+                                                        r.answers,
+                                                      );
+                                                      if (ctx.mounted) {
+                                                        Navigator.of(ctx).pop();
+                                                      }
+                                                    },
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
                                     onOpenDiagnostics: () {
                                       // Diagnostics can start and stop locks,
                                       // so it must never be a way out of a
@@ -238,7 +275,11 @@ class _TopBar extends StatelessWidget {
               ),
             ),
             child: Text(
-              penalty ? 'PENALTY' : 'RANK ${model.rank.name.toUpperCase()}',
+              !penalty
+                  ? 'RANK ${model.rank.name.toUpperCase()}'
+                  : model.dungeonPenalty
+                  ? 'DUNGEON PENALTY'
+                  : 'PENALTY',
               style: Hud.head(11, p.hi, spacing: .15),
             ),
           ),

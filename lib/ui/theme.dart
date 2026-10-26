@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../domain/progression.dart';
+
 /// Look of one mode of the app. A2 for normal use, P3 for the Penalty Zone.
 /// See design/DESIGN.md.
 class HudPalette {
@@ -76,9 +78,37 @@ class HudPalette {
     lineAlpha: .6,
     glitch: true,
   );
+
+  /// Dungeon Penalty: darker crimson with gold, so it never feels like an
+  /// ordinary failed day.
+  static const dungeon = HudPalette(
+    sys: Color(0xFFD7263D),
+    hi: Color(0xFFF5C96A),
+    voidColor: Color(0xFF060102),
+    top: Color(0xFF22040A),
+    panel: Color(0xC0180308),
+    text: Color(0xFFFFEBD9),
+    dim: Color(0xFF9E6B5F),
+    glow: 22,
+    glowAlpha: .9,
+    gridAlpha: .08,
+    scanAlpha: .05,
+    lineAlpha: .65,
+    glitch: true,
+  );
 }
 
 class Hud {
+  /// Badge colour for each rank, E to S.
+  static Color rankColor(Rank r) => switch (r) {
+    Rank.e => const Color(0xFF9AA4B8),
+    Rank.d => const Color(0xFF5BD69A),
+    Rank.c => const Color(0xFF4FB3FF),
+    Rank.b => const Color(0xFFB07CFF),
+    Rank.a => const Color(0xFFFF9F45),
+    Rank.s => gold,
+  };
+
   static const gold = Color(0xFFF5C96A);
   static const warn = Color(0xFFFF8A93);
 

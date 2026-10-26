@@ -11,6 +11,7 @@ import 'data/game_store.dart';
 import 'platform/blocker.dart';
 import 'platform/notifier.dart';
 import 'platform/time_source.dart';
+import 'platform/usage_meter.dart';
 import 'ui/app_shell.dart';
 import 'ui/fx.dart';
 import 'ui/game_model.dart';
@@ -20,7 +21,7 @@ import 'ui/widgets/hud_background.dart';
 
 /// Platform services: real ones on Android, stand-ins elsewhere (web, tests).
 class Platform {
-  Platform._(this.blocker, this.notifier, this.clock);
+  Platform._(this.blocker, this.notifier, this.clock, this.meter);
 
   factory Platform.current() {
     final android = !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
@@ -29,17 +30,20 @@ class Platform {
             AndroidAppBlocker(),
             LocalNotifier(),
             TrustedClock(AndroidTimeSource()),
+            const AndroidUsageMeter(),
           )
         : Platform._(
             NoopAppBlocker(),
             NoopNotifier(),
             TrustedClock(const DeviceTimeSource()),
+            const NoUsageMeter(),
           );
   }
 
   final AppBlocker blocker;
   final Notifier notifier;
   final TrustedClock clock;
+  final UsageMeter meter;
 }
 
 Future<void> main() async {
@@ -67,7 +71,17 @@ Future<void> main() async {
   }
 
   final store = PrefsGameStore(prefs);
-  final service = await GameService.load(store: store, clock: platform.clock);
+  var service = await GameService.load(
+    store: store,
+    clock: platform.clock,
+    meter: platform.meter,
+  );
+  // A trial with its own written objectives is archived, with its full log,
+  // and replaced by an Awakening. One with a penalty still in effect is kept
+  // until that penalty is over, so the update is never a way out of one.
+  if (service != null && service.needsMigration) {
+    if (await service.abandon(reason: 'migrated_to_systems')) service = null;
+  }
   runApp(DoOrDieApp(store: store, initial: service, platform: platform));
 }
 
@@ -114,13 +128,16 @@ class _DoOrDieAppState extends State<DoOrDieApp> {
   }
 
   Future<void> _onboard(OnboardingResult r) async {
-    final service = await GameService.start(
+    final service = await GameService.awaken(
       store: widget.store,
-      tasks: r.tasks,
+      system: r.system,
+      placement: r.placement,
+      placementAnswers: r.answers,
       blockedPackages: r.blocked,
       sleep: r.sleep,
       dryRunDays: 3,
       clock: widget.platform.clock,
+      meter: widget.platform.meter,
     );
     final model = _modelFor(service);
     setState(() => _model = model);
@@ -128,10 +145,10 @@ class _DoOrDieAppState extends State<DoOrDieApp> {
     await model.requestNotifications();
   }
 
-  /// Swaps in the fresh trial; the old game is already archived.
-  void _restarted(GameService service) {
+  /// The game was archived and removed: back to the Awakening.
+  void _abandoned() {
     final old = _model;
-    setState(() => _model = _modelFor(service));
+    setState(() => _model = null);
     old?.dispose();
   }
 
@@ -156,7 +173,7 @@ class _DoOrDieAppState extends State<DoOrDieApp> {
               key: ObjectKey(model),
               model: model,
               blocker: blocker,
-              onRestarted: _restarted,
+              onAbandoned: _abandoned,
             ),
     );
   }

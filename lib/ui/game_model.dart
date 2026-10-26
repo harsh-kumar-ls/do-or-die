@@ -9,8 +9,11 @@ import '../app/trusted_clock.dart';
 import '../platform/blocker.dart';
 import '../platform/notifier.dart';
 import '../domain/day.dart';
+import '../domain/dungeon.dart';
 import '../domain/engine.dart';
 import '../domain/progression.dart';
+import '../domain/system_catalogue.dart';
+import '../domain/systems.dart';
 import '../domain/tasks.dart';
 import 'fx.dart';
 
@@ -21,12 +24,16 @@ class SystemNotice {
     required this.lines,
     this.levelUp,
     this.danger = false,
+    this.cue,
   });
 
   final String title;
   final List<String> lines;
   final int? levelUp;
   final bool danger;
+
+  /// Overrides the default sound for this notice.
+  final Cue? cue;
 }
 
 /// Wraps [GameService] for the UI: rebuilds listeners after every change,
@@ -161,9 +168,78 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
   bool isMeasured(TaskDefinition t) => service.liveProgress(t.id) != null;
   bool isDone(TaskDefinition t) => t.isComplete(service.liveProgress(t.id));
   bool get isQuestComplete => tasks.isNotEmpty && tasks.every(isDone);
-  Rank get rank => service.engine.progression.rankForLevel(state.level);
+
+  /// The System rank, or (in an older game) the rank for the level.
+  Rank get rank =>
+      service.systems?.rank ??
+      service.engine.progression.rankForLevel(state.level);
+
+  // ---- Systems & Dungeons ----------------------------------------------
+
+  SystemsState? get systems => service.systems;
+  SystemSpec? get systemSpec =>
+      systems?.active == null ? null : systemCatalogue[systems!.active!];
+
+  /// The Dungeon floor today (1-3), or 0.
+  int get floorToday => systems?.floorOn(service.today) ?? 0;
+
+  /// An open Gate waiting to be entered.
+  Gate? get gate => systems?.gate;
+
+  /// Cleared days in the 30-day window, up to yesterday.
+  int get clearedInWindow =>
+      systems?.clearedInWindow(service.today.addDays(-1)) ?? 0;
+
+  /// The day after a failed floor: the Dungeon Penalty look and rules.
+  bool get dungeonPenalty => service.dungeonPenaltyToday;
+
+  /// Floor 2's deadline today, if any.
+  DateTime? get deadlineToday => service.deadlineToday;
+
+  /// The current System is complete and a new one may be chosen.
+  bool get canChooseSystem =>
+      systems != null && systems!.progress.canChooseSystem;
+
+  /// Days before a Gate may open again, or 0.
+  int get gateBlockedDays {
+    final until = systems?.gateBlockedUntil;
+    if (until == null) return 0;
+    return daysLeft(service.today, until);
+  }
+
+  int get reductionToday => service.reductionToday;
+  int get reductionTomorrow => service.reductionTomorrow;
+
+  Future<void> setReduction(int percent) =>
+      _run(() => service.setReduction(percent));
+
+  Future<bool> enterGate() async {
+    var ok = false;
+    await _run(() async => ok = await service.enterGate());
+    _drainSystemEvents();
+    notifyListeners();
+    return ok;
+  }
+
+  Future<bool> chooseSystem(
+    SystemKind kind,
+    Rank placement,
+    Map<String, int> answers,
+  ) async {
+    var ok = false;
+    await _run(
+      () async =>
+          ok = await service.chooseSystem(kind, placement, answers: answers),
+    );
+    return ok;
+  }
+
   int get xpToNext => service.engine.progression.xpToNextLevel(state.level);
-  int get xpReward => service.engine.config.xpPerClear;
+
+  /// XP for clearing today: half while the reduction valve is in force.
+  int get xpReward => service.reductionToday > 0
+      ? service.engine.config.xpPerClear ~/ 2
+      : service.engine.config.xpPerClear;
 
   bool get hasDebt =>
       !(state.debt?.isPaid ?? true) && state.debt!.dueDay == service.today;
@@ -196,11 +272,12 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       await service.measureCaps();
     }
     await _sync();
-    if (events.isEmpty) {
+    final systemEvents = service.takeSystemEvents();
+    if (events.isEmpty && systemEvents.isEmpty) {
       notifyListeners(); // clock or permission state may have changed
       return;
     }
-    _noticesFor(events);
+    _noticesFor(events, systemEvents);
     _wasComplete = isQuestComplete;
     notifyListeners();
   }
@@ -278,6 +355,9 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
   /// Why RESTART TRIAL is unavailable right now, or null if it's available.
   /// Never reveals when a scheduled lock will start.
   String? get restartBlockedReason {
+    if (service.dungeonInProgress && !service.penaltyInEffect) {
+      return 'Restart unlocks after the Dungeon ends.';
+    }
     if (!service.penaltyInEffect) return null;
     final parts = <String>[];
     final debt = state.debt;
@@ -337,11 +417,12 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
   void _queue(SystemNotice n) {
     _notices.add(n);
     Fx.instance.play(
-      n.levelUp != null
-          ? Cue.levelUp
-          : n.danger
-          ? Cue.penalty
-          : Cue.notice,
+      n.cue ??
+          (n.levelUp != null
+              ? Cue.levelUp
+              : n.danger
+              ? Cue.penalty
+              : Cue.notice),
     );
   }
 
@@ -370,8 +451,15 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     return changed;
   }
 
-  void _noticesFor(List<GameEvent> events) {
+  void _drainSystemEvents() => _systemNotices(service.takeSystemEvents());
+
+  void _noticesFor(List<GameEvent> events, List<SystemEvent> systemEvents) {
+    // A failed floor gets the Dungeon notice instead of the ordinary one.
+    final failedFloors = {
+      for (final e in systemEvents.whereType<DungeonFailed>()) e.day,
+    };
     for (final e in events) {
+      if (e is QuestFailed && failedFloors.contains(e.day)) continue;
       switch (e) {
         case QuestCleared(:final xpGained):
           final levels = events.whereType<LevelUp>().where(
@@ -432,6 +520,79 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
         default:
           break;
       }
+    }
+    _systemNotices(systemEvents);
+  }
+
+  static String _r(Rank r) => r.name.toUpperCase();
+
+  void _systemNotices(List<SystemEvent> events) {
+    for (final e in events) {
+      _queue(switch (e) {
+        GateOpened(:final gate) => SystemNotice(
+          title: '[ GATE ]',
+          cue: Cue.gateOpen,
+          lines: [
+            'A Gate has opened.',
+            'Rank ${_r(gate.from)} Dungeon. Enter within 48 hours.',
+            'Clear three floors to reach rank ${_r(Rank.values[gate.from.index + 1])}.',
+          ],
+        ),
+        GateExpired() => const SystemNotice(
+          title: '[ NOTIFICATION ]',
+          lines: ['The Gate has closed.', 'It may open again in 3 days.'],
+        ),
+        DungeonEntered() => const SystemNotice(
+          title: '[ DUNGEON ]',
+          cue: Cue.gateOpen,
+          lines: [
+            'You have entered the Dungeon.',
+            'Floor 1 begins at 00:00.',
+            'Floor 2 must be cleared by 18:00.',
+            'Floor 3 is the Rank Trial.',
+          ],
+        ),
+        FloorCleared(:final floor) => SystemNotice(
+          title: '[ DUNGEON ]',
+          lines: [
+            'Floor $floor cleared.',
+            floor == 1
+                ? 'Floor 2 begins. Clear it by 18:00.'
+                : 'The Rank Trial begins.',
+          ],
+        ),
+        DungeonCleared(:final newRank, :final title) => SystemNotice(
+          title: '[ RANK UP ]',
+          cue: Cue.rankUp,
+          lines: [
+            'The Dungeon has been cleared.',
+            'Rank ${_r(newRank)}.',
+            'Title earned: $title.',
+            '+${DungeonRules.clearStatPoints} stat points.',
+          ],
+        ),
+        DungeonFailed(:final floor) => SystemNotice(
+          title: '[ DUNGEON FAILED ]',
+          danger: true,
+          cue: Cue.dungeonPenalty,
+          lines: [
+            'Floor $floor was not cleared.',
+            service.isDryRunToday
+                ? 'Dry run: no penalty is enforced.'
+                : 'Dungeon Penalty today: double lock and double reps.',
+            'The Gate is shut for ${DungeonRules.failCooldown} days. Your rank is kept.',
+          ],
+        ),
+        SystemCompleted(:final system) => SystemNotice(
+          title: '[ SYSTEM COMPLETE ]',
+          cue: Cue.rankUp,
+          lines: [
+            '${systemCatalogue[system]!.name} complete.',
+            'Rank S held for ${SystemsState.catalogueHoldDays} days.',
+            'A new System may now be chosen.',
+          ],
+        ),
+      });
     }
   }
 

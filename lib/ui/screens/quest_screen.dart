@@ -26,7 +26,28 @@ class QuestScreen extends StatelessWidget {
         model.checkCompletion();
         final now = model.now;
         final midnight = DateTime(now.year, now.month, now.day + 1);
+        final deadline = model.deadlineToday ?? midnight;
+        final left = deadline.isAfter(now)
+            ? deadline.difference(now)
+            : Duration.zero;
         final complete = model.isQuestComplete;
+        final floor = model.floorToday;
+        final trial = model.systemSpec?.at(model.rank).trial;
+        final (title, subtitle) = switch (floor) {
+          1 => (
+            '[ DUNGEON · FLOOR 1 ]',
+            'The daily quest, 25% harder. Clear it before the day ends.',
+          ),
+          2 => (
+            '[ DUNGEON · FLOOR 2 ]',
+            'The daily quest, 50% harder. Clear it before 18:00.',
+          ),
+          3 => ('[ RANK TRIAL ]', trial?.summary ?? 'The boss of this rank.'),
+          _ => (
+            '[ DAILY QUEST ]',
+            'Complete every objective before the day ends.',
+          ),
+        };
         return Padding(
           padding: const EdgeInsets.fromLTRB(18, 4, 18, 16),
           child: Column(
@@ -70,52 +91,79 @@ class QuestScreen extends StatelessWidget {
                 const SizedBox(height: 12),
               ],
               if (model.inPenalty) ...[
-                _PenaltyBanner(onTap: onOpenPenalty),
+                _PenaltyBanner(
+                  onTap: onOpenPenalty,
+                  dungeon: model.dungeonPenalty,
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (model.gate != null) ...[
+                _GateBanner(model: model),
+                const SizedBox(height: 12),
+              ] else if (model.systems?.dungeon != null && floor == 0) ...[
+                _AlertBanner(
+                  title: 'DUNGEON AHEAD',
+                  body: 'Floor 1 begins at 00:00. Floor 2 must be cleared by 18:00.',
+                ),
                 const SizedBox(height: 12),
               ],
               Expanded(
-                child: SystemWindow(
-                  expand: true,
-                  title: '[ DAILY QUEST ]',
-                  subtitle: 'Complete every objective before the day ends.',
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(child: _TaskList(model: model)),
-                      _DashedLine(color: p.sys),
-                      const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'TIME REMAINING',
-                            style: Hud.mono(11, p.dim, spacing: .06),
-                          ),
-                          Text(
-                            hms(midnight.difference(now)),
-                            style: Hud.mono(
-                              13,
-                              p.text,
-                              weight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 300),
+                child: model.tasks.isEmpty && model.canChooseSystem
+                    ? SystemWindow(
+                        title: '[ SYSTEM COMPLETE ]',
                         child: Text(
-                          complete
-                              ? 'All objectives complete.'
-                              : 'Failure to complete will result in a penalty.',
-                          key: ValueKey(complete),
+                          'No quest is issued until the next System is chosen. Choose it on the Status tab.',
                           textAlign: TextAlign.center,
-                          style: Hud.mono(11, complete ? Hud.gold : Hud.warn),
+                          style: Hud.mono(13, p.text).copyWith(height: 1.5),
+                        ),
+                      )
+                    : SystemWindow(
+                        expand: true,
+                        title: title,
+                        subtitle: subtitle,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(child: _TaskList(model: model)),
+                            _DashedLine(color: p.sys),
+                            const SizedBox(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  floor == 2 ? 'UNTIL 18:00' : 'TIME REMAINING',
+                                  style: Hud.mono(11, p.dim, spacing: .06),
+                                ),
+                                Text(
+                                  hms(left),
+                                  style: Hud.mono(
+                                    13,
+                                    p.text,
+                                    weight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 300),
+                              child: Text(
+                                complete
+                                    ? 'All objectives complete.'
+                                    : floor > 0
+                                    ? 'Failure brings the Dungeon Penalty: double lock, double reps.'
+                                    : 'Failure to complete will result in a penalty.',
+                                key: ValueKey(complete),
+                                textAlign: TextAlign.center,
+                                style: Hud.mono(
+                                  11,
+                                  complete ? Hud.gold : Hud.warn,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
-                ),
               ),
               const SizedBox(height: 12),
               _XpWindow(model: model, pending: complete),
@@ -285,7 +333,11 @@ class _TaskRow extends StatelessWidget {
           ],
         );
       case TaskType.counter:
-        final steps = task.target >= 20 ? [1, 5, 10] : [1];
+        final steps = task.target >= 20
+            ? [1, 5, 10]
+            : task.target >= 10
+            ? [1, 5]
+            : [1];
         return _steps(steps, done, (s) => '+$s');
       case TaskType.distance:
         return _steps(const [100, 500], done, (s) => '+$s m');
@@ -451,14 +503,16 @@ class _AlertBanner extends StatelessWidget {
   const _AlertBanner({
     required this.title,
     required this.body,
-    required this.action,
-    required this.onTap,
+    this.action,
+    this.onTap,
   });
 
   final String title;
   final String body;
-  final String action;
-  final VoidCallback onTap;
+
+  /// Null for an information-only banner.
+  final String? action;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -466,7 +520,7 @@ class _AlertBanner extends StatelessWidget {
     return Semantics(
       container: true,
       button: true,
-      label: '$title. $body $action',
+      label: '$title. $body ${action ?? ''}',
       child: GestureDetector(
         onTap: onTap,
         child: Container(
@@ -488,8 +542,10 @@ class _AlertBanner extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: 10),
-                Text('$action ›', style: Hud.mono(11, p.hi)),
+                if (action != null) ...[
+                  const SizedBox(width: 10),
+                  Text('$action ›', style: Hud.mono(11, p.hi)),
+                ],
               ],
             ),
           ),
@@ -500,35 +556,91 @@ class _AlertBanner extends StatelessWidget {
 }
 
 class _PenaltyBanner extends StatelessWidget {
-  const _PenaltyBanner({required this.onTap});
+  const _PenaltyBanner({required this.onTap, this.dungeon = false});
   final VoidCallback onTap;
+  final bool dungeon;
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
-    onTap: onTap,
-    child: Container(
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-      decoration: BoxDecoration(
-        color: HudPalette.penalty.panel,
-        border: Border.all(color: HudPalette.penalty.line),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              'PENALTY ZONE ACTIVE',
-              style: Hud.head(
-                12,
-                HudPalette.penalty.hi,
-                spacing: .2,
-              ).copyWith(shadows: HudPalette.penalty.textGlow(.6)),
+  Widget build(BuildContext context) {
+    final pal = dungeon ? HudPalette.dungeon : HudPalette.penalty;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+        decoration: BoxDecoration(
+          color: pal.panel,
+          border: Border.all(color: pal.line),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                dungeon ? 'DUNGEON PENALTY ACTIVE' : 'PENALTY ZONE ACTIVE',
+                style: Hud.head(
+                  12,
+                  pal.hi,
+                  spacing: .2,
+                ).copyWith(shadows: pal.textGlow(.6)),
+              ),
             ),
+            Text('OPEN ›', style: Hud.mono(11, pal.hi)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// An open Gate: its rank, time left, and a hold to enter.
+class _GateBanner extends StatelessWidget {
+  const _GateBanner({required this.model});
+  final GameModel model;
+
+  @override
+  Widget build(BuildContext context) {
+    final gate = model.gate!;
+    final c = Hud.rankColor(gate.from);
+    final left = gate.expiresAt.difference(model.now);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+      decoration: BoxDecoration(
+        color: c.withValues(alpha: .08),
+        border: Border.all(color: c.withValues(alpha: .7)),
+        boxShadow: [BoxShadow(color: c.withValues(alpha: .25), blurRadius: 18)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'RANK ${gate.from.name.toUpperCase()} GATE OPEN',
+                  style: Hud.head(13, c, spacing: .18),
+                ),
+              ),
+              Text(
+                left.isNegative ? 'CLOSING' : hms(left),
+                style: Hud.mono(12, c, weight: FontWeight.w500),
+              ),
+            ],
           ),
-          Text('OPEN ›', style: Hud.mono(11, HudPalette.penalty.hi)),
+          const SizedBox(height: 6),
+          Text(
+            'Three floors on three days. The third is the Rank Trial. Failing any floor brings the Dungeon Penalty.',
+            style: Hud.mono(11, HudScope.of(context).dim).copyWith(height: 1.4),
+          ),
+          const SizedBox(height: 10),
+          HoldButton(
+            label: 'HOLD TO ENTER THE GATE',
+            doneLabel: 'ENTERED',
+            holdFor: const Duration(milliseconds: 1500),
+            onConfirmed: model.enterGate,
+          ),
         ],
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _DashedLine extends StatelessWidget {
