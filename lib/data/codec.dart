@@ -80,25 +80,32 @@ SleepWindow sleepFromJson(Map<String, Object?> j) => SleepWindow(
   endMinute: j['endMinute'] as int,
 );
 
-Map<String, Object?>? debtToJson(ExerciseDebt? d) => d == null
+Map<String, Object?>? debtToJson(PenaltyDebt? d) => d == null
     ? null
     : {
         'dueDay': dayToJson(d.dueDay),
-        'pushupsOwed': d.pushupsOwed,
-        'squatsOwed': d.squatsOwed,
-        'pushupsDone': d.pushupsDone,
-        'squatsDone': d.squatsDone,
+        'kind': d.kind.name,
+        'primaryOwed': d.primaryOwed,
+        'secondaryOwed': d.secondaryOwed,
+        'primaryDone': d.primaryDone,
+        'secondaryDone': d.secondaryDone,
       };
 
-ExerciseDebt? debtFromJson(Map<String, Object?>? j) => j == null
-    ? null
-    : ExerciseDebt(
-        dueDay: dayFromJson(j['dueDay']),
-        pushupsOwed: j['pushupsOwed'] as int,
-        squatsOwed: j['squatsOwed'] as int,
-        pushupsDone: j['pushupsDone'] as int,
-        squatsDone: j['squatsDone'] as int,
-      );
+/// Reads a debt. Saves from before penalty kinds used push-up and squat
+/// key names, and were always exercise.
+PenaltyDebt? debtFromJson(Map<String, Object?>? j) {
+  if (j == null) return null;
+  int n(String key, String legacy) => (j[key] ?? j[legacy] ?? 0) as int;
+  final kind = j['kind'] as String?;
+  return PenaltyDebt(
+    dueDay: dayFromJson(j['dueDay']),
+    kind: kind == null ? PenaltyKind.exercise : PenaltyKind.values.byName(kind),
+    primaryOwed: n('primaryOwed', 'pushupsOwed'),
+    secondaryOwed: n('secondaryOwed', 'squatsOwed'),
+    primaryDone: n('primaryDone', 'pushupsDone'),
+    secondaryDone: n('secondaryDone', 'squatsDone'),
+  );
+}
 
 Map<String, Object?>? lockToJson(LockWindow? w) => w == null
     ? null
@@ -203,7 +210,18 @@ Map<String, Object?> systemsToJson(SystemsState s) => {
   'systemStartedOn': s.systemStartedOn == null
       ? null
       : dayToJson(s.systemStartedOn!),
+  'issued': {
+    for (final e in s.issued.entries)
+      dayToJson(e.key): [for (final q in e.value) questItemToJson(q)],
+  },
 };
+
+QuestItem questItemFromJson(Map<String, Object?> j) => QuestItem(
+  j['id'] as String,
+  j['label'] as String,
+  QuestKind.values.byName(j['kind'] as String),
+  j['target'] as int,
+);
 
 SystemsState systemsFromJson(Map<String, Object?> j) {
   DayKey? day(String k) => j[k] == null ? null : dayFromJson(j[k]);
@@ -248,6 +266,13 @@ SystemsState systemsFromJson(Map<String, Object?> j) {
     titles: (j['titles'] as List).cast<String>(),
     sHold: j['sHold'] as int,
     systemStartedOn: day('systemStartedOn'),
+    issued: {
+      for (final e in ((j['issued'] as Map?) ?? const {}).entries)
+        dayFromJson(e.key): [
+          for (final q in (e.value as List).cast<Map>())
+            questItemFromJson(q.cast<String, Object?>()),
+        ],
+    },
   );
 }
 

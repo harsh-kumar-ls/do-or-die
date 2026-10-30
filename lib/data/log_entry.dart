@@ -38,21 +38,29 @@ class LogEntry {
         'day': day,
         'level': newLevel,
       }),
-      CarriedOver(:final pushups, :final squats) => LogEntry(
+      CarriedOver(:final primary, :final secondary, :final kind) => LogEntry(
         at,
         'carried_over',
-        {'day': day, 'pushups': pushups, 'squats': squats},
-      ),
-      PenaltyIssued(:final pushups, :final squats, :final enforced) => LogEntry(
-        at,
-        'penalty_issued',
         {
           'day': day,
-          'pushups': pushups,
-          'squats': squats,
-          'enforced': enforced,
+          'kind': kind.name,
+          'primary': primary,
+          'secondary': secondary,
         },
       ),
+      PenaltyIssued(
+        :final primary,
+        :final secondary,
+        :final kind,
+        :final enforced,
+      ) =>
+        LogEntry(at, 'penalty_issued', {
+          'day': day,
+          'kind': kind.name,
+          'primary': primary,
+          'secondary': secondary,
+          'enforced': enforced,
+        }),
       LockScheduled(:final window, :final enforced) => LogEntry(
         at,
         'lock_scheduled',

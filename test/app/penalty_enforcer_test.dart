@@ -164,7 +164,7 @@ void main() {
     expect(entry.data['release'], 1);
     expect(entry.data['lockMinutesRemaining'], 230);
     // Exercise owed is untouched.
-    expect(g.state.debt!.pushupsOwed, 50);
+    expect(g.state.debt!.primaryOwed, 50);
 
     // After 15 minutes the lock is back by itself.
     clock.set(inLock.add(const Duration(minutes: 15)));

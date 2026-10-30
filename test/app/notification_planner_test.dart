@@ -115,7 +115,7 @@ void main() {
     final g = await start();
     clock.set(DateTime(2026, 10, 20, 6));
     await g.tick();
-    await g.recordExercise(pushups: 50);
+    await g.recordPenalty(primary: 50);
     expect(byId(planner.plan(g, clock.now()), NoticeId.exercise), isNull);
   });
 

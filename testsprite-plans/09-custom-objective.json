@@ -13,7 +13,7 @@
     },
     {
       "type": "action",
-      "description": "On the '[ CHOOSE YOUR SYSTEM ]' window, click the card titled 'FITNESS SYSTEM'"
+      "description": "On the '[ CHOOSE YOUR SYSTEM ]' window, click the 'FITNESS' tile"
     },
     {
       "type": "action",
@@ -57,11 +57,11 @@
     },
     {
       "type": "assertion",
-      "description": "The '[ RANK ASSIGNED ]' window shows 'FITNESS SYSTEM \u00b7 RANK C' and the line 'Ranks above C are earned only through Dungeons.'"
+      "description": "The '[ YOUR DAILY QUEST ]' window shows 'FITNESS SYSTEM \u00b7 RANK C' and the line 'Ranks above C are earned only through Dungeons.'"
     },
     {
       "type": "action",
-      "description": "Click 'CONTINUE' on the '[ RANK ASSIGNED ]' window"
+      "description": "Click 'CONTINUE' on the '[ YOUR DAILY QUEST ]' window"
     },
     {
       "type": "action",

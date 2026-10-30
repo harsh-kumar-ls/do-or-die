@@ -108,6 +108,7 @@ final personalitySystem = SystemSpec(
       [
         _count('pages', 'Read (pages)', 10),
         _check('journal', 'Write one journal line'),
+        _check('hello', 'Say hello to someone you rarely talk to'),
       ],
       RankTrial('Finish a short book (150 pages or fewer) inside the Dungeon', [
         _check('book', 'Finish a short book'),

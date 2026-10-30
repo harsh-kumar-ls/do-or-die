@@ -30,13 +30,13 @@ LOAD = act("Open the app at / and wait up to 30 seconds for the '[ SYSTEM ]' win
 CONFIRM_APPS = act("Click 'CONFIRM APPS' on the '[ LOCK TARGETS ]' window (the web build lists no apps; that is expected)")
 
 
-def awakening(system="FITNESS SYSTEM", answers=None):
+def awakening(system="FITNESS", answers=None):
     """The Awakening up to the Daily Quest screen. [answers] are
     (question text, value) pairs typed into the placement test."""
     steps = [
         LOAD,
         act("Click 'ACCEPT' on the '[ SYSTEM ]' window"),
-        act(f"On the '[ CHOOSE YOUR SYSTEM ]' window, click the card titled '{system}'"),
+        act(f"On the '[ CHOOSE YOUR SYSTEM ]' window, click the '{system}' tile"),
         act("Click 'CONFIRM SYSTEM'"),
     ]
     for question, value in answers or []:
@@ -50,7 +50,7 @@ def awakening(system="FITNESS SYSTEM", answers=None):
         ]
     steps += [
         act("Click 'SUBMIT' on the '[ PLACEMENT TEST ]' window"),
-        act("Click 'CONTINUE' on the '[ RANK ASSIGNED ]' window"),
+        act("Click 'CONTINUE' on the '[ YOUR DAILY QUEST ]' window"),
         CONFIRM_APPS,
         act("Click 'CONFIRM' on the '[ REST PERIOD ]' window"),
         act("Click 'HOLD TO ACCEPT' once on the '[ PENALTY TERMS ]' window (this test build accepts a click in place of the hold)"),
@@ -79,7 +79,7 @@ PLANS = {
     ),
     "03-breakfast-confirm": (
         "Quest: a checkbox objective is confirmed with the hold button",
-        awakening("PERSONALITY SYSTEM") + [
+        awakening("PERSONALITY") + [
             check("The 'Write one journal line' objective shows '0 / 1' and a 'HOLD TO CONFIRM' button"),
             act("Click 'HOLD TO CONFIRM' once in the 'Write one journal line' objective (test build: a click confirms)"),
             check("That button now reads 'CONFIRMED' and 'Write one journal line' shows '1 / 1'"),
@@ -98,9 +98,10 @@ PLANS = {
     ),
     "05-quest-complete-notice": (
         "Quest: completing every objective shows the System notice",
-        awakening("PERSONALITY SYSTEM") + [
+        awakening("PERSONALITY") + [
             act("In the 'Read (pages)' objective, click '+5' twice"),
             act("Click 'HOLD TO CONFIRM' once in the 'Write one journal line' objective"),
+            act("Click 'HOLD TO CONFIRM' once in the 'Say hello to someone you rarely talk to' objective"),
             check("A '[ NOTIFICATION ]' window appears containing 'The daily quest has been completed.' and 'Reward: +100 XP'"),
             act("Click 'ACKNOWLEDGE'"),
             check("The notification closes and the quest screen shows 'All objectives complete.'"),
@@ -122,6 +123,17 @@ PLANS = {
             check("No 'PUSH-UPS OWED' window and no 'RELEASE 15 MIN' button are shown"),
         ],
     ),
+    "14-system-explainer": (
+        "Awakening: tapping a System explains what it trains and its own penalty",
+        [
+            LOAD,
+            act("Click 'ACCEPT' on the '[ SYSTEM ]' window"),
+            act("On the '[ CHOOSE YOUR SYSTEM ]' window, click the 'PERSONALITY' tile"),
+            check("The window now explains 'PERSONALITY SYSTEM' with 'TRAINS INT · CHA', a 'RANK E · WHERE YOU START' list including 'Read (pages) · 10', and an 'IF YOU FAIL A DAY' section that mentions '20 pages of reading' and a written reflection, and no push-ups"),
+            act("Click the 'FOCUS' tile"),
+            check("The explanation switches to 'FOCUS SYSTEM' and its failure section mentions 'a 60-minute phone-free block'"),
+        ],
+    ),
     "08-onboarding-validation": (
         "Awakening: continuing without choosing a System is refused",
         [
@@ -134,7 +146,7 @@ PLANS = {
     "09-custom-objective": (
         "Awakening: a strong placement test starts the Player at rank C, never higher",
         awakening(answers=[("Most push-ups you can do in one set", 80), ("Minutes to walk or jog 1 km", 4)])[:-4] + [
-            check("The '[ RANK ASSIGNED ]' window shows 'FITNESS SYSTEM · RANK C' and the line 'Ranks above C are earned only through Dungeons.'"),
+            check("The '[ YOUR DAILY QUEST ]' window shows 'FITNESS SYSTEM · RANK C' and the line 'Ranks above C are earned only through Dungeons.'"),
         ] + awakening()[-4:] + [
             check("The '[ DAILY QUEST ]' window lists 'Jog' showing '0.0 / 2.0 km' and 'Push-ups' showing '0 / 30'"),
         ],
@@ -149,7 +161,7 @@ PLANS = {
     ),
     "11-phone-free-block": (
         "Quest: a Focus phone-free block starts and ends from its objective",
-        awakening("FOCUS SYSTEM") + [
+        awakening("FOCUS") + [
             check("The '[ DAILY QUEST ]' window lists 'No phone after waking (minutes)' with a 'START BLOCK' button"),
             act("Click 'START BLOCK'"),
             check("The button now reads 'END BLOCK' and the text 'Chosen apps are locked until the block ends.' is shown under it"),

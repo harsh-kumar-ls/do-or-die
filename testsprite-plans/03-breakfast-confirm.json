@@ -13,7 +13,7 @@
     },
     {
       "type": "action",
-      "description": "On the '[ CHOOSE YOUR SYSTEM ]' window, click the card titled 'PERSONALITY SYSTEM'"
+      "description": "On the '[ CHOOSE YOUR SYSTEM ]' window, click the 'PERSONALITY' tile"
     },
     {
       "type": "action",
@@ -25,7 +25,7 @@
     },
     {
       "type": "action",
-      "description": "Click 'CONTINUE' on the '[ RANK ASSIGNED ]' window"
+      "description": "Click 'CONTINUE' on the '[ YOUR DAILY QUEST ]' window"
     },
     {
       "type": "action",

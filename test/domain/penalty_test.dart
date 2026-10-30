@@ -46,26 +46,26 @@ void main() {
     const day = DayKey(2026, 10, 20);
 
     test('recording reps reduces what is owed and never goes negative', () {
-      var debt = const ExerciseDebt(
+      var debt = const PenaltyDebt(
         dueDay: day,
-        pushupsOwed: 50,
-        squatsOwed: 0,
+        primaryOwed: 50,
+        secondaryOwed: 0,
       );
-      debt = debt.record(pushups: 40);
-      expect(debt.pushupsRemaining, 10);
-      debt = debt.record(pushups: 30);
-      expect(debt.pushupsRemaining, 0);
-      expect(debt.pushupsDone, 50);
+      debt = debt.record(primary: 40);
+      expect(debt.primaryRemaining, 10);
+      debt = debt.record(primary: 30);
+      expect(debt.primaryRemaining, 0);
+      expect(debt.primaryDone, 50);
       expect(debt.isPaid, isTrue);
     });
 
     test('negative input is ignored', () {
-      final debt = const ExerciseDebt(
+      final debt = const PenaltyDebt(
         dueDay: day,
-        pushupsOwed: 50,
-        squatsOwed: 0,
-      ).record(pushups: -20);
-      expect(debt.pushupsRemaining, 50);
+        primaryOwed: 50,
+        secondaryOwed: 0,
+      ).record(primary: -20);
+      expect(debt.primaryRemaining, 50);
     });
   });
 

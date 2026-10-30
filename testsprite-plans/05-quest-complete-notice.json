@@ -13,7 +13,7 @@
     },
     {
       "type": "action",
-      "description": "On the '[ CHOOSE YOUR SYSTEM ]' window, click the card titled 'PERSONALITY SYSTEM'"
+      "description": "On the '[ CHOOSE YOUR SYSTEM ]' window, click the 'PERSONALITY' tile"
     },
     {
       "type": "action",
@@ -25,7 +25,7 @@
     },
     {
       "type": "action",
-      "description": "Click 'CONTINUE' on the '[ RANK ASSIGNED ]' window"
+      "description": "Click 'CONTINUE' on the '[ YOUR DAILY QUEST ]' window"
     },
     {
       "type": "action",
@@ -46,6 +46,10 @@
     {
       "type": "action",
       "description": "Click 'HOLD TO CONFIRM' once in the 'Write one journal line' objective"
+    },
+    {
+      "type": "action",
+      "description": "Click 'HOLD TO CONFIRM' once in the 'Say hello to someone you rarely talk to' objective"
     },
     {
       "type": "assertion",

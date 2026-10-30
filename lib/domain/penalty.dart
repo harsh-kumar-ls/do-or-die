@@ -3,6 +3,21 @@ import 'dart:math';
 import 'config.dart';
 import 'day.dart';
 
+/// What a failed day costs besides the app lock. Each System has its own,
+/// so the penalty trains what the System trains: a Personality failure is
+/// not paid in push-ups.
+enum PenaltyKind {
+  /// Push-ups, then squats past the cap (Fitness, and games without a System).
+  exercise,
+
+  /// Pages to read, plus a written reflection on why the quest failed
+  /// (Personality).
+  reading,
+
+  /// A phone-free block, in minutes, run with the in-app timer (Focus).
+  focus,
+}
+
 class PenaltyCalculator {
   const PenaltyCalculator(this.config);
 
@@ -23,37 +38,87 @@ class PenaltyCalculator {
         config.squatsPerLevel * (level - firstSquatLevel);
   }
 
+  /// The penalty for failing at [level] as (primary, secondary), scaled by
+  /// [multiplier] (2 for a failed Dungeon floor). Push-ups never go above
+  /// the cap, even doubled: the excess becomes squats.
+  (int, int) amountsFor(PenaltyKind kind, int level, {int multiplier = 1}) {
+    switch (kind) {
+      case PenaltyKind.exercise:
+        final pushups = pushupsForLevel(level) * multiplier;
+        final capped = min(pushups, config.pushupCap);
+        return (
+          capped,
+          squatsForLevel(level) * multiplier + (pushups - capped),
+        );
+      case PenaltyKind.reading:
+        final pages = min(
+          config.basePages + config.pagesPerLevel * (level - 1),
+          config.pagesCap,
+        );
+        return (pages * multiplier, config.reflections * multiplier);
+      case PenaltyKind.focus:
+        final minutes = min(
+          config.baseBlockMinutes + config.blockMinutesPerLevel * (level - 1),
+          config.blockMinutesCap,
+        );
+        return (minutes * multiplier, 0);
+    }
+  }
+
   int lockMinutesForLevel(int level) =>
       config.baseLockMinutes + config.lockMinutesPerLevel * (level - 1);
 }
 
-/// Exercise owed, due by the end of [dueDay].
-class ExerciseDebt {
-  const ExerciseDebt({
+/// A penalty owed, due by the end of [dueDay]. What the two amounts mean
+/// depends on [kind]: push-ups and squats, pages and reflections, or
+/// phone-free minutes (no secondary).
+class PenaltyDebt {
+  const PenaltyDebt({
     required this.dueDay,
-    required this.pushupsOwed,
-    required this.squatsOwed,
-    this.pushupsDone = 0,
-    this.squatsDone = 0,
+    required this.primaryOwed,
+    required this.secondaryOwed,
+    this.primaryDone = 0,
+    this.secondaryDone = 0,
+    this.kind = PenaltyKind.exercise,
   });
 
   final DayKey dueDay;
-  final int pushupsOwed;
-  final int squatsOwed;
-  final int pushupsDone;
-  final int squatsDone;
+  final PenaltyKind kind;
+  final int primaryOwed;
+  final int secondaryOwed;
+  final int primaryDone;
+  final int secondaryDone;
 
-  int get pushupsRemaining => max(0, pushupsOwed - pushupsDone);
-  int get squatsRemaining => max(0, squatsOwed - squatsDone);
-  bool get isPaid => pushupsRemaining == 0 && squatsRemaining == 0;
+  int get primaryRemaining => max(0, primaryOwed - primaryDone);
+  int get secondaryRemaining => max(0, secondaryOwed - secondaryDone);
+  bool get isPaid => primaryRemaining == 0 && secondaryRemaining == 0;
 
-  ExerciseDebt record({int pushups = 0, int squats = 0}) => ExerciseDebt(
+  PenaltyDebt record({int primary = 0, int secondary = 0}) => PenaltyDebt(
     dueDay: dueDay,
-    pushupsOwed: pushupsOwed,
-    squatsOwed: squatsOwed,
-    pushupsDone: min(pushupsOwed, pushupsDone + max(0, pushups)),
-    squatsDone: min(squatsOwed, squatsDone + max(0, squats)),
+    kind: kind,
+    primaryOwed: primaryOwed,
+    secondaryOwed: secondaryOwed,
+    primaryDone: min(primaryOwed, primaryDone + max(0, primary)),
+    secondaryDone: min(secondaryOwed, secondaryDone + max(0, secondary)),
   );
+}
+
+/// How a penalty reads to the user, e.g. "40 push-ups and 10 squats".
+String describePenalty(PenaltyKind kind, int primary, int secondary) {
+  String plural(int n, String one, String many) => '$n ${n == 1 ? one : many}';
+  final parts = switch (kind) {
+    PenaltyKind.exercise => [
+      if (primary > 0) plural(primary, 'push-up', 'push-ups'),
+      if (secondary > 0) plural(secondary, 'squat', 'squats'),
+    ],
+    PenaltyKind.reading => [
+      if (primary > 0) plural(primary, 'page', 'pages'),
+      if (secondary > 0)
+        plural(secondary, 'written reflection', 'written reflections'),
+    ],
+    PenaltyKind.focus => [if (primary > 0) '$primary phone-free minutes'],
+  };
+  return parts.join(' and ');
 }
 
 /// Hours the user is asleep. Crosses midnight when [startMinute] > [endMinute].
@@ -165,4 +230,11 @@ class LockScheduler {
     final floored = DateTime(t.year, t.month, t.day, t.hour, t.minute);
     return floored == t ? t : floored.add(const Duration(minutes: 1));
   }
+}
+
+/// A reflection counts when it has at least five non-empty lines, or 200
+/// characters of the user's own words.
+bool reflectionAccepted(String text) {
+  final lines = text.split('\n').where((l) => l.trim().isNotEmpty).length;
+  return lines >= 5 || text.trim().length >= 200;
 }

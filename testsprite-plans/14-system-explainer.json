@@ -1,0 +1,31 @@
+{
+  "projectId": "d37f7ffc-2ffc-4da9-88ea-8ee0106eba69",
+  "type": "frontend",
+  "name": "Awakening: tapping a System explains what it trains and its own penalty",
+  "planSteps": [
+    {
+      "type": "action",
+      "description": "Open the app at / and wait up to 30 seconds for the '[ SYSTEM ]' window to appear (a Flutter web app; it can take a while to load, and controls are exposed in the accessibility tree)"
+    },
+    {
+      "type": "action",
+      "description": "Click 'ACCEPT' on the '[ SYSTEM ]' window"
+    },
+    {
+      "type": "action",
+      "description": "On the '[ CHOOSE YOUR SYSTEM ]' window, click the 'PERSONALITY' tile"
+    },
+    {
+      "type": "assertion",
+      "description": "The window now explains 'PERSONALITY SYSTEM' with 'TRAINS INT \u00b7 CHA', a 'RANK E \u00b7 WHERE YOU START' list including 'Read (pages) \u00b7 10', and an 'IF YOU FAIL A DAY' section that mentions '20 pages of reading' and a written reflection, and no push-ups"
+    },
+    {
+      "type": "action",
+      "description": "Click the 'FOCUS' tile"
+    },
+    {
+      "type": "assertion",
+      "description": "The explanation switches to 'FOCUS SYSTEM' and its failure section mentions 'a 60-minute phone-free block'"
+    }
+  ]
+}

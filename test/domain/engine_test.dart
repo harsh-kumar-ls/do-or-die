@@ -70,8 +70,8 @@ void main() {
       );
       final debt = r.state.debt!;
       expect(debt.dueDay, tuesday);
-      expect(debt.pushupsOwed, 50);
-      expect(debt.squatsOwed, 0);
+      expect(debt.primaryOwed, 50);
+      expect(debt.secondaryOwed, 0);
 
       final lock = r.state.lock!;
       expect(lock.day, tuesday);
@@ -91,7 +91,7 @@ void main() {
       tuesday,
       progress: {monday: nothingDone},
     );
-    expect(r.state.debt!.pushupsOwed, 50);
+    expect(r.state.debt!.primaryOwed, 50);
   });
 
   test('unpaid reps carry over doubled (100% interest)', () {
@@ -100,7 +100,7 @@ void main() {
       tuesday,
       progress: {monday: oneMissed},
     ).state;
-    s = engine.recordExercise(s, tuesday, pushups: 40);
+    s = engine.recordPenalty(s, tuesday, primary: 40);
     final r = close(
       s,
       wednesday,
@@ -108,8 +108,8 @@ void main() {
     );
 
     expect(r.state.debt!.dueDay, wednesday);
-    expect(r.state.debt!.pushupsOwed, 20);
-    expect(r.events.whereType<CarriedOver>().single.pushups, 20);
+    expect(r.state.debt!.primaryOwed, 20);
+    expect(r.events.whereType<CarriedOver>().single.primary, 20);
   });
 
   test('carry-over adds to a new penalty', () {
@@ -118,13 +118,13 @@ void main() {
       tuesday,
       progress: {monday: oneMissed},
     ).state;
-    s = engine.recordExercise(s, tuesday, pushups: 40);
+    s = engine.recordPenalty(s, tuesday, primary: 40);
     final r = close(
       s,
       wednesday,
       progress: {monday: oneMissed, tuesday: oneMissed},
     );
-    expect(r.state.debt!.pushupsOwed, 50 + 20);
+    expect(r.state.debt!.primaryOwed, 50 + 20);
   });
 
   test('carry-over only, with a cleared day, does not lock apps', () {
@@ -134,7 +134,7 @@ void main() {
       progress: {monday: oneMissed},
     ).state;
     final mondayLock = s.lock;
-    s = engine.recordExercise(s, tuesday, pushups: 40);
+    s = engine.recordPenalty(s, tuesday, primary: 40);
     final r = close(
       s,
       wednesday,
@@ -155,7 +155,7 @@ void main() {
       tuesday,
       progress: {monday: oneMissed},
     ).state;
-    s = engine.recordExercise(s, tuesday, pushups: 50);
+    s = engine.recordPenalty(s, tuesday, primary: 50);
     final r = close(
       s,
       wednesday,
@@ -169,10 +169,10 @@ void main() {
     final s = GameState(startDay: monday, level: 21).copyWith(
       lastClosedDay: monday,
       debt: () =>
-          ExerciseDebt(dueDay: tuesday, pushupsOwed: 150, squatsOwed: 0),
+          PenaltyDebt(dueDay: tuesday, primaryOwed: 150, secondaryOwed: 0),
     );
     final r = close(s, wednesday, progress: {tuesday: oneMissed});
-    expect(r.state.debt!.pushupsOwed, 150 + 300);
+    expect(r.state.debt!.primaryOwed, 150 + 300);
   });
 
   test('exercise only counts on the day it is due', () {
@@ -181,15 +181,12 @@ void main() {
       tuesday,
       progress: {monday: oneMissed},
     ).state;
-    expect(engine.recordExercise(s, monday, pushups: 50).debt!.pushupsDone, 0);
+    expect(engine.recordPenalty(s, monday, primary: 50).debt!.primaryDone, 0);
     expect(
-      engine.recordExercise(s, wednesday, pushups: 50).debt!.pushupsDone,
+      engine.recordPenalty(s, wednesday, primary: 50).debt!.primaryDone,
       0,
     );
-    expect(
-      engine.recordExercise(s, tuesday, pushups: 50).debt!.pushupsDone,
-      50,
-    );
+    expect(engine.recordPenalty(s, tuesday, primary: 50).debt!.primaryDone, 50);
   });
 
   test('levelling up raises the penalty for later failures', () {
@@ -207,7 +204,7 @@ void main() {
     expect(r.events.whereType<LevelUp>().single.newLevel, 2);
     expect(s.level, 2);
     expect(s.unspentStatPoints, 3);
-    expect(s.debt!.pushupsOwed, 55);
+    expect(s.debt!.primaryOwed, 55);
     expect(s.lock!.duration, const Duration(minutes: 260));
   });
 
@@ -232,7 +229,7 @@ void main() {
     ).state;
     final again = close(s, tuesday, progress: {monday: allDone});
     expect(again.events, isEmpty);
-    expect(again.state.debt!.pushupsOwed, 50);
+    expect(again.state.debt!.primaryOwed, 50);
   });
 
   test('skipped days are each judged when the app catches up', () {

@@ -42,7 +42,7 @@ void main() {
 
       expect(events.whereType<QuestFailed>(), hasLength(1));
       final penalty = events.whereType<PenaltyIssued>().single;
-      expect(penalty.pushups, 50);
+      expect(penalty.primary, 50);
       expect(penalty.enforced, isFalse);
       final lock = events.whereType<LockScheduled>().single;
       expect(lock.enforced, isFalse);
@@ -74,7 +74,7 @@ void main() {
     clock.advance(const Duration(days: 1));
     final events = await g.tick();
     expect(events.whereType<PenaltyIssued>().single.enforced, isTrue);
-    expect(g.state.debt!.pushupsOwed, greaterThanOrEqualTo(50));
+    expect(g.state.debt!.primaryOwed, greaterThanOrEqualTo(50));
     expect(g.state.lock, isNotNull);
   });
 
@@ -104,7 +104,7 @@ void main() {
         clock: clock,
         random: Random(4),
       ))!;
-      expect(reloaded.state.debt!.pushupsOwed, 50);
+      expect(reloaded.state.debt!.primaryOwed, 50);
       expect(reloaded.state.lock, isNotNull);
     },
   );
@@ -136,7 +136,7 @@ void main() {
 
       expect(await g.restartTrial(), isNull);
       expect(store.archived, isEmpty);
-      expect(g.state.debt!.pushupsOwed, 50);
+      expect(g.state.debt!.primaryOwed, 50);
     },
   );
 }

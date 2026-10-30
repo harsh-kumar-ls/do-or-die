@@ -34,7 +34,7 @@ class GameState {
   final Map<Stat, int> stats;
 
   /// Exercise currently owed, if any.
-  final ExerciseDebt? debt;
+  final PenaltyDebt? debt;
 
   /// The scheduled or running app lock, if any.
   final LockWindow? lock;
@@ -50,7 +50,7 @@ class GameState {
     int? xp,
     int? unspentStatPoints,
     Map<Stat, int>? stats,
-    ExerciseDebt? Function()? debt,
+    PenaltyDebt? Function()? debt,
     LockWindow? Function()? lock,
   }) => GameState(
     startDay: startDay,
@@ -86,24 +86,32 @@ class LevelUp extends GameEvent {
 }
 
 class CarriedOver extends GameEvent {
-  const CarriedOver(super.day, {required this.pushups, required this.squats});
+  const CarriedOver(
+    super.day, {
+    required this.primary,
+    required this.secondary,
+    this.kind = PenaltyKind.exercise,
+  });
 
-  /// Reps added to the next day, after interest.
-  final int pushups;
-  final int squats;
+  /// Amounts added to the next day, after interest.
+  final int primary;
+  final int secondary;
+  final PenaltyKind kind;
 }
 
 class PenaltyIssued extends GameEvent {
   const PenaltyIssued(
     super.day, {
-    required this.pushups,
-    required this.squats,
+    required this.primary,
+    required this.secondary,
+    this.kind = PenaltyKind.exercise,
     this.enforced = true,
   });
 
   /// The new penalty for the failed day, before any carry-over.
-  final int pushups;
-  final int squats;
+  final int primary;
+  final int secondary;
+  final PenaltyKind kind;
 
   /// False during a dry run: worked out and shown, but not owed.
   final bool enforced;
@@ -163,6 +171,7 @@ class QuestEngine {
     bool Function(DayKey failedDay) isEnforced = _always,
     int Function(DayKey day) penaltyMultiplier = _one,
     int Function(DayKey day) xpPercent = _hundred,
+    PenaltyKind Function(DayKey day) penaltyKind = _exercise,
   }) {
     final events = <GameEvent>[];
     var s = state;
@@ -179,6 +188,7 @@ class QuestEngine {
         isEnforced(day),
         penaltyMultiplier(day),
         xpPercent(day),
+        penaltyKind(day),
         events,
       );
     }
@@ -188,6 +198,7 @@ class QuestEngine {
   static bool _always(DayKey _) => true;
   static int _one(DayKey _) => 1;
   static int _hundred(DayKey _) => 100;
+  static PenaltyKind _exercise(DayKey _) => PenaltyKind.exercise;
 
   GameState _closeDay(
     GameState s,
@@ -200,6 +211,7 @@ class QuestEngine {
     bool enforced,
     int multiplier,
     int xpPercent,
+    PenaltyKind kind,
     List<GameEvent> events,
   ) {
     final failedIds = [
@@ -230,33 +242,43 @@ class QuestEngine {
     }
 
     // Carry-over: anything unpaid on a debt due today doubles into tomorrow.
-    var carryPushups = 0;
-    var carrySquats = 0;
+    var carryPrimary = 0;
+    var carrySecondary = 0;
+    var carryKind = kind;
     final debt = s.debt;
     if (debt != null && !debt.dueDay.isAfter(day) && !debt.isPaid) {
-      carryPushups = debt.pushupsRemaining * config.carryOverMultiplier;
-      carrySquats = debt.squatsRemaining * config.carryOverMultiplier;
-      events.add(CarriedOver(day, pushups: carryPushups, squats: carrySquats));
+      carryPrimary = debt.primaryRemaining * config.carryOverMultiplier;
+      carrySecondary = debt.secondaryRemaining * config.carryOverMultiplier;
+      carryKind = debt.kind;
+      events.add(
+        CarriedOver(
+          day,
+          primary: carryPrimary,
+          secondary: carrySecondary,
+          kind: carryKind,
+        ),
+      );
     }
 
-    var newPushups = 0;
-    var newSquats = 0;
+    var newPrimary = 0;
+    var newSecondary = 0;
     LockWindow? lock = s.lock;
     final tomorrow = day.addDays(1);
 
     if (!cleared) {
-      // A failed Dungeon floor multiplies the whole penalty (x2).
-      // The push-up cap still holds: anything above it becomes squats.
-      final doubled = penalties.pushupsForLevel(penaltyLevel) * multiplier;
-      final pushups = min(doubled, config.pushupCap);
-      final squats =
-          penalties.squatsForLevel(penaltyLevel) * multiplier +
-          (doubled - pushups);
+      // A failed Dungeon floor multiplies the whole penalty (x2); the
+      // push-up cap still holds.
+      final (primary, secondary) = penalties.amountsFor(
+        kind,
+        penaltyLevel,
+        multiplier: multiplier,
+      );
       events.add(
         PenaltyIssued(
           day,
-          pushups: pushups,
-          squats: squats,
+          primary: primary,
+          secondary: secondary,
+          kind: kind,
           enforced: enforced,
         ),
       );
@@ -276,19 +298,27 @@ class QuestEngine {
       );
 
       if (enforced) {
-        newPushups = pushups;
-        newSquats = squats;
+        newPrimary = primary;
+        newSecondary = secondary;
         lock = window;
       }
     }
 
-    final totalPushups = newPushups + carryPushups;
-    final totalSquats = newSquats + carrySquats;
-    final nextDebt = totalPushups + totalSquats > 0
-        ? ExerciseDebt(
+    // A carried debt of another kind (only after a new System begins) can't
+    // be added to this one; the new penalty takes its place.
+    if (newPrimary + newSecondary > 0 && carryKind != kind) {
+      carryPrimary = 0;
+      carrySecondary = 0;
+    }
+    final nextKind = newPrimary + newSecondary > 0 ? kind : carryKind;
+    final totalPrimary = newPrimary + carryPrimary;
+    final totalSecondary = newSecondary + carrySecondary;
+    final nextDebt = totalPrimary + totalSecondary > 0
+        ? PenaltyDebt(
             dueDay: tomorrow,
-            pushupsOwed: totalPushups,
-            squatsOwed: totalSquats,
+            kind: nextKind,
+            primaryOwed: totalPrimary,
+            secondaryOwed: totalSecondary,
           )
         : null;
 
@@ -302,17 +332,17 @@ class QuestEngine {
     );
   }
 
-  /// Records exercise done on [today] against the debt due today.
-  GameState recordExercise(
+  /// Records penalty work done on [today] against the debt due today.
+  GameState recordPenalty(
     GameState s,
     DayKey today, {
-    int pushups = 0,
-    int squats = 0,
+    int primary = 0,
+    int secondary = 0,
   }) {
     final debt = s.debt;
     if (debt == null || debt.dueDay != today) return s;
     return s.copyWith(
-      debt: () => debt.record(pushups: pushups, squats: squats),
+      debt: () => debt.record(primary: primary, secondary: secondary),
     );
   }
 

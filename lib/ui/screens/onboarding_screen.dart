@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../domain/penalty.dart';
+import '../../domain/penalty_kind.dart';
 import '../../domain/placement.dart';
 import '../../domain/progression.dart';
 import '../../domain/system_catalogue.dart';
@@ -167,117 +168,190 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ),
           Expanded(
-            child: ListView(
+            child: Padding(
               key: ValueKey(_step),
-              padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
-              children: [
-                body,
-                if (_error != null) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    _error!,
-                    textAlign: TextAlign.center,
-                    style: Hud.mono(12, Hud.warn),
-                  ),
-                ],
-                if (_index > 0 && _step != _Step.intro) ...[
-                  const SizedBox(height: 10),
-                  Center(
+              padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
+              child: body,
+            ),
+          ),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: Hud.mono(12, Hud.warn),
+              ),
+            ),
+          SizedBox(
+            height: 44,
+            child: _index > 0
+                ? Center(
                     child: TextButton(
                       onPressed: _back,
                       child: Text('BACK', style: Hud.mono(11, p.dim)),
                     ),
-                  ),
-                ],
-              ],
-            ),
+                  )
+                : null,
           ),
         ],
       ),
     );
   }
 
-  Widget _lines(HudPalette p, List<String> lines) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      for (final line in lines)
+  /// A full-height System window: [top] from the top, [bottom] pinned to
+  /// the bottom, spare space between. Scrolls only if the content is taller
+  /// than the screen.
+  Widget _page({
+    String? title,
+    String? subtitle,
+    required List<Widget> top,
+    required List<Widget> bottom,
+    bool center = false,
+  }) => LayoutBuilder(
+    builder: (context, c) => SingleChildScrollView(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: c.maxHeight),
+        child: IntrinsicHeight(
+          child: SystemWindow(
+            expand: true,
+            title: title,
+            subtitle: subtitle,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (center) const Spacer(),
+                ...top,
+                const Spacer(),
+                const SizedBox(height: 16),
+                ...bottom,
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+
+  Widget _intro(HudPalette p) => _page(
+    title: '[ SYSTEM ]',
+    top: [
+      const SizedBox(height: 24),
+      Center(
+        child: Icon(
+          Icons.blur_on,
+          size: 96,
+          color: p.sys,
+          shadows: p.textGlow(2),
+        ),
+      ),
+      const SizedBox(height: 28),
+      for (final line in const [
+        'You have met the conditions to become a Player.',
+        'Choose one System. It will issue a quest every day.',
+        'Clear it, and you grow. Fail it, and a penalty follows.',
+        'Clear 21 days in 30, and a Gate opens to the next rank.',
+      ])
         Padding(
-          padding: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.only(bottom: 14),
           child: Text(
             line,
             textAlign: TextAlign.center,
-            style: Hud.mono(13, p.text).copyWith(height: 1.5),
+            style: Hud.mono(14, p.text).copyWith(height: 1.5),
           ),
         ),
     ],
+    bottom: [
+      Text(
+        'Will you accept?',
+        textAlign: TextAlign.center,
+        style: Hud.head(16, p.hi, spacing: .12),
+      ),
+      const SizedBox(height: 14),
+      HudButton('ACCEPT', onPressed: _next),
+    ],
   );
 
-  Widget _intro(HudPalette p) => SystemWindow(
-    title: '[ SYSTEM ]',
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _lines(p, const [
-          'You have met the conditions to become a Player.',
-          'The System will issue a daily quest. Clear it, and you grow.',
-          'Fail it, and a penalty follows.',
-          'Will you accept?',
-        ]),
-        const SizedBox(height: 6),
-        HudButton('ACCEPT', onPressed: _next),
+  Widget _systemStep(HudPalette p) {
+    final choices = [
+      for (final k in SystemKind.values)
+        if (!widget.completed.contains(k)) k,
+    ];
+    final chosen = _system;
+    return _page(
+      title: '[ CHOOSE YOUR SYSTEM ]',
+      subtitle: widget.nextSystemOnly
+          ? 'Your System is complete. Choose the next one.'
+          : 'One System at a time. No switching until it is complete.',
+      top: [
+        Row(
+          children: [
+            for (final (i, k) in choices.indexed) ...[
+              if (i > 0) const SizedBox(width: 8),
+              Expanded(
+                child: _SystemTile(
+                  spec: systemCatalogue[k]!,
+                  selected: chosen == k,
+                  onTap: () => _choose(k),
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 14),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          child: chosen == null
+              ? Padding(
+                  key: const ValueKey('none'),
+                  padding: const EdgeInsets.symmetric(vertical: 40),
+                  child: Text(
+                    'Tap a System to see what it trains, what it asks of you, and what failure costs.',
+                    textAlign: TextAlign.center,
+                    style: Hud.mono(13, p.dim).copyWith(height: 1.5),
+                  ),
+                )
+              : _SystemDetail(
+                  key: ValueKey(chosen),
+                  spec: systemCatalogue[chosen]!,
+                ),
+        ),
       ],
-    ),
-  );
-
-  Widget _systemStep(HudPalette p) => SystemWindow(
-    title: '[ CHOOSE YOUR SYSTEM ]',
-    subtitle: widget.nextSystemOnly
-        ? 'Your System is complete. Choose the next one.'
-        : 'One System at a time. No switching until it is complete.',
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final kind in SystemKind.values)
-          if (!widget.completed.contains(kind))
-            _SystemCard(
-              spec: systemCatalogue[kind]!,
-              selected: _system == kind,
-              onTap: () => _choose(kind),
-            ),
-        const SizedBox(height: 6),
-        HudButton('CONFIRM SYSTEM', onPressed: _next),
-      ],
-    ),
-  );
+      bottom: [HudButton('CONFIRM SYSTEM', onPressed: _next)],
+    );
+  }
 
   Widget _placementStep(HudPalette p) {
     final kind = _system!;
-    return SystemWindow(
+    return _page(
       title: '[ PLACEMENT TEST ]',
-      subtitle: 'Answer honestly. The System sets your starting rank.',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (final q in placementQuestions[kind]!)
-            _NumberField(
-              key: ValueKey(q.id),
-              question: q,
-              value: _answers[q.id] ?? q.initial,
-              onChanged: (v) => setState(() => _answers[q.id] = v),
-            ),
-          if (kind == SystemKind.focus && widget.yesterdaySocialMinutes != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Text(
-                'Read from usage access on this phone.',
-                textAlign: TextAlign.center,
-                style: Hud.mono(10, p.dim),
-              ),
-            ),
-          const SizedBox(height: 6),
-          HudButton('SUBMIT', onPressed: _next),
-        ],
-      ),
+      center: true,
+      subtitle: 'These answers only set your starting rank. Your daily quest is shown next.',
+      top: [
+        const SizedBox(height: 8),
+        for (final q in placementQuestions[kind]!)
+          _NumberField(
+            key: ValueKey(q.id),
+            question: q,
+            value: _answers[q.id] ?? q.initial,
+            onChanged: (v) => setState(() => _answers[q.id] = v),
+          ),
+        if (kind == SystemKind.focus && widget.yesterdaySocialMinutes != null)
+          Text(
+            'Read from usage access on this phone.',
+            textAlign: TextAlign.center,
+            style: Hud.mono(10, p.dim),
+          ),
+      ],
+      bottom: [
+        Text(
+          'Answer honestly. A rank too high only makes the first weeks harder.',
+          textAlign: TextAlign.center,
+          style: Hud.mono(11, p.dim),
+        ),
+        const SizedBox(height: 12),
+        HudButton('SUBMIT', onPressed: _next),
+      ],
     );
   }
 
@@ -286,68 +360,79 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final rank = _placement;
     final spec = systemCatalogue[kind]!;
     final quest = spec.at(rank).daily.map(questTask).toList();
-    return SystemWindow(
-      title: '[ RANK ASSIGNED ]',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Center(child: RankBadge(rank: rank, size: 64)),
-          const SizedBox(height: 12),
-          Text(
-            '${spec.name.toUpperCase()} · RANK ${rank.name.toUpperCase()}',
-            textAlign: TextAlign.center,
-            style: Hud.head(15, p.hi, spacing: .12),
-          ),
+    final next = rank == Rank.s ? null : Rank.values[rank.index + 1];
+    final have = {for (final q in spec.at(rank).daily) q.id};
+    final added = next == null
+        ? const <TaskDefinition>[]
+        : [
+            for (final q in spec.at(next).daily)
+              if (!have.contains(q.id)) questTask(q),
+          ];
+    return _page(
+      title: '[ YOUR DAILY QUEST ]',
+      top: [
+        Center(child: RankBadge(rank: rank, size: 72)),
+        const SizedBox(height: 12),
+        Text(
+          '${spec.name.toUpperCase()} · RANK ${rank.name.toUpperCase()}',
+          textAlign: TextAlign.center,
+          style: Hud.head(15, p.hi, spacing: .12),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'The System will issue this every day. Every objective must be cleared before midnight.',
+          textAlign: TextAlign.center,
+          style: Hud.mono(11, p.dim).copyWith(height: 1.5),
+        ),
+        const SizedBox(height: 16),
+        for (final (i, t) in quest.indexed) _QuestLine(index: i + 1, task: t),
+        if (added.isNotEmpty) ...[
           const SizedBox(height: 14),
           Text(
-            'DAILY QUEST',
+            'AT RANK ${next!.name.toUpperCase()} THE SYSTEM ADDS',
             textAlign: TextAlign.center,
-            style: Hud.mono(11, p.dim, spacing: .1),
+            style: Hud.mono(10, p.dim, spacing: .12),
           ),
-          const SizedBox(height: 8),
-          for (final t in quest)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Row(
-                children: [
-                  Text('›  ', style: Hud.mono(12, p.sys)),
-                  Expanded(child: Text(t.name, style: Hud.mono(12, p.text))),
-                  Text(questTarget(t), style: Hud.mono(12, p.hi)),
-                ],
-              ),
-            ),
-          const SizedBox(height: 8),
-          Text(
-            'Ranks above C are earned only through Dungeons.',
-            textAlign: TextAlign.center,
-            style: Hud.mono(10, p.dim),
-          ),
-          if (kind == SystemKind.fitness) ...[
-            const SizedBox(height: 6),
+          const SizedBox(height: 6),
+          for (final t in added)
             Text(
-              'These are conservative progressions, not medical advice. With a health condition, ask a doctor first.',
+              t.name,
               textAlign: TextAlign.center,
-              style: Hud.mono(10, Hud.warn),
+              style: Hud.mono(12, p.text),
             ),
-          ],
-          const SizedBox(height: 12),
-          HudButton(
-            widget.nextSystemOnly ? 'BEGIN THIS SYSTEM' : 'CONTINUE',
-            onPressed: _next,
+        ],
+      ],
+      bottom: [
+        Text(
+          'Ranks above C are earned only through Dungeons.',
+          textAlign: TextAlign.center,
+          style: Hud.mono(10, p.dim),
+        ),
+        if (kind == SystemKind.fitness) ...[
+          const SizedBox(height: 6),
+          Text(
+            'These are conservative progressions, not medical advice. With a health condition, ask a doctor first.',
+            textAlign: TextAlign.center,
+            style: Hud.mono(10, Hud.warn),
           ),
         ],
-      ),
+        const SizedBox(height: 12),
+        HudButton(
+          widget.nextSystemOnly ? 'BEGIN THIS SYSTEM' : 'CONTINUE',
+          onPressed: _next,
+        ),
+      ],
     );
   }
 
   Widget _appStep(HudPalette p) => SystemWindow(
+    expand: true,
     title: '[ LOCK TARGETS ]',
     subtitle: 'Choose the apps that lock when you fail a day. Screen-time quests measure these apps.',
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SizedBox(
-          height: 380,
+        Expanded(
           child: AppPickerList(
             blocker: widget.blocker,
             selected: _blocked,
@@ -369,18 +454,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     ),
   );
 
-  Widget _sleepStep(HudPalette p) => SystemWindow(
+  Widget _sleepStep(HudPalette p) => _page(
     title: '[ REST PERIOD ]',
+    center: true,
     subtitle: 'Penalty locks never start or run while you sleep.',
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _timeRow(p, 'SLEEP STARTS', _sleepStart, (t) => _sleepStart = t),
-        _timeRow(p, 'SLEEP ENDS', _sleepEnd, (t) => _sleepEnd = t),
-        const SizedBox(height: 12),
-        HudButton('CONFIRM', onPressed: _next),
-      ],
-    ),
+    top: [
+      const SizedBox(height: 20),
+      Center(child: Icon(Icons.nights_stay_outlined, size: 72, color: p.sys)),
+      const SizedBox(height: 24),
+      _timeRow(p, 'SLEEP STARTS', _sleepStart, (t) => _sleepStart = t),
+      _timeRow(p, 'SLEEP ENDS', _sleepEnd, (t) => _sleepEnd = t),
+    ],
+    bottom: [HudButton('CONFIRM', onPressed: _next)],
   );
 
   Widget _timeRow(
@@ -389,12 +474,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     TimeOfDay value,
     ValueChanged<TimeOfDay> set,
   ) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 6),
+    padding: const EdgeInsets.symmetric(vertical: 8),
     child: Row(
       children: [
-        Expanded(child: Text(label, style: Hud.mono(12, p.dim, spacing: .08))),
+        Expanded(child: Text(label, style: Hud.mono(13, p.dim, spacing: .08))),
         SizedBox(
-          width: 110,
+          width: 120,
           child: HudButton(
             value.format(context),
             onPressed: () async {
@@ -410,49 +495,46 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     ),
   );
 
-  Widget _termsStep(HudPalette p) => SystemWindow(
+  Widget _termsStep(HudPalette p) => _page(
     title: '[ PENALTY TERMS ]',
     subtitle: 'Read carefully. These rules are enforced.',
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final line in const [
-          'If any objective is incomplete at midnight, the day is failed.',
-          'The next day, chosen apps lock for 4 hours (+20 minutes per level), starting at an undisclosed time while you are awake.',
-          'You also owe 50 push-ups (+5 per level, capped at 150; squats are added beyond the cap).',
-          'Unpaid reps double and carry into the following day.',
-          'Clear 21 of 30 days and a Gate opens. Enter it within 48 hours.',
-          'A Dungeon is three floors on three days. Floor 2 must be cleared by 18:00. The third floor is the Rank Trial.',
-          'Fail a floor and the Dungeon Penalty follows: double lock and double reps. The Gate stays shut for 7 days.',
-          'Ranks never go down. One System at a time, until it is complete.',
-          'A quest can be lowered by up to 20% for injury or illness, from the next day. Those days earn half XP.',
-          'For the first 3 days, failures are a dry run: shown, never enforced.',
-          'Calls, messages, maps and settings are never locked. Releases from a lock always exist, and every one is logged.',
-          'Only do exercise that is safe for your body.',
-        ])
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('›  ', style: Hud.mono(12, p.sys)),
-                Expanded(
-                  child: Text(
-                    line,
-                    style: Hud.mono(12, p.text).copyWith(height: 1.5),
-                  ),
+    top: [
+      for (final line in [
+        'If any objective is incomplete at midnight, the day is failed.',
+        'The next day, chosen apps lock for 4 hours (+20 minutes per level), starting at an undisclosed time while you are awake.',
+        'You also owe ${penaltyTerms(penaltyKindFor(_system))}.',
+        'Anything unpaid doubles and carries into the following day.',
+        'Clear 21 of 30 days and a Gate opens. Enter it within 48 hours.',
+        'A Dungeon is three floors on three days. Floor 2 must be cleared by 18:00. The third floor is the Rank Trial.',
+        'Fail a floor and the Dungeon Penalty follows: double lock and a double penalty. The Gate stays shut for 7 days.',
+        'Ranks never go down. One System at a time, until it is complete.',
+        'A quest can be lowered by up to 20% for injury or illness, from the next day. Those days earn half XP.',
+        'For the first 3 days, failures are a dry run: shown, never enforced.',
+        'Calls, messages, maps and settings are never locked. Releases from a lock always exist, and every one is logged.',
+      ])
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('›  ', style: Hud.mono(12, p.sys)),
+              Expanded(
+                child: Text(
+                  line,
+                  style: Hud.mono(12, p.text).copyWith(height: 1.5),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        const SizedBox(height: 6),
-        HoldButton(
-          label: 'HOLD TO ACCEPT',
-          doneLabel: 'ACCEPTED',
-          onConfirmed: _finish,
         ),
-      ],
-    ),
+    ],
+    bottom: [
+      HoldButton(
+        label: 'HOLD TO ACCEPT',
+        doneLabel: 'ACCEPTED',
+        onConfirmed: _finish,
+      ),
+    ],
   );
 }
 
@@ -465,8 +547,22 @@ String questTarget(TaskDefinition t) => switch (t.type) {
   TaskType.screenCap => 'max ${t.target} min',
 };
 
-class _SystemCard extends StatelessWidget {
-  const _SystemCard({
+/// What a System's penalty costs at level 1, in words.
+String penaltyTerms(PenaltyKind kind) => switch (kind) {
+  PenaltyKind.exercise => '50 push-ups (+5 per level, capped at 150; squats are added beyond the cap)',
+  PenaltyKind.reading => '20 pages of reading (+2 per level, up to 60) and a written reflection on why the quest failed',
+  PenaltyKind.focus => 'a 60-minute phone-free block (+5 minutes per level, up to 3 hours), run in the app with your chosen apps locked',
+};
+
+IconData systemIcon(SystemKind k) => switch (k) {
+  SystemKind.fitness => Icons.fitness_center,
+  SystemKind.personality => Icons.auto_stories_outlined,
+  SystemKind.focus => Icons.center_focus_strong_outlined,
+};
+
+/// One of the three Systems, as a selectable tile.
+class _SystemTile extends StatelessWidget {
+  const _SystemTile({
     required this.spec,
     required this.selected,
     required this.onTap,
@@ -475,6 +571,61 @@ class _SystemCard extends StatelessWidget {
   final SystemSpec spec;
   final bool selected;
   final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    final short = spec.name.split(' ').first.toUpperCase();
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: spec.name,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 6),
+          decoration: BoxDecoration(
+            color: selected ? p.sys.withValues(alpha: .18) : p.panel,
+            border: Border.all(
+              color: selected ? p.sys : p.line,
+              width: selected ? 1.5 : 1,
+            ),
+            boxShadow: selected
+                ? [BoxShadow(color: p.glowColor, blurRadius: p.glow * 1.5)]
+                : null,
+          ),
+          child: ExcludeSemantics(
+            child: Column(
+              children: [
+                Icon(
+                  systemIcon(spec.kind),
+                  size: 34,
+                  color: selected ? p.hi : p.dim,
+                ),
+                const SizedBox(height: 10),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    short,
+                    maxLines: 1,
+                    style: Hud.head(12, selected ? p.hi : p.text, spacing: .12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// What a System trains, its first and final quests, and what failure costs.
+class _SystemDetail extends StatelessWidget {
+  const _SystemDetail({super.key, required this.spec});
+
+  final SystemSpec spec;
 
   static const _stat = {
     Stat.strength: 'STR',
@@ -487,50 +638,90 @@ class _SystemCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = HudScope.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Semantics(
-        button: true,
-        selected: selected,
-        label: spec.name,
-        child: GestureDetector(
-          onTap: onTap,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: selected
-                  ? p.sys.withValues(alpha: .16)
-                  : Colors.transparent,
-              border: Border.all(color: selected ? p.sys : p.line),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        spec.name.toUpperCase(),
-                        style: Hud.head(
-                          14,
-                          selected ? p.hi : p.text,
-                          spacing: .12,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      spec.stats.map((s) => _stat[s]).join(' · '),
-                      style: Hud.mono(11, p.sys),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(spec.tagline, style: Hud.mono(11, p.dim)),
-              ],
-            ),
-          ),
+    Widget label(String t) => Padding(
+      padding: const EdgeInsets.only(top: 14, bottom: 6),
+      child: Text(t, style: Hud.mono(10, p.sys, spacing: .14)),
+    );
+    Widget item(String t) => Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('›  ', style: Hud.mono(12, p.sys)),
+          Expanded(child: Text(t, style: Hud.mono(12, p.text))),
+        ],
+      ),
+    );
+    final first = spec.at(Rank.e).daily.map(questTask);
+    final last = spec.at(Rank.s).daily.map(questTask);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          spec.name.toUpperCase(),
+          textAlign: TextAlign.center,
+          style: Hud.head(18, p.hi, spacing: .14),
         ),
+        const SizedBox(height: 6),
+        Text(
+          spec.tagline,
+          textAlign: TextAlign.center,
+          style: Hud.mono(12, p.dim),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'TRAINS ${spec.stats.map((s) => _stat[s]).join(' · ')}',
+          textAlign: TextAlign.center,
+          style: Hud.mono(11, Hud.gold, spacing: .1),
+        ),
+        label('RANK E · WHERE YOU START'),
+        for (final t in first)
+          item(
+            t.type == TaskType.checkbox
+                ? t.name
+                : '${t.name} · ${questTarget(t)}',
+          ),
+        label('RANK S · WHERE IT ENDS'),
+        for (final t in last) item(t.name),
+        label('IF YOU FAIL A DAY'),
+        item('Your chosen apps lock for 4 hours, at a time you are not told.'),
+        item(_capitalise(penaltyTerms(penaltyKindFor(spec.kind)))),
+      ],
+    );
+  }
+
+  static String _capitalise(String s) =>
+      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+}
+
+/// One numbered objective of the daily quest, with its target.
+class _QuestLine extends StatelessWidget {
+  const _QuestLine({required this.index, required this.task});
+
+  final int index;
+  final TaskDefinition task;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        color: p.sys.withValues(alpha: .06),
+        border: Border.all(color: p.line),
+      ),
+      child: Row(
+        children: [
+          Text('$index', style: Hud.head(16, p.sys, spacing: 0)),
+          const SizedBox(width: 12),
+          Expanded(child: Text(task.name, style: Hud.mono(13, p.text))),
+          const SizedBox(width: 8),
+          Text(
+            questTarget(task),
+            style: Hud.mono(13, p.hi, weight: FontWeight.w500),
+          ),
+        ],
       ),
     );
   }

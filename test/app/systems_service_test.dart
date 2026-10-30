@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:do_or_die/app/game_service.dart';
 import 'package:do_or_die/app/penalty_enforcer.dart';
+import 'package:do_or_die/data/codec.dart';
 import 'package:do_or_die/data/game_store.dart';
 import 'package:do_or_die/domain/clock.dart';
 import 'package:do_or_die/domain/day.dart';
@@ -218,8 +219,8 @@ void main() {
         final p = g.engine.penalties;
         await nextDay(g); // floor 1 not cleared
         final debt = g.state.debt!;
-        expect(debt.pushupsOwed, p.pushupsForLevel(level) * 2);
-        expect(debt.squatsOwed, p.squatsForLevel(level) * 2);
+        expect(debt.primaryOwed, p.pushupsForLevel(level) * 2);
+        expect(debt.secondaryOwed, p.squatsForLevel(level) * 2);
         final lock = g.state.lock!;
         expect(
           lock.end.difference(lock.start).inMinutes,
@@ -248,7 +249,7 @@ void main() {
       final level = g.state.level;
       await nextDay(g);
       expect(
-        g.state.debt!.pushupsOwed,
+        g.state.debt!.primaryOwed,
         g.engine.penalties.pushupsForLevel(level),
       );
       final blocker = FakeBlocker();
@@ -517,9 +518,9 @@ void main() {
         );
         final p = engine.penalties;
         final issued = r.events.whereType<PenaltyIssued>().single;
-        expect(issued.pushups, 150);
+        expect(issued.primary, 150);
         expect(
-          issued.squats,
+          issued.secondary,
           p.squatsForLevel(21) * 2 + p.pushupsForLevel(21) * 2 - 150,
         );
       },
@@ -596,6 +597,120 @@ void main() {
       expect(g.reportDue, isTrue);
       await g.markReportIssued();
       expect(g.reportDue, isFalse);
+    });
+  });
+
+  group('penalties follow the System', () {
+    test('Fitness owes push-ups', () async {
+      final g = await awaken(SystemKind.fitness);
+      await nextDay(g);
+      expect(g.state.debt!.kind, PenaltyKind.exercise);
+      expect(g.state.debt!.primaryOwed, 50);
+    });
+
+    test(
+      'Personality owes pages and a written reflection, never push-ups',
+      () async {
+        final g = await awaken(SystemKind.personality);
+        await nextDay(g);
+        final debt = g.state.debt!;
+        expect(debt.kind, PenaltyKind.reading);
+        expect((debt.primaryOwed, debt.secondaryOwed), (20, 1));
+        expect(await g.submitReflection('too short'), isFalse);
+        await g.recordPenalty(secondary: 1); // can't be ticked off
+        expect(g.state.debt!.secondaryDone, 0);
+        expect(
+          await g.submitReflection(
+            'I skipped reading.\nI was tired.\n'
+            'I left it too late.\nTomorrow I read at lunch.\nPhone away.',
+          ),
+          isTrue,
+        );
+        await g.recordPenalty(primary: 20);
+        expect(g.state.debt!.isPaid, isTrue);
+        expect(g.game.log.where((e) => e.type == 'reflection'), hasLength(1));
+      },
+    );
+
+    test('Focus owes a phone-free block, paid only by running it', () async {
+      final g = await awaken(SystemKind.focus);
+      await nextDay(g);
+      final debt = g.state.debt!;
+      expect(debt.kind, PenaltyKind.focus);
+      expect((debt.primaryOwed, debt.secondaryOwed), (60, 0));
+      await g.recordPenalty(primary: 60); // can't be typed in
+      expect(g.state.debt!.primaryDone, 0);
+      await g.startPenaltyBlock();
+      expect(g.focusBlock, isNotNull, reason: 'apps lock during the block');
+      final blocker = FakeBlocker();
+      await PenaltyEnforcer(blocker, clock: clock).sync(g);
+      expect(blocker.focus, isNotNull);
+      clock.advance(const Duration(minutes: 61));
+      await g.stopTimer();
+      expect(g.state.debt!.isPaid, isTrue);
+      expect(g.focusBlock, isNull);
+    });
+
+    test('a penalty block left running counts only to midnight', () async {
+      final g = await awaken(SystemKind.focus);
+      await nextDay(g);
+      clock.set(g.today.at(23 * 60 + 30));
+      await g.startPenaltyBlock();
+      clock.set(g.today.addDays(1).at(1 * 60));
+      await g.tick();
+      expect(g.game.timer, isNull);
+      expect(
+        g.game.log
+            .lastWhere((e) => e.type == 'penalty_block_ended')
+            .data['minutes'],
+        30,
+      );
+    });
+
+    test('saves from before penalty kinds still load as exercise', () {
+      final debt = debtFromJson({
+        'dueDay': '2026-10-20',
+        'pushupsOwed': 50,
+        'squatsOwed': 0,
+        'pushupsDone': 10,
+        'squatsDone': 0,
+      })!;
+      expect(debt.kind, PenaltyKind.exercise);
+      expect((debt.primaryOwed, debt.primaryDone), (50, 10));
+    });
+  });
+
+  group('issued quests are frozen', () {
+    test('today\'s quest is snapshotted and judged as issued', () async {
+      final g = await awaken(SystemKind.personality);
+      await g.tick();
+      final snap = g.systems!.issued[g.today]!;
+      expect(snap.map((q) => q.id), ['pages', 'journal', 'hello']);
+      // A snapshot that differs from the catalogue wins (an app update
+      // must never change a quest already issued).
+      final altered = g.systems!.copyWith(
+        issued: {
+          g.today: [snap.first],
+        },
+      );
+      await store.save(g.game.copyWith(systems: altered));
+      final h = (await GameService.load(
+        store: store,
+        clock: clock,
+        meter: meter,
+      ))!;
+      expect(h.todaysTasks.map((t) => t.id), ['pages']);
+      await h.setProgress('pages', 10);
+      final events = await nextDay(h);
+      expect(events.whereType<QuestCleared>(), hasLength(1));
+    });
+
+    test('old snapshots are dropped after 40 days', () async {
+      final g = await awaken(SystemKind.fitness);
+      await clearDays(g, 45);
+      final days = g.systems!.issued.keys.toList()..sort();
+      expect(days.length, lessThanOrEqualTo(41));
+      expect(days.last, g.today);
     });
   });
 }

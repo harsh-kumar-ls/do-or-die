@@ -213,6 +213,8 @@ Each prompt is what I'd run for that iteration of the loop.
 
 - [x] **Hotfix 0.2.1 (2026-10-31): black screen at start.** 0.2.0 was the first release-mode (R8-shrunk) build; earlier installs were `flutter run` builds, which skip shrinking. R8 removed code that shared_preferences calls from Dart through JNI, so loading the save threw before the first frame. Code shrinking is now off for release builds. Startup now shows a `[ SYSTEM ERROR ]` screen if the save can't be read (never a silent fresh start). The phone's "Asia/Calcutta" zone is mapped to "Asia/Kolkata" for notifications. Verified on the phone: the Awakening appears. **Lesson: device-check the exact release APK before handing it over.**
 
+- [x] **0.3.0 (2026-10-31): first device-test feedback.** Onboarding steps fill the screen; the System choice is three tiles with a full explanation (what it trains, rank E and S quests, the System's own penalty); the placement test says it only sets the rank; the rank step is a numbered "Your daily quest" reveal with the next rank's additions. **Penalties now follow the System** (`PenaltyKind`: exercise, reading + reflection, focus block), generalised through engine, save format (old saves still load), Penalty tab, planner and notices. Issued quests are snapshotted per day. Claude Design prompts in `design/CLAUDE_DESIGN_PROMPTS.md`. Gates: 199/199 tests; TestSprite 14/14 (new: System explainer).
+
 ### Device checklist for 0.2.0 (manual, on the phone)
 1. Install the APK over the old app; the old trial is archived and the Awakening appears (if a penalty was in effect, the old trial stays until it ends).
 2. Complete the Awakening; Status shows the System, rank and 0 / 21.

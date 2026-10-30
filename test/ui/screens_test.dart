@@ -261,13 +261,13 @@ void main() {
   ) async {
     final model = await pumpShell(tester, system: SystemKind.personality);
     final journal = model.tasks.firstWhere((t) => t.id == 'journal');
-    await tester.ensureVisible(find.text('HOLD TO CONFIRM'));
-    await tester.tap(find.text('HOLD TO CONFIRM'));
+    await tester.ensureVisible(find.text('HOLD TO CONFIRM').first);
+    await tester.tap(find.text('HOLD TO CONFIRM').first);
     await tester.pump(const Duration(milliseconds: 200));
     expect(model.isDone(journal), isFalse);
 
     final gesture = await tester.startGesture(
-      tester.getCenter(find.text('HOLD TO CONFIRM')),
+      tester.getCenter(find.text('HOLD TO CONFIRM').first),
     );
     // The press registers after ~100ms; then the fill needs ~900ms of frames.
     await tester.pump(const Duration(milliseconds: 150));
@@ -356,7 +356,7 @@ void main() {
     OnboardingResult? result;
     await pumpOnboarding(tester, (r) => result = r);
     await tapText(tester, 'ACCEPT');
-    await tapText(tester, 'FITNESS SYSTEM');
+    await tapText(tester, 'FITNESS');
     await tapText(tester, 'CONFIRM SYSTEM');
     expect(find.text('[ PLACEMENT TEST ]'), findsOneWidget);
     final fields = find.byType(TextField);
@@ -391,9 +391,14 @@ void main() {
       nextSystemOnly: true,
       completed: const {SystemKind.fitness},
     );
-    expect(find.text('FITNESS SYSTEM'), findsNothing);
-    expect(find.text('FOCUS SYSTEM'), findsOneWidget);
+    expect(find.text('FITNESS'), findsNothing);
+    expect(find.text('FOCUS'), findsOneWidget);
+    expect(find.text('PERSONALITY'), findsOneWidget);
+    // Choosing one explains it, including its own penalty.
+    await tapText(tester, 'PERSONALITY');
     expect(find.text('PERSONALITY SYSTEM'), findsOneWidget);
+    expect(find.textContaining('20 pages of reading'), findsOneWidget);
+    expect(find.textContaining('push-ups'), findsNothing);
   });
 
   /// Clears [n] days in a row on [clock], ending at 09:00 the day after.

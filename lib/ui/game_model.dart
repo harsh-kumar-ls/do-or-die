@@ -11,6 +11,7 @@ import '../platform/notifier.dart';
 import '../domain/day.dart';
 import '../domain/dungeon.dart';
 import '../domain/engine.dart';
+import '../domain/penalty.dart';
 import '../domain/progression.dart';
 import '../domain/system_catalogue.dart';
 import '../domain/systems.dart';
@@ -376,10 +377,11 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     final debt = state.debt;
     if (debt != null && debt.dueDay == service.today && !debt.isPaid) {
       parts.add(
-        [
-          if (debt.pushupsRemaining > 0) '${debt.pushupsRemaining} push-ups',
-          if (debt.squatsRemaining > 0) '${debt.squatsRemaining} squats',
-        ].join(' and '),
+        describePenalty(
+          debt.kind,
+          debt.primaryRemaining,
+          debt.secondaryRemaining,
+        ),
       );
     }
     final lock = state.lock;
@@ -416,9 +418,30 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
   bool isTimerRunning(TaskDefinition t) => service.isTimerRunning(t.id);
   int runningSeconds(TaskDefinition t) => service.runningSeconds(t.id);
 
-  Future<void> recordExercise({int pushups = 0, int squats = 0}) {
+  Future<void> recordPenalty({int primary = 0, int secondary = 0}) {
     Fx.instance.play(Cue.rep);
-    return _run(() => service.recordExercise(pushups: pushups, squats: squats));
+    return _run(
+      () => service.recordPenalty(primary: primary, secondary: secondary),
+    );
+  }
+
+  Future<bool> submitReflection(String text) async {
+    var ok = false;
+    await _run(() async => ok = await service.submitReflection(text));
+    if (ok) Fx.instance.play(Cue.confirm);
+    return ok;
+  }
+
+  /// A Focus penalty block: running, and how long.
+  bool get penaltyBlockRunning => service.penaltyBlockRunning;
+  int get penaltyBlockSeconds => service.penaltyBlockSeconds;
+
+  Future<void> togglePenaltyBlock() {
+    final running = service.penaltyBlockRunning;
+    Fx.instance.play(running ? Cue.timerStop : Cue.timerStart);
+    return _run(
+      () => running ? service.stopTimer() : service.startPenaltyBlock(),
+    );
   }
 
   Future<void> allocateStat(Stat stat) {
@@ -499,7 +522,11 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
               .firstOrNull;
           final exercise = penalty == null
               ? null
-              : '${penalty.pushups} push-ups${penalty.squats > 0 ? ', ${penalty.squats} squats' : ''}';
+              : describePenalty(
+                  penalty.kind,
+                  penalty.primary,
+                  penalty.secondary,
+                );
           if (penalty != null && !penalty.enforced) {
             // Dry run: nothing is enforced, so the whole penalty is shown.
             final live = service.liveFrom;

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../domain/penalty.dart';
 import '../../platform/blocker.dart';
 import '../game_model.dart';
 import '../theme.dart';
@@ -120,21 +121,7 @@ class PenaltyScreen extends StatelessWidget {
               ),
               if (owesToday) ...[
                 const SizedBox(height: 14),
-                _ExerciseWindow(
-                  title: 'PUSH-UPS OWED',
-                  done: debt.pushupsDone,
-                  owed: debt.pushupsOwed,
-                  onAdd: (n) => model.recordExercise(pushups: n),
-                ),
-                if (debt.squatsOwed > 0) ...[
-                  const SizedBox(height: 14),
-                  _ExerciseWindow(
-                    title: 'SQUATS OWED',
-                    done: debt.squatsDone,
-                    owed: debt.squatsOwed,
-                    onAdd: (n) => model.recordExercise(squats: n),
-                  ),
-                ],
+                ..._owed(model, debt),
               ],
               const SizedBox(height: 14),
               Text(
@@ -147,6 +134,55 @@ class PenaltyScreen extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+/// The windows for what is owed today, by the System's penalty kind.
+List<Widget> _owed(GameModel model, PenaltyDebt debt) {
+  switch (debt.kind) {
+    case PenaltyKind.exercise:
+      return [
+        _CountWindow(
+          title: 'PUSH-UPS OWED',
+          done: debt.primaryDone,
+          owed: debt.primaryOwed,
+          steps: const [1, 10],
+          unit: 'REP',
+          onAdd: (n) => model.recordPenalty(primary: n),
+        ),
+        if (debt.secondaryOwed > 0) ...[
+          const SizedBox(height: 14),
+          _CountWindow(
+            title: 'SQUATS OWED',
+            done: debt.secondaryDone,
+            owed: debt.secondaryOwed,
+            steps: const [1, 10],
+            unit: 'REP',
+            onAdd: (n) => model.recordPenalty(secondary: n),
+          ),
+        ],
+      ];
+    case PenaltyKind.reading:
+      return [
+        _CountWindow(
+          title: 'PAGES OWED',
+          done: debt.primaryDone,
+          owed: debt.primaryOwed,
+          steps: const [1, 5],
+          unit: 'PAGE',
+          onAdd: (n) => model.recordPenalty(primary: n),
+        ),
+        if (debt.secondaryOwed > 0) ...[
+          const SizedBox(height: 14),
+          _ReflectionWindow(
+            done: debt.secondaryDone,
+            owed: debt.secondaryOwed,
+            onSubmit: (text) => model.submitReflection(text),
+          ),
+        ],
+      ];
+    case PenaltyKind.focus:
+      return [_BlockWindow(model: model, debt: debt)];
   }
 }
 
@@ -284,17 +320,23 @@ class _EnforcementStatusState extends State<_EnforcementStatus> {
   }
 }
 
-class _ExerciseWindow extends StatelessWidget {
-  const _ExerciseWindow({
+class _CountWindow extends StatelessWidget {
+  const _CountWindow({
     required this.title,
     required this.done,
     required this.owed,
+    required this.steps,
+    required this.unit,
     required this.onAdd,
   });
 
   final String title;
   final int done;
   final int owed;
+  final List<int> steps;
+
+  /// "REP" or "PAGE"; pluralised on the buttons.
+  final String unit;
   final ValueChanged<int> onAdd;
 
   @override
@@ -321,24 +363,162 @@ class _ExerciseWindow extends StatelessWidget {
           const SizedBox(height: 10),
           Row(
             children: [
-              Expanded(
-                child: HudButton(
-                  '+1 REP',
-                  onPressed: paid ? null : () => onAdd(1),
+              for (final (i, n) in steps.indexed) ...[
+                if (i > 0) const SizedBox(width: 8),
+                Expanded(
+                  child: HudButton(
+                    '+$n ${n == 1 ? unit : '${unit}S'}',
+                    onPressed: paid ? null : () => onAdd(n),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: HudButton(
-                  '+10 REPS',
-                  onPressed: paid ? null : () => onAdd(10),
-                ),
-              ),
+              ],
             ],
           ),
           const SizedBox(height: 10),
           Text(
-            paid ? 'Penalty paid.' : 'Unpaid reps double at midnight.',
+            paid ? 'Paid.' : 'Anything unpaid doubles at midnight.',
+            textAlign: TextAlign.center,
+            style: Hud.mono(11, paid ? Hud.gold : Hud.warn),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Personality penalty: a written reflection on why the quest failed. At
+/// least five lines of the user's own words; saved in the trial log.
+class _ReflectionWindow extends StatefulWidget {
+  const _ReflectionWindow({
+    required this.done,
+    required this.owed,
+    required this.onSubmit,
+  });
+
+  final int done;
+  final int owed;
+  final Future<bool> Function(String text) onSubmit;
+
+  @override
+  State<_ReflectionWindow> createState() => _ReflectionWindowState();
+}
+
+class _ReflectionWindowState extends State<_ReflectionWindow> {
+  final _c = TextEditingController();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    final paid = widget.done >= widget.owed;
+    final ok = reflectionAccepted(_c.text);
+    return SystemWindow(
+      title: 'REFLECTION OWED · ${widget.done} / ${widget.owed}',
+      delay: const Duration(milliseconds: 160),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            paid ? 'Reflection recorded.' : 'Why did the quest fail, and what changes tomorrow? Five lines at least.',
+            textAlign: TextAlign.center,
+            style: Hud.mono(11, paid ? Hud.gold : p.dim),
+          ),
+          if (!paid) ...[
+            const SizedBox(height: 10),
+            TextField(
+              controller: _c,
+              minLines: 5,
+              maxLines: 10,
+              style: Hud.mono(12, p.text),
+              cursorColor: p.sys,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: 'Write in your own words.',
+                hintStyle: Hud.mono(12, p.dim),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.zero,
+                  borderSide: BorderSide(color: p.line),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.zero,
+                  borderSide: BorderSide(color: p.sys),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            HudButton(
+              ok ? 'SUBMIT REFLECTION' : 'AT LEAST 5 LINES',
+              onPressed: ok
+                  ? () async {
+                      if (await widget.onSubmit(_c.text)) _c.clear();
+                      setState(() {});
+                    }
+                  : null,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Focus penalty: a phone-free block. The chosen apps lock while it runs;
+/// only whole minutes count, and only today.
+class _BlockWindow extends StatelessWidget {
+  const _BlockWindow({required this.model, required this.debt});
+
+  final GameModel model;
+  final PenaltyDebt debt;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    final running = model.penaltyBlockRunning;
+    final paid = debt.isPaid;
+    final runningMinutes = model.penaltyBlockSeconds ~/ 60;
+    return SystemWindow(
+      title: 'PHONE-FREE MINUTES OWED',
+      delay: const Duration(milliseconds: 120),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            '${debt.primaryDone + (running ? runningMinutes : 0)} / ${debt.primaryOwed}',
+            textAlign: TextAlign.center,
+            style: Hud.head(
+              40,
+              paid ? Hud.gold : p.hi,
+              spacing: .02,
+            ).copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+          ),
+          if (running) ...[
+            const SizedBox(height: 6),
+            Text(
+              hms(Duration(seconds: model.penaltyBlockSeconds)),
+              textAlign: TextAlign.center,
+              style: Hud.mono(14, Colors.white),
+            ),
+          ],
+          const SizedBox(height: 10),
+          HudBar(value: debt.primaryDone / debt.primaryOwed, done: paid),
+          const SizedBox(height: 10),
+          HudButton(
+            running ? 'END BLOCK' : 'START PENALTY BLOCK',
+            onPressed: paid && !running ? null : model.togglePenaltyBlock,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            paid
+                ? 'Paid.'
+                : running
+                ? 'Chosen apps are locked until the block ends.'
+                : 'Chosen apps lock while the block runs. Anything unpaid doubles at midnight.',
             textAlign: TextAlign.center,
             style: Hud.mono(11, paid ? Hud.gold : Hud.warn),
           ),

@@ -9,6 +9,7 @@ import '../domain/clock.dart';
 import '../domain/day.dart';
 import '../domain/engine.dart';
 import '../domain/penalty.dart';
+import '../domain/penalty_kind.dart';
 import '../domain/progression.dart';
 import '../domain/dungeon.dart';
 import '../domain/system_catalogue.dart';
@@ -306,6 +307,8 @@ class GameService {
                   sys.progress.reductionOn(d) > 0
             ? 50 // the reduction valve halves the day's XP
             : 100,
+        // Each System's own penalty; older games stay on exercise.
+        penaltyKind: (_) => penaltyKindFor(sys?.active),
       );
       var state = result.state;
       events.addAll(result.events);
@@ -357,6 +360,12 @@ class GameService {
         _systemEvents.addAll(expired);
         log.addAll([for (final e in expired) LogEntry.fromSystemEvent(now, e)]);
       }
+    }
+    // Issue today's quest: it is fixed from now until today is judged.
+    final current = g.systems;
+    if (current != null) {
+      final issued = current.issue(catalogue, today);
+      if (!identical(issued, current)) g = g.copyWith(systems: issued);
     }
     if (log.isEmpty && identical(g, _game)) return const [];
     await _commit(g.copyWith(newLogEntries: log));
@@ -643,7 +652,10 @@ class GameService {
   /// until it is paused.
   RunningTimer? get focusBlock {
     final timer = _game.timer;
-    if (timer == null || !_isPhoneFree(timer.taskId)) return null;
+    if (timer == null) return null;
+    if (timer.taskId != penaltyBlockId && !_isPhoneFree(timer.taskId)) {
+      return null;
+    }
     return timer;
   }
 
@@ -689,6 +701,7 @@ class GameService {
   /// A phone-free block keeps the longest single block instead of a total.
   SavedGame _withTimerCredited(DateTime now) {
     final timer = _game.timer!;
+    if (timer.taskId == penaltyBlockId) return _withPenaltyBlockCredited(now);
     final day = DayKey.fromDateTime(timer.startedAt);
     final end = _timerEnd(timer, now);
     final seconds = max(0, end.difference(timer.startedAt).inSeconds);
@@ -723,14 +736,21 @@ class GameService {
     );
   }
 
-  Future<void> recordExercise({int pushups = 0, int squats = 0}) async {
+  /// Records penalty work done today: push-ups and squats, pages and
+  /// reflections. Focus minutes are earned only with [startPenaltyBlock].
+  Future<void> recordPenalty({int primary = 0, int secondary = 0}) async {
     await tick();
+    final kind = _game.state.debt?.kind;
+    // Focus minutes come only from a penalty block; reflections only from
+    // submitReflection.
+    if (kind == PenaltyKind.focus && primary > 0) return;
+    if (kind == PenaltyKind.reading && secondary > 0) return;
     final before = _game.state.debt;
-    final next = engine.recordExercise(
+    final next = engine.recordPenalty(
       _game.state,
       today,
-      pushups: pushups,
-      squats: squats,
+      primary: primary,
+      secondary: secondary,
     );
     if (identical(next, _game.state)) return;
     final after = next.debt!;
@@ -738,15 +758,102 @@ class GameService {
       _game.copyWith(
         state: next,
         newLogEntries: [
-          LogEntry(_clock.now(), 'exercise', {
+          LogEntry(_clock.now(), 'penalty_work', {
             'day': today.toString(),
-            'pushups': after.pushupsDone - (before?.pushupsDone ?? 0),
-            'squats': after.squatsDone - (before?.squatsDone ?? 0),
-            'pushupsRemaining': after.pushupsRemaining,
-            'squatsRemaining': after.squatsRemaining,
+            'kind': after.kind.name,
+            'primary': after.primaryDone - (before?.primaryDone ?? 0),
+            'secondary': after.secondaryDone - (before?.secondaryDone ?? 0),
+            'primaryRemaining': after.primaryRemaining,
+            'secondaryRemaining': after.secondaryRemaining,
           }),
         ],
       ),
+    );
+  }
+
+  /// Pays one reflection of a reading penalty with the user's [text], which
+  /// is kept in the trial log. Refused unless it is long enough.
+  Future<bool> submitReflection(String text) async {
+    await tick();
+    final debt = _game.state.debt;
+    if (debt == null ||
+        debt.kind != PenaltyKind.reading ||
+        debt.dueDay != today ||
+        debt.secondaryRemaining == 0 ||
+        !reflectionAccepted(text)) {
+      return false;
+    }
+    await _commit(
+      _game.copyWith(
+        state: _game.state.copyWith(debt: () => debt.record(secondary: 1)),
+        newLogEntries: [
+          LogEntry(now, 'reflection', {
+            'day': today.toString(),
+            'text': text.trim(),
+          }),
+        ],
+      ),
+    );
+    return true;
+  }
+
+  /// The timer id used for a Focus penalty block.
+  static const penaltyBlockId = '__penalty_block__';
+
+  /// Whether a Focus penalty block is running.
+  bool get penaltyBlockRunning => _game.timer?.taskId == penaltyBlockId;
+
+  /// Seconds into the running penalty block.
+  int get penaltyBlockSeconds {
+    final timer = _game.timer;
+    if (timer == null || timer.taskId != penaltyBlockId) return 0;
+    return max(0, _clock.now().difference(timer.startedAt).inSeconds);
+  }
+
+  /// Starts paying a Focus penalty: a phone-free block that locks the
+  /// chosen apps until it is ended. Any running quest timer is stopped first.
+  Future<void> startPenaltyBlock() async {
+    await tick();
+    final debt = _game.state.debt;
+    if (debt == null ||
+        debt.kind != PenaltyKind.focus ||
+        debt.dueDay != today ||
+        debt.isPaid ||
+        penaltyBlockRunning) {
+      return;
+    }
+    var next = _game.timer == null ? _game : _withTimerCredited(now);
+    next = next.copyWith(
+      timer: () => RunningTimer(penaltyBlockId, now),
+      newLogEntries: [
+        LogEntry(now, 'penalty_block_started', {'day': today.toString()}),
+      ],
+    );
+    await _commit(next);
+  }
+
+  /// Ends the penalty block and credits its whole minutes to the debt of
+  /// the day it started (never past that day's midnight).
+  SavedGame _withPenaltyBlockCredited(DateTime now) {
+    final timer = _game.timer!;
+    final day = DayKey.fromDateTime(timer.startedAt);
+    final midnight = day.addDays(1).at(0);
+    final end = now.isAfter(midnight) ? midnight : now;
+    final minutes = max(0, end.difference(timer.startedAt).inMinutes);
+    final debt = _game.state.debt;
+    final credited = debt != null && debt.dueDay == day && minutes > 0;
+    return _game.copyWith(
+      timer: () => null,
+      state: credited
+          ? _game.state.copyWith(debt: () => debt.record(primary: minutes))
+          : null,
+      newLogEntries: [
+        LogEntry(now, 'penalty_block_ended', {
+          'day': day.toString(),
+          'minutes': minutes,
+          'credited': credited,
+        }),
+      ],
     );
   }
 

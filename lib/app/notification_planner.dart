@@ -127,15 +127,16 @@ class NotificationPlanner {
     // Exercise owed today.
     final debt = g.state.debt;
     if (debt != null && debt.dueDay == today && !debt.isPaid) {
-      final owed = [
-        if (debt.pushupsRemaining > 0) '${debt.pushupsRemaining} push-ups',
-        if (debt.squatsRemaining > 0) '${debt.squatsRemaining} squats',
-      ].join(' and ');
+      final owed = describePenalty(
+        debt.kind,
+        debt.primaryRemaining,
+        debt.secondaryRemaining,
+      );
       add(
         NoticeId.exercise,
         today.at(exerciseAt),
-        '[ PENALTY ] Exercise owed',
-        '$owed remaining. Unpaid reps double at midnight.',
+        '[ PENALTY ] Penalty owed',
+        '$owed remaining. Anything unpaid doubles at midnight.',
       );
     }
 

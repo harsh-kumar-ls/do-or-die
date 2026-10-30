@@ -115,6 +115,7 @@ class SystemsState {
     this.titles = const [],
     this.sHold = 0,
     this.systemStartedOn,
+    this.issued = const {},
   });
 
   final SystemProgress progress;
@@ -142,6 +143,14 @@ class SystemsState {
 
   final DayKey? systemStartedOn;
 
+  /// The quest exactly as issued on each recent day. A day is judged against
+  /// what it showed, so an app update (or anything else) can never change a
+  /// quest after it was issued.
+  final Map<DayKey, List<QuestItem>> issued;
+
+  /// How many days of issued quests are kept.
+  static const issuedKept = 40;
+
   SystemKind? get active => progress.active;
   Rank? get rank => active == null ? null : progress.rankOf(active!);
 
@@ -156,6 +165,7 @@ class SystemsState {
     List<String>? titles,
     int? sHold,
     DayKey? Function()? systemStartedOn,
+    Map<DayKey, List<QuestItem>>? issued,
   }) => SystemsState(
     progress: progress ?? this.progress,
     history: history ?? this.history,
@@ -173,6 +183,7 @@ class SystemsState {
     systemStartedOn: systemStartedOn != null
         ? systemStartedOn()
         : this.systemStartedOn,
+    issued: issued ?? this.issued,
   );
 
   /// Starts a System at its placement rank.
@@ -182,6 +193,7 @@ class SystemsState {
         countFrom: today,
         titles: titles,
         systemStartedOn: today,
+        issued: issued,
       );
 
   /// Cleared days in the window ending on [day].
@@ -215,6 +227,29 @@ class SystemsState {
   /// tomorrow). Floors are built on the full daily quest: the reduction valve
   /// never applies inside a Dungeon.
   List<QuestItem> questFor(Map<SystemKind, SystemSpec> catalogue, DayKey day) {
+    final snapshot = issued[day];
+    if (snapshot != null) return snapshot;
+    return _computeQuest(catalogue, day);
+  }
+
+  /// Records [day]'s quest as issued, if it isn't already, dropping
+  /// snapshots older than [issuedKept] days. Returns this when unchanged.
+  SystemsState issue(Map<SystemKind, SystemSpec> catalogue, DayKey day) {
+    if (issued.containsKey(day)) return this;
+    final oldest = day.addDays(-issuedKept);
+    return copyWith(
+      issued: {
+        for (final e in issued.entries)
+          if (!e.key.isBefore(oldest)) e.key: e.value,
+        day: _computeQuest(catalogue, day),
+      },
+    );
+  }
+
+  List<QuestItem> _computeQuest(
+    Map<SystemKind, SystemSpec> catalogue,
+    DayKey day,
+  ) {
     final start = systemStartedOn;
     if (start != null && day.isBefore(start)) return const [];
     final floor = floorOn(day);
