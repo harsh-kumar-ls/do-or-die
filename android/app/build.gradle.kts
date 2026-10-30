@@ -36,6 +36,11 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            // No code shrinking: plugins such as shared_preferences are called
+            // from Dart through JNI, which R8 can't see, so it removed code they
+            // need and the app hung on a black screen at start (0.2.0).
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }

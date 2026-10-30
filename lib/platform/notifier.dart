@@ -68,12 +68,23 @@ class LocalNotifier implements Notifier {
         AndroidFlutterLocalNotificationsPlugin
       >();
 
+  /// Old zone names some phones still report, mapped to the names in the
+  /// timezone database (Android reports "Asia/Calcutta" in India).
+  static String _canonical(String id) =>
+      const {
+        'Asia/Calcutta': 'Asia/Kolkata',
+        'Asia/Katmandu': 'Asia/Kathmandu',
+        'Asia/Saigon': 'Asia/Ho_Chi_Minh',
+        'Asia/Rangoon': 'Asia/Yangon',
+      }[id] ??
+      id;
+
   @override
   Future<void> init() async {
     tzdata.initializeTimeZones();
     try {
       final zone = await FlutterTimezone.getLocalTimezone();
-      tz.setLocalLocation(tz.getLocation(zone.identifier));
+      tz.setLocalLocation(tz.getLocation(_canonical(zone.identifier)));
     } catch (e) {
       debugPrint('Timezone lookup failed, using UTC offset clock: $e');
     }

@@ -71,16 +71,25 @@ Future<void> main() async {
   }
 
   final store = PrefsGameStore(prefs);
-  var service = await GameService.load(
-    store: store,
-    clock: platform.clock,
-    meter: platform.meter,
-  );
-  // A trial with its own written objectives is archived, with its full log,
-  // and replaced by an Awakening. One with a penalty still in effect is kept
-  // until that penalty is over, so the update is never a way out of one.
-  if (service != null && service.needsMigration) {
-    if (await service.abandon(reason: 'migrated_to_systems')) service = null;
+  GameService? service;
+  try {
+    service = await GameService.load(
+      store: store,
+      clock: platform.clock,
+      meter: platform.meter,
+    );
+    // A trial with its own written objectives is archived, with its full log,
+    // and replaced by an Awakening. One with a penalty still in effect is kept
+    // until that penalty is over, so the update is never a way out of one.
+    if (service != null && service.needsMigration) {
+      if (await service.abandon(reason: 'migrated_to_systems')) service = null;
+    }
+  } catch (e, st) {
+    // Never fall through to a fresh start: that could wipe a game (and a
+    // penalty). Say what went wrong instead of hanging on a black screen.
+    debugPrint('Could not load the saved game: $e\n$st');
+    runApp(StartupErrorApp(error: '$e'));
+    return;
   }
   runApp(DoOrDieApp(store: store, initial: service, platform: platform));
 }
@@ -177,4 +186,45 @@ class _DoOrDieAppState extends State<DoOrDieApp> {
             ),
     );
   }
+}
+
+/// Shown when the saved game can't be read at start.
+class StartupErrorApp extends StatelessWidget {
+  const StartupErrorApp({super.key, required this.error});
+
+  final String error;
+
+  @override
+  Widget build(BuildContext context) => MaterialApp(
+    debugShowCheckedModeBanner: false,
+    theme: Hud.theme(HudPalette.penalty),
+    home: Scaffold(
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                '[ SYSTEM ERROR ]',
+                style: Hud.head(18, HudPalette.penalty.hi),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'The saved game could not be read. Nothing has been changed. '
+                'Restart the app; if this persists, report the text below.',
+                textAlign: TextAlign.center,
+                style: Hud.mono(13, HudPalette.penalty.text),
+              ),
+              const SizedBox(height: 16),
+              SelectableText(
+                error,
+                style: Hud.mono(10, HudPalette.penalty.dim),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 }

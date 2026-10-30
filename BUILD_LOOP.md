@@ -211,6 +211,8 @@ Each prompt is what I'd run for that iteration of the loop.
   - Release APK `dist/DoOrDie-0.2.0.apk` (version 0.2.0+2, same signing key as the installed build, so it updates in place).
   - TestSprite covers the web UI only. Blocking, the Dungeon block screen, usage-access measurement, phone-free locking and notifications need the device checklist below.
 
+- [x] **Hotfix 0.2.1 (2026-10-31): black screen at start.** 0.2.0 was the first release-mode (R8-shrunk) build; earlier installs were `flutter run` builds, which skip shrinking. R8 removed code that shared_preferences calls from Dart through JNI, so loading the save threw before the first frame. Code shrinking is now off for release builds. Startup now shows a `[ SYSTEM ERROR ]` screen if the save can't be read (never a silent fresh start). The phone's "Asia/Calcutta" zone is mapped to "Asia/Kolkata" for notifications. Verified on the phone: the Awakening appears. **Lesson: device-check the exact release APK before handing it over.**
+
 ### Device checklist for 0.2.0 (manual, on the phone)
 1. Install the APK over the old app; the old trial is archived and the Awakening appears (if a penalty was in effect, the old trial stays until it ends).
 2. Complete the Awakening; Status shows the System, rank and 0 / 21.
