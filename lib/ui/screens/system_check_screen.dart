@@ -80,14 +80,18 @@ class _SystemCheckScreenState extends State<SystemCheckScreen>
       _Check(
         'USAGE ACCESS',
         'Lets the watcher see when a locked app opens. '
-            'No accessibility service is used, so payment apps keep working.',
+            'No accessibility service is used, so payment apps keep working. '
+            'If Android says "Access denied" (app installed from a file): '
+            'open App info for Do or Die, tap the menu at the top right, '
+            'choose "Allow restricted settings", then allow this again.',
         s?.usageAccess,
         'ALLOW',
         widget.blocker.requestUsageAccess,
       ),
       _Check(
         'DISPLAY OVER APPS',
-        'Lets the Penalty Zone appear over a locked app.',
+        'Lets the Penalty Zone appear over a locked app. '
+            'If refused, allow restricted settings as above first.',
         s?.overlay,
         'ALLOW',
         widget.blocker.requestOverlay,
