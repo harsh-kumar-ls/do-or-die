@@ -49,11 +49,16 @@ class SysTopBar extends StatelessWidget {
               children: [
                 Text(dayLabel(now), style: Hud.head(14, p.text, spacing: .2)),
                 const SizedBox(height: 2),
-                Text(
-                  kicker.toUpperCase(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Hud.mono(10, p.dim, spacing: .16),
+                // Shrinks to fit rather than cutting the System name off
+                // on narrow phones.
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    kicker.toUpperCase(),
+                    maxLines: 1,
+                    style: Hud.mono(10, p.dim, spacing: .16),
+                  ),
                 ),
               ],
             ),
