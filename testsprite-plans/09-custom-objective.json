@@ -5,79 +5,87 @@
   "planSteps": [
     {
       "type": "action",
-      "description": "Open the app at / and wait up to 30 seconds for the '[ SYSTEM ]' window to appear (a Flutter web app; it can take a while to load, and controls are exposed in the accessibility tree)"
+      "description": "Open the app at / and wait up to 30 seconds for a black screen with the text 'TOUCH TO ESTABLISH CONTACT' (a Flutter web app; it can take a while to load, and controls are exposed in the accessibility tree)"
     },
     {
       "type": "action",
-      "description": "Click 'ACCEPT' on the '[ SYSTEM ]' window"
+      "description": "Click 'TOUCH TO ESTABLISH CONTACT'"
     },
     {
       "type": "action",
-      "description": "On the '[ CHOOSE YOUR SYSTEM ]' window, click the 'FITNESS' tile"
+      "description": "Wait 6 seconds while the emblem forms and the '[ NOTIFICATION ]' window types its message"
     },
     {
       "type": "action",
-      "description": "Click 'CONFIRM SYSTEM'"
+      "description": "Click 'ACCEPT' once (this test build accepts a click in place of the hold)"
     },
     {
       "type": "action",
-      "description": "On the '[ PLACEMENT TEST ]' window, click inside the number box for 'Most push-ups you can do in one set'"
+      "description": "On the 'CHOOSE YOUR SYSTEM' screen, click the FITNESS card"
     },
     {
       "type": "action",
-      "description": "Press the Backspace key three times to empty that box"
+      "description": "Click 'BIND FITNESS'"
+    },
+    {
+      "type": "action",
+      "description": "On the 'PLACEMENT TEST' screen, click the big number for 'Most push-ups you can do in one set'"
+    },
+    {
+      "type": "action",
+      "description": "Press the Backspace key three times to empty it"
     },
     {
       "type": "action",
       "description": "Type 80 with the keyboard (key presses, not a programmatic fill)"
     },
     {
-      "type": "assertion",
-      "description": "The number box for 'Most push-ups you can do in one set' now shows 80"
+      "type": "action",
+      "description": "On the 'PLACEMENT TEST' screen, click the big number for 'Minutes to walk or jog 1 km'"
     },
     {
       "type": "action",
-      "description": "On the '[ PLACEMENT TEST ]' window, click inside the number box for 'Minutes to walk or jog 1 km'"
-    },
-    {
-      "type": "action",
-      "description": "Press the Backspace key three times to empty that box"
+      "description": "Press the Backspace key three times to empty it"
     },
     {
       "type": "action",
       "description": "Type 4 with the keyboard (key presses, not a programmatic fill)"
     },
     {
+      "type": "action",
+      "description": "Click 'SUBMIT'"
+    },
+    {
+      "type": "action",
+      "description": "Wait 3 seconds for the rank badge and the '[ DAILY QUEST ]' cards to appear"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONTINUE'"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONFIRM TARGETS' on the 'LOCK TARGETS' screen (the web build lists no apps; that is expected)"
+    },
+    {
+      "type": "action",
+      "description": "Click 'SET REST PERIOD' on the 'REST PERIOD' screen"
+    },
+    {
+      "type": "action",
+      "description": "On the 'PENALTY TERMS' screen, scroll the list of terms down to the last term, 'The System does not negotiate.', until the text 'ALL TERMS READ' appears"
+    },
+    {
+      "type": "action",
+      "description": "Click 'HOLD TO ACCEPT' once (this test build accepts a click in place of the hold)"
+    },
+    {
+      "type": "action",
+      "description": "Click 'ENTER' on the '[ PLAYER REGISTERED ]' window"
+    },
+    {
       "type": "assertion",
-      "description": "The number box for 'Minutes to walk or jog 1 km' now shows 4"
-    },
-    {
-      "type": "action",
-      "description": "Click 'SUBMIT' on the '[ PLACEMENT TEST ]' window"
-    },
-    {
-      "type": "assertion",
-      "description": "The '[ YOUR DAILY QUEST ]' window shows 'FITNESS SYSTEM \u00b7 RANK C' and the line 'Ranks above C are earned only through Dungeons.'"
-    },
-    {
-      "type": "action",
-      "description": "Click 'CONTINUE' on the '[ YOUR DAILY QUEST ]' window"
-    },
-    {
-      "type": "action",
-      "description": "Click 'CONFIRM APPS' on the '[ LOCK TARGETS ]' window (the web build lists no apps; that is expected)"
-    },
-    {
-      "type": "action",
-      "description": "Click 'CONFIRM' on the '[ REST PERIOD ]' window"
-    },
-    {
-      "type": "action",
-      "description": "Click 'HOLD TO ACCEPT' once on the '[ PENALTY TERMS ]' window (this test build accepts a click in place of the hold)"
-    },
-    {
-      "type": "assertion",
-      "description": "The '[ DAILY QUEST ]' window lists 'Jog' showing '0.0 / 2.0 km' and 'Push-ups' showing '0 / 30'"
+      "description": "The '[ DAILY QUEST ]' window lists 'Jog' showing '0.0 / 2.0 km' and 'Push-ups' showing '0 / 30' (the rank C quest), and the top bar shows 'RANK C'"
     }
   ]
 }

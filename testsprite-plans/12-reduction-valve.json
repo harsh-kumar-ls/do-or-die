@@ -5,39 +5,59 @@
   "planSteps": [
     {
       "type": "action",
-      "description": "Open the app at / and wait up to 30 seconds for the '[ SYSTEM ]' window to appear (a Flutter web app; it can take a while to load, and controls are exposed in the accessibility tree)"
+      "description": "Open the app at / and wait up to 30 seconds for a black screen with the text 'TOUCH TO ESTABLISH CONTACT' (a Flutter web app; it can take a while to load, and controls are exposed in the accessibility tree)"
     },
     {
       "type": "action",
-      "description": "Click 'ACCEPT' on the '[ SYSTEM ]' window"
+      "description": "Click 'TOUCH TO ESTABLISH CONTACT'"
     },
     {
       "type": "action",
-      "description": "On the '[ CHOOSE YOUR SYSTEM ]' window, click the 'FITNESS' tile"
+      "description": "Wait 6 seconds while the emblem forms and the '[ NOTIFICATION ]' window types its message"
     },
     {
       "type": "action",
-      "description": "Click 'CONFIRM SYSTEM'"
+      "description": "Click 'ACCEPT' once (this test build accepts a click in place of the hold)"
     },
     {
       "type": "action",
-      "description": "Click 'SUBMIT' on the '[ PLACEMENT TEST ]' window"
+      "description": "On the 'CHOOSE YOUR SYSTEM' screen, click the FITNESS card"
     },
     {
       "type": "action",
-      "description": "Click 'CONTINUE' on the '[ YOUR DAILY QUEST ]' window"
+      "description": "Click 'BIND FITNESS'"
     },
     {
       "type": "action",
-      "description": "Click 'CONFIRM APPS' on the '[ LOCK TARGETS ]' window (the web build lists no apps; that is expected)"
+      "description": "Click 'SUBMIT'"
     },
     {
       "type": "action",
-      "description": "Click 'CONFIRM' on the '[ REST PERIOD ]' window"
+      "description": "Wait 3 seconds for the rank badge and the '[ DAILY QUEST ]' cards to appear"
     },
     {
       "type": "action",
-      "description": "Click 'HOLD TO ACCEPT' once on the '[ PENALTY TERMS ]' window (this test build accepts a click in place of the hold)"
+      "description": "Click 'CONTINUE'"
+    },
+    {
+      "type": "action",
+      "description": "Click 'CONFIRM TARGETS' on the 'LOCK TARGETS' screen (the web build lists no apps; that is expected)"
+    },
+    {
+      "type": "action",
+      "description": "Click 'SET REST PERIOD' on the 'REST PERIOD' screen"
+    },
+    {
+      "type": "action",
+      "description": "On the 'PENALTY TERMS' screen, scroll the list of terms down to the last term, 'The System does not negotiate.', until the text 'ALL TERMS READ' appears"
+    },
+    {
+      "type": "action",
+      "description": "Click 'HOLD TO ACCEPT' once (this test build accepts a click in place of the hold)"
+    },
+    {
+      "type": "action",
+      "description": "Click 'ENTER' on the '[ PLAYER REGISTERED ]' window"
     },
     {
       "type": "action",

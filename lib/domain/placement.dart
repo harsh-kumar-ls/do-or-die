@@ -12,6 +12,7 @@ class PlacementQuestion {
     required this.min,
     required this.max,
     required this.initial,
+    this.step = 1,
   });
 
   final String id;
@@ -20,6 +21,9 @@ class PlacementQuestion {
   final int min;
   final int max;
   final int initial;
+
+  /// How much one tap of minus or plus changes the answer.
+  final int step;
 }
 
 const placementQuestions = <SystemKind, List<PlacementQuestion>>{
@@ -49,6 +53,7 @@ const placementQuestions = <SystemKind, List<PlacementQuestion>>{
       min: 0,
       max: 200,
       initial: 5,
+      step: 5,
     ),
     PlacementQuestion(
       'comfort',
@@ -67,6 +72,7 @@ const placementQuestions = <SystemKind, List<PlacementQuestion>>{
       min: 0,
       max: 900,
       initial: 120,
+      step: 5,
     ),
   ],
 };

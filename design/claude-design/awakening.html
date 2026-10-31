@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Do or Die — Awakening sequence (prototype)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<!-- Fonts load from Google Fonts; bundle them as assets in the Flutter build. -->
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* =========================================================
+   BRAND TOKENS
+   ========================================================= */
+:root{
+  --void:#05070D; --void-glow:#0B1730; --panel:rgba(10,18,34,0.72);
+  --sys:#4FB3FF; --hi:#A9DCFF; --text:#DBE7FF; --dim:#7D8BA8;
+  --gold:#F5C96A; --warn:#FF8A93;
+  --pz-red:#FF3B4A; --pz-bg:#090204;
+  --dp-crimson:#D7263D; --dp-gold:#F5C96A; --dp-bg:#060102;
+  --rank-e:#9AA4B8; --rank-d:#5BD69A; --rank-c:#4FB3FF; --rank-b:#B07CFF; --rank-a:#FF9F45; --rank-s:#F5C96A;
+  --f-title:"Chakra Petch",system-ui,sans-serif;
+  --f-body:"JetBrains Mono",ui-monospace,monospace;
+  /* layout */
+  --safe-top:44px; --safe-bottom:34px; --pad:20px; --touch:48px; --chamfer:12px;
+  /* derived */
+  --line:rgba(79,179,255,.55); --line-dim:rgba(79,179,255,.18);
+  --glow:0 0 8px rgba(79,179,255,.55);
+  --ease:cubic-bezier(.2,.8,.2,1);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#020308;color:var(--text);font-family:var(--f-body)}
+body{display:flex;gap:28px;justify-content:center;align-items:flex-start;padding:24px;min-height:100%}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+
+/* ---------- reviewer chrome (outside the phone) ---------- */
+.stagecol{display:flex;flex-direction:column;align-items:center;gap:14px}
+.jump{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+.jump button{font-family:var(--f-body);font-size:11px;letter-spacing:.08em;color:var(--dim);border:1px solid var(--line-dim);padding:8px 10px;min-height:36px}
+.jump button.on{color:var(--hi);border-color:var(--sys)}
+.notes{width:340px;font-size:12px;line-height:1.6;color:var(--dim);border-left:1px solid var(--line-dim);padding-left:18px;max-height:860px;overflow:auto}
+.notes h2{font-family:var(--f-title);letter-spacing:.18em;font-size:13px;color:var(--hi);margin:14px 0 6px}
+.notes b{color:var(--text);font-weight:500}
+.notes .gap{color:var(--warn)}
+@media (max-width:820px){.notes{display:none}}
+
+/* =========================================================
+   PHONE 390 x 844
+   ========================================================= */
+.phone{user-select:none;-webkit-user-select:none;width:390px;height:844px;position:relative;overflow:hidden;border-radius:38px;
+  background:radial-gradient(120% 60% at 50% -10%,var(--void-glow) 0%,var(--void) 62%);
+  box-shadow:0 0 0 1px #111a2c,0 30px 80px rgba(0,0,0,.6)}
+/* faint grid + scanlines over the void */
+.phone::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;
+  background-image:linear-gradient(rgba(79,179,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(79,179,255,.045) 1px,transparent 1px);
+  background-size:26px 26px;mask-image:radial-gradient(90% 70% at 50% 40%,#000 30%,transparent 100%)}
+.phone::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:50;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.18) 0 1px,transparent 1px 3px);mix-blend-mode:multiply}
+.phone.black{background:#000}
+.phone.black::before{opacity:0}
+
+/* progress bar */
+.prog{position:absolute;top:calc(var(--safe-top) - 26px);left:var(--pad);right:var(--pad);z-index:20;display:flex;align-items:center;gap:10px;transition:opacity .4s}
+.prog .segs{flex:1;display:flex;gap:4px}
+.prog .seg{flex:1;height:2px;background:var(--line-dim);position:relative;overflow:hidden}
+.prog .seg i{position:absolute;inset:0;background:var(--sys);box-shadow:var(--glow);transform:scaleX(0);transform-origin:left;transition:transform .4s var(--ease)}
+.prog .seg.done i{transform:scaleX(1)}
+.prog .seg.cur i{transform:scaleX(.5)}
+.prog .ct{font-size:10px;letter-spacing:.14em;color:var(--dim);min-width:40px;text-align:right}
+.phone.black .prog{opacity:0}
+
+/* steps */
+.step{position:absolute;inset:0;z-index:5;display:none;flex-direction:column;
+  padding:calc(var(--safe-top) + 6px) var(--pad) calc(var(--safe-bottom) + 6px)}
+.step.active{display:flex}
+/* ANIM step-enter: opacity 0->1, translateY 10->0, 300ms easeOutCubic. step-exit: opacity 1->0, 200ms. */
+.step.enter{animation:stepIn .3s var(--ease) both}
+.step.exit{animation:stepOut .2s ease-in both}
+@keyframes stepIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes stepOut{to{opacity:0;transform:translateY(-6px)}}
+
+/* ---------- typography ---------- */
+.h-title{font-family:var(--f-title);font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:var(--hi);text-shadow:0 0 10px rgba(79,179,255,.6)}
+.kicker{font-size:10px;letter-spacing:.24em;color:var(--dim);text-transform:uppercase}
+.body{font-size:14px;line-height:1.6;color:var(--text)}
+.dimtxt{font-size:12px;line-height:1.55;color:var(--dim)}
+.num{font-family:var(--f-body);font-weight:700}
+
+/* ---------- System window: chamfered frame + corner brackets ---------- */
+.frame{position:relative;filter:drop-shadow(0 0 10px rgba(79,179,255,.22))}
+.frame>.b{position:absolute;width:14px;height:14px;border-color:var(--hi);border-style:solid;opacity:.9;pointer-events:none}
+.frame>.b.tl{top:-5px;left:-5px;border-width:2px 0 0 2px}
+.frame>.b.tr{top:-5px;right:-5px;border-width:2px 2px 0 0}
+.frame>.b.bl{bottom:-5px;left:-5px;border-width:0 0 2px 2px}
+.frame>.b.br{bottom:-5px;right:-5px;border-width:0 2px 2px 0}
+.win{padding:1px;background:linear-gradient(160deg,var(--sys),rgba(79,179,255,.25) 40%,rgba(79,179,255,.6));
+  clip-path:polygon(var(--chamfer) 0,calc(100% - var(--chamfer)) 0,100% var(--chamfer),100% calc(100% - var(--chamfer)),calc(100% - var(--chamfer)) 100%,var(--chamfer) 100%,0 calc(100% - var(--chamfer)),0 var(--chamfer))}
+.win>.in{background:linear-gradient(180deg,rgba(13,24,46,.96),rgba(8,14,27,.96));padding:16px;height:100%;
+  clip-path:polygon(calc(var(--chamfer) - .5px) 0,calc(100% - var(--chamfer) + .5px) 0,100% calc(var(--chamfer) - .5px),100% calc(100% - var(--chamfer) + .5px),calc(100% - var(--chamfer) + .5px) 100%,calc(var(--chamfer) - .5px) 100%,0 calc(100% - var(--chamfer) + .5px),0 calc(var(--chamfer) - .5px))}
+.wtitle{font-family:var(--f-title);font-weight:700;font-size:13px;letter-spacing:.26em;color:var(--hi);text-align:center;text-shadow:var(--glow);padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--line-dim)}
+
+/* ---------- buttons ---------- */
+.btn{position:relative;min-height:56px;width:100%;font-family:var(--f-title);font-weight:700;font-size:15px;letter-spacing:.28em;color:var(--hi);
+  background:rgba(79,179,255,.08);border:1px solid var(--sys);
+  clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);
+  text-shadow:var(--glow);transition:transform .12s,background .2s,opacity .2s}
+/* ANIM pressed: scale 1->0.97, 120ms; release back 120ms. */
+.btn:active:not(:disabled){transform:scale(.97);background:rgba(79,179,255,.18)}
+.btn:disabled{opacity:.35;cursor:default;border-color:var(--line-dim)}
+.btn.done{background:rgba(79,179,255,.22);color:#fff}
+
+/* hold-to-confirm: a charge bar fills under the label */
+.hold{overflow:hidden;user-select:none;touch-action:none}
+.hold .fill{position:absolute;inset:0;background:linear-gradient(90deg,rgba(79,179,255,.15),rgba(79,179,255,.55));transform:scaleX(0);transform-origin:left}
+.hold .lbl{position:relative}
+.hold .pct{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-family:var(--f-body);font-size:10px;letter-spacing:.1em;color:var(--dim);opacity:0}
+.hold.charging .pct{opacity:1}
+.hold.done .fill{transform:scaleX(1)}
+.hold.done{animation:holdFlash .35s ease-out}
+@keyframes holdFlash{0%{box-shadow:0 0 0 rgba(79,179,255,0)}40%{box-shadow:0 0 30px rgba(169,220,255,.9);background:rgba(169,220,255,.35)}100%{box-shadow:0 0 0 rgba(79,179,255,0)}}
+
+/* full-screen flash used by power-on and rank stamp */
+.flash{position:absolute;inset:0;z-index:40;background:#cfeaff;opacity:0;pointer-events:none}
+.flash.go{animation:flash .32s ease-out}
+@keyframes flash{0%{opacity:0}15%{opacity:.55}100%{opacity:0}}
+.shake{animation:shake .22s linear}
+@keyframes shake{25%{transform:translate(-3px,2px)}50%{transform:translate(3px,-2px)}75%{transform:translate(-2px,-1px)}}
+
+/* =========================================================
+   STEP 1 — SYSTEM CONTACT
+   ========================================================= */
+.s1{padding-top:var(--safe-top)}
+#pcv{position:absolute;inset:0;z-index:1;pointer-events:none}
+.wake{position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;cursor:pointer}
+.wake .cursor{font-size:22px;color:var(--sys);animation:blink 1s steps(1) infinite}
+.wake .kicker{opacity:.7}
+@keyframes blink{50%{opacity:0}}
+.emblemWrap{position:absolute;left:0;right:0;top:150px;display:flex;justify-content:center;z-index:2;opacity:0}
+.emblemWrap.on{opacity:1;transition:opacity .4s}
+.emblemWrap svg{width:160px;height:160px;filter:drop-shadow(0 0 12px rgba(79,179,255,.8))}
+.emblemWrap.on svg{animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{50%{filter:drop-shadow(0 0 22px rgba(169,220,255,.95))}}
+#w1{position:absolute;left:var(--pad);right:var(--pad);top:350px;z-index:4;opacity:0;transform:scaleY(.02)}
+/* ANIM power-on: scaleY 0.02 -> 1 over 450ms easeOutExpo (origin centre) + full-screen flash 320ms at t=0. */
+#w1.on{opacity:1;transform:none;transition:transform .45s cubic-bezier(.16,1,.3,1),opacity .1s}
+#w1 .typed{min-height:70px;font-size:16px}
+#w1 .typed::after{content:"_";color:var(--sys);animation:blink .8s steps(1) infinite}
+#w1 .typed.fin::after{content:""}
+.s1 .cta{position:absolute;left:var(--pad);right:var(--pad);bottom:calc(var(--safe-bottom) + 10px);z-index:4;opacity:0;transform:translateY(8px);transition:opacity .3s,transform .3s var(--ease)}
+.s1 .cta.on{opacity:1;transform:none}
+.s1 .cta .dimtxt{text-align:center;margin-top:10px}
+
+/* =========================================================
+   STEP 2 — CHOOSE YOUR SYSTEM
+   ========================================================= */
+.head{margin:8px 0 14px}
+.head .h-title{font-size:20px;margin-top:6px}
+.sysList{flex:1;display:flex;flex-direction:column;gap:12px;min-height:0}
+.sysCard{flex:1;position:relative;text-align:left;display:flex;gap:14px;align-items:center;padding:14px 16px;
+  border:1px solid var(--line-dim);background:var(--panel);
+  clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);
+  transition:border-color .2s,background .2s,opacity .25s,transform .12s}
+.sysCard:active{transform:scale(.985)}
+.sysCard svg{width:64px;height:64px;flex:none;opacity:.75;transition:opacity .2s}
+.sysCard .nm{font-family:var(--f-title);font-weight:700;letter-spacing:.24em;font-size:17px;color:var(--text)}
+.sysCard .st{display:flex;gap:6px;margin:6px 0}
+.chip{font-size:10px;letter-spacing:.14em;padding:3px 7px;border:1px solid var(--line-dim);color:var(--hi)}
+.sysCard .ex{font-size:11px;color:var(--dim);line-height:1.45}
+.sysCard .tick{position:absolute;right:14px;top:14px;width:18px;height:18px;border:1px solid var(--line-dim);transform:rotate(45deg);transition:all .2s}
+/* ANIM select: border dim->sys 200ms, others fade to 0.45 opacity 250ms, tick diamond fills 200ms. */
+.sysList.has .sysCard:not(.sel){opacity:.45}
+.sysCard.sel{border-color:var(--sys);background:rgba(79,179,255,.10)}
+.sysCard.sel svg{opacity:1;filter:drop-shadow(0 0 8px rgba(79,179,255,.8))}
+.sysCard.sel .nm{color:var(--hi);text-shadow:var(--glow)}
+.sysCard.sel .tick{background:var(--sys);border-color:var(--hi);box-shadow:var(--glow)}
+.foot{margin-top:14px}
+
+/* =========================================================
+   STEP 3 — PLACEMENT TEST
+   ========================================================= */
+.qList{flex:1;display:flex;flex-direction:column;gap:16px;justify-content:center}
+.q .qt{font-size:13px;line-height:1.5;color:var(--text);margin-bottom:14px;min-height:40px}
+.q .qn{font-size:10px;letter-spacing:.2em;color:var(--sys);margin-bottom:6px}
+.stepper{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.stepper .pm{width:64px;height:64px;border:1px solid var(--sys);font-family:var(--f-title);font-size:28px;color:var(--hi);background:rgba(79,179,255,.06);
+  clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);user-select:none;touch-action:none;transition:transform .1s,background .15s}
+.stepper .pm:active{transform:scale(.94);background:rgba(79,179,255,.22)}
+.stepper .val{flex:1;text-align:center}
+.stepper .val .n{font-size:44px;font-weight:700;color:#fff;text-shadow:var(--glow);display:inline-block}
+/* ANIM value tick: number scales 1.12 -> 1 over 160ms on every change. */
+.stepper .val .n.tick{animation:tick .16s ease-out}
+@keyframes tick{from{transform:scale(1.12)}}
+.stepper .val .u{display:block;font-size:10px;letter-spacing:.2em;color:var(--dim);margin-top:2px}
+.slide{margin-top:16px}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:32px;background:transparent}
+input[type=range]::-webkit-slider-runnable-track{height:2px;background:linear-gradient(90deg,var(--sys) var(--p,0%),var(--line-dim) var(--p,0%))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;margin-top:-10px;background:var(--void);border:2px solid var(--hi);transform:rotate(45deg);box-shadow:var(--glow)}
+input[type=range]::-moz-range-track{height:2px;background:var(--line-dim)}
+input[type=range]::-moz-range-progress{height:2px;background:var(--sys)}
+input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:0;background:var(--void);border:2px solid var(--hi);transform:rotate(45deg)}
+.slide .ends{display:flex;justify-content:space-between;font-size:10px;color:var(--dim)}
+
+/* =========================================================
+   STEP 4 — RANK ASSIGNED / DAILY QUEST
+   ========================================================= */
+.rankBox{display:flex;align-items:center;gap:16px;margin:4px 0 16px;min-height:124px}
+.badge{width:116px;height:124px;flex:none;opacity:0}
+/* ANIM stamp: scale 2.4->1, opacity 0->1, 300ms easeInQuad; on impact: flash 320ms, screen shake 220ms, shock ring scale 1->1.8 + fade 450ms. */
+.badge.stamp{animation:stamp .3s cubic-bezier(.55,0,1,.45) forwards}
+@keyframes stamp{from{opacity:0;transform:scale(2.4)}to{opacity:1;transform:scale(1)}}
+.badge .ring{transform-origin:58px 62px;opacity:0}
+.badge.stamp .ring{animation:ring .45s ease-out .3s}
+@keyframes ring{from{opacity:.9;transform:scale(1)}to{opacity:0;transform:scale(1.8)}}
+.rankMeta{opacity:0;transition:opacity .3s .35s}
+.rankMeta.on{opacity:1}
+.rankMeta .rk{font-family:var(--f-title);font-weight:700;font-size:22px;letter-spacing:.2em;color:var(--rc)}
+.questWin{flex:1;display:flex;flex-direction:column;min-height:0}
+.questWin .frame,.questWin .win,.questWin .in{height:100%}
+.questWin .in{display:flex;flex-direction:column}
+.qmeta{display:flex;justify-content:space-between;font-size:10px;letter-spacing:.16em;color:var(--dim);margin-bottom:10px}
+.qmeta .gold{color:var(--gold)}
+.cards{display:flex;flex-direction:column;gap:8px;flex:1}
+.qcard{flex:1;max-height:84px;display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line-dim);background:rgba(79,179,255,.04);opacity:0;transform:translateX(40px)}
+/* ANIM deal-in: each card translateX 40->0 + opacity, 260ms easeOutCubic, 140ms stagger. */
+.qcard.dealt{opacity:1;transform:none;transition:transform .26s var(--ease),opacity .26s}
+.qcard .ix{font-size:11px;color:var(--sys);width:22px}
+.qcard .nm{flex:1;font-size:13px}
+.qcard .tg{font-size:15px;font-weight:700;color:#fff}
+.tease{margin-top:12px;padding:12px;border:1px dashed rgba(245,201,106,.4);font-size:12px;line-height:1.5;color:var(--dim);opacity:0;transition:opacity .4s}
+.tease.on{opacity:1}
+.tease b{color:var(--gold);font-weight:500}
+
+/* =========================================================
+   STEP 5 — LOCK TARGETS
+   ========================================================= */
+.perm{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid rgba(255,138,147,.5);background:rgba(255,138,147,.06);margin-bottom:14px;transition:all .3s}
+.perm .t{flex:1;font-size:11px;line-height:1.45;color:var(--text)}
+.perm .t b{display:block;font-family:var(--f-title);letter-spacing:.2em;font-size:11px;color:var(--warn);margin-bottom:2px}
+.perm .g{min-height:var(--touch);padding:0 14px;border:1px solid var(--warn);color:var(--warn);font-family:var(--f-title);letter-spacing:.2em;font-size:12px}
+.perm.ok{border-color:var(--line-dim);background:rgba(79,179,255,.05)}
+.perm.ok .t b{color:var(--rank-d)}
+.perm.ok .g{border-color:var(--rank-d);color:var(--rank-d);pointer-events:none}
+.grid{flex:1;display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:1fr;gap:10px;max-height:420px}
+.app{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:10px 2px 8px;border:1px solid transparent;transition:border-color .2s,background .2s,transform .12s;min-height:86px}
+.app:active{transform:scale(.94)}
+.app .ic{width:52px;height:52px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:#121b2e;border:1px solid #1f2b44;transition:filter .2s}
+.app .ic svg{width:24px;height:24px}
+.app .an{font-size:10px;color:var(--dim);text-align:center}
+.app .lk{position:absolute;top:4px;right:6px;width:18px;height:18px;opacity:0;transform:scale(.4);transition:all .2s var(--ease)}
+/* ANIM lock toggle: lock glyph scale 0.4->1 + fade 200ms; tile border to warn; icon desaturates. */
+.app.on{border-color:rgba(255,138,147,.55);background:rgba(255,138,147,.07)}
+.app.on .ic{filter:grayscale(1) brightness(.6)}
+.app.on .an{color:var(--warn)}
+.app.on .lk{opacity:1;transform:none}
+.grid.disabled .app{opacity:.35;pointer-events:none}
+.safe{margin-top:10px;padding-top:10px;border-top:1px solid var(--line-dim)}
+.safe .row{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
+.safe .row span{font-size:10px;padding:4px 8px;border:1px solid var(--line-dim);color:var(--rank-d)}
+.countLine{display:flex;justify-content:space-between;font-size:11px;color:var(--dim);margin:0 0 10px}
+.countLine b{color:var(--warn);font-weight:700}
+
+/* =========================================================
+   STEP 6 — REST PERIOD RING
+   ========================================================= */
+.ringWrap{flex:1;display:flex;align-items:center;justify-content:center;position:relative}
+#ring{width:330px;height:330px;touch-action:none}
+#ring .hdl{cursor:grab}
+#ring .hdl circle.hit{fill:transparent}
+.ringRead{position:absolute;text-align:center;pointer-events:none}
+.ringRead .tm{font-size:22px;font-weight:700;color:#fff;text-shadow:var(--glow)}
+.ringRead .tm span{color:var(--dim);font-weight:400;margin:0 6px}
+.ringRead .du{font-family:var(--f-title);letter-spacing:.2em;font-size:13px;color:var(--hi);margin-top:6px}
+.ringRead .er{font-size:10px;letter-spacing:.14em;color:var(--warn);margin-top:6px;min-height:14px}
+.legend{display:flex;justify-content:center;gap:18px;font-size:10px;letter-spacing:.12em;color:var(--dim);margin-bottom:6px}
+.legend i{display:inline-block;width:10px;height:10px;margin-right:6px;vertical-align:-1px}
+
+/* =========================================================
+   STEP 7 — PENALTY TERMS
+   ========================================================= */
+.terms{flex:1;overflow-y:auto;min-height:0;padding:6px 2px 30px;scrollbar-width:none;
+  mask-image:linear-gradient(180deg,transparent 0,#000 18px,#000 calc(100% - 40px),transparent)}
+.terms::-webkit-scrollbar{display:none}
+.term{display:flex;gap:12px;padding:16px 4px;border-bottom:1px solid var(--line-dim);opacity:.08;transform:translateY(12px);transition:opacity .35s,transform .35s var(--ease)}
+/* ANIM reveal-on-scroll: each line opacity 0.08->1 + translateY 12->0, 350ms, triggered at 70% visibility. */
+.term.seen{opacity:1;transform:none}
+.term .ix{font-size:11px;color:var(--warn);width:26px;flex:none;padding-top:2px}
+.term .tx{font-size:14px;line-height:1.55}
+.term .tx em{font-style:normal;color:var(--warn)}
+.term .tx strong{font-weight:500;color:var(--gold)}
+.term.redline .ix,.term.redline .tx em{color:var(--pz-red)}
+.readMeter{font-size:10px;letter-spacing:.16em;color:var(--dim);text-align:center;margin-bottom:10px}
+.hold.red{border-color:var(--warn);color:#ffd6da;text-shadow:0 0 8px rgba(255,138,147,.6)}
+.hold.red .fill{background:linear-gradient(90deg,rgba(255,59,74,.15),rgba(255,59,74,.6))}
+
+/* final registration overlay */
+.reg{position:absolute;inset:0;z-index:30;display:none;flex-direction:column;justify-content:center;padding:var(--pad);background:rgba(5,7,13,.86)}
+.reg.on{display:flex;animation:stepIn .4s var(--ease)}
+.reg .rows{display:grid;grid-template-columns:auto 1fr;gap:10px 18px;font-size:13px;margin:6px 0 4px}
+.reg .rows span:nth-child(odd){color:var(--dim);letter-spacing:.14em;font-size:11px;padding-top:2px}
+</style>
+</head>
+<body>
+
+<div class="stagecol">
+<div class="phone black" id="phone">
+  <div class="prog" id="prog"><div class="segs"></div><div class="ct" id="progCt">01/07</div></div>
+  <div class="flash" id="flash"></div>
+
+  <!-- ============ STEP 1 · SYSTEM CONTACT ============ -->
+  <section class="step s1 active" data-step="1">
+    <canvas id="pcv" width="390" height="844"></canvas>
+    <div class="wake" id="wake"><div class="cursor">_</div><div class="kicker">Touch to establish contact</div></div>
+
+    <div class="emblemWrap" id="emblemWrap">
+      <!-- EXPORT: emblem-awakening.svg (original geometry) -->
+      <svg id="emblem-awakening" viewBox="0 0 160 160" fill="none" stroke="#4FB3FF" stroke-width="2" xmlns="http://www.w3.org/2000/svg">
+        <path d="M80 16 L144 80 L80 144 L16 80 Z"/>
+        <path d="M80 42 L118 80 L80 118 L42 80 Z" stroke="#A9DCFF"/>
+        <path d="M80 2 V30 M80 130 V158 M2 80 H22 M138 80 H158" stroke-width="1.5"/>
+        <path d="M72 80 L80 72 L88 80 L80 88 Z" fill="#A9DCFF" stroke="none"/>
+        <path d="M80 50 V64 M80 96 V110" stroke="#A9DCFF" stroke-width="1"/>
+      </svg>
+    </div>
+
+    <div class="frame" id="w1">
+      <span class="b tl"></span><span class="b tr"></span><span class="b bl"></span><span class="b br"></span>
+      <div class="win"><div class="in">
+        <div class="wtitle">[ NOTIFICATION ]</div>
+        <p class="body typed" id="typed"></p>
+        <p class="dimtxt" style="margin-top:10px">Acceptance binds you to the System.</p>
+      </div></div>
+    </div>
+
+    <div class="cta" id="s1cta">
+      <button class="btn hold" id="hold1" data-dur="1000"><span class="fill"></span><span class="lbl">ACCEPT</span><span class="pct">0%</span></button>
+      <p class="dimtxt">Hold to accept</p>
+    </div>
+  </section>
+
+  <!-- ============ STEP 2 · CHOOSE YOUR SYSTEM ============ -->
+  <section class="step" data-step="2">
+    <div class="head"><div class="kicker">Awakening · System binding</div><div class="h-title">Choose your System</div>
+      <p class="dimtxt" style="margin-top:6px">One System per Player. Each issues a different daily quest.</p></div>
+    <div class="sysList" id="sysList">
+      <button class="sysCard" data-sys="fitness">
+        <!-- EXPORT: sys-fitness.svg -->
+        <svg viewBox="0 0 64 64" fill="none" stroke="#4FB3FF" stroke-width="2"><path d="M32 4 L60 32 L32 60 L4 32 Z"/><path d="M18 32 H46 M22 25 V39 M42 25 V39 M14 28 V36 M50 28 V36"/></svg>
+        <div><div class="nm">FITNESS</div><div class="st"><span class="chip">STR</span><span class="chip">VIT</span></div>
+        <div class="ex">Walks, push-ups, squats, planks, runs.</div></div><span class="tick"></span>
+      </button>
+      <button class="sysCard" data-sys="personality">
+        <!-- EXPORT: sys-personality.svg -->
+        <svg viewBox="0 0 64 64" fill="none" stroke="#4FB3FF" stroke-width="2"><path d="M32 4 L60 32 L32 60 L4 32 Z"/><path d="M20 24 H44 V36 H30 L24 42 V36 H20 Z"/><path d="M26 30 H38" stroke-width="1.5"/></svg>
+        <div><div class="nm">PERSONALITY</div><div class="st"><span class="chip">INT</span><span class="chip">CHA</span></div>
+        <div class="ex">Reading, journaling, talking to people, presenting work.</div></div><span class="tick"></span>
+      </button>
+      <button class="sysCard" data-sys="focus">
+        <!-- EXPORT: sys-focus.svg -->
+        <svg viewBox="0 0 64 64" fill="none" stroke="#4FB3FF" stroke-width="2"><path d="M32 4 L60 32 L32 60 L4 32 Z"/><circle cx="32" cy="32" r="11"/><circle cx="32" cy="32" r="3" fill="#4FB3FF"/><path d="M32 14 V20 M32 44 V50 M14 32 H20 M44 32 H50"/></svg>
+        <div><div class="nm">FOCUS</div><div class="st"><span class="chip">DIS</span></div>
+        <div class="ex">Phone-free blocks, social media caps, no phone at meals.</div></div><span class="tick"></span>
+      </button>
+    </div>
+    <div class="foot"><button class="btn" id="bindBtn" disabled>BIND SYSTEM</button></div>
+  </section>
+
+  <!-- ============ STEP 3 · PLACEMENT TEST ============ -->
+  <section class="step" data-step="3">
+    <div class="head"><div class="kicker" id="s3k">Fitness System</div><div class="h-title">Placement test</div>
+      <p class="dimtxt" style="margin-top:6px">These answers only set your starting rank. Your daily quest is shown next.</p></div>
+    <div class="qList" id="qList"></div>
+    <div class="foot"><button class="btn" id="submitBtn">SUBMIT</button></div>
+  </section>
+
+  <!-- ============ STEP 4 · RANK + DAILY QUEST ============ -->
+  <section class="step" data-step="4" id="s4">
+    <div class="rankBox">
+      <!-- EXPORT: rank-badge.svg (letter + colour swap per rank) -->
+      <svg class="badge" id="badge" viewBox="0 0 116 124" xmlns="http://www.w3.org/2000/svg">
+        <path class="ring" d="M58 2 L112 32 V92 L58 122 L4 92 V32 Z" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path d="M58 6 L108 34 V90 L58 118 L8 90 V34 Z" fill="rgba(10,18,34,.9)" stroke="currentColor" stroke-width="2.5"/>
+        <path d="M58 18 L97 40 V84 L58 106 L19 84 V40 Z" fill="none" stroke="currentColor" stroke-width="1" opacity=".5"/>
+        <text id="badgeL" x="58" y="78" text-anchor="middle" font-family="Chakra Petch" font-weight="700" font-size="50" fill="currentColor">E</text>
+      </svg>
+      <div class="rankMeta" id="rankMeta"><div class="kicker">Rank assigned</div><div class="rk" id="rankTxt">RANK E</div>
+        <p class="dimtxt" id="rankSub" style="margin-top:4px">Fitness System · Day 1 of 30</p></div>
+    </div>
+    <div class="questWin">
+      <div class="frame"><span class="b tl"></span><span class="b tr"></span><span class="b bl"></span><span class="b br"></span>
+        <div class="win"><div class="in">
+          <div class="wtitle">[ DAILY QUEST ]</div>
+          <div class="qmeta"><span>CLEAR BEFORE 23:59</span><span class="gold">+100 XP</span></div>
+          <div class="cards" id="cards"></div>
+          <div class="tease" id="tease"></div>
+        </div></div>
+      </div>
+    </div>
+    <div class="foot"><button class="btn" id="s4btn" disabled>CONTINUE</button></div>
+  </section>
+
+  <!-- ============ STEP 5 · LOCK TARGETS ============ -->
+  <section class="step" data-step="5">
+    <div class="head"><div class="kicker">Penalty configuration</div><div class="h-title">Lock targets</div>
+      <p class="dimtxt" style="margin-top:6px">Selected apps lock on a failed day.</p></div>
+    <!-- GAP: permission flow. Real build leaves the app for system settings and must handle return + denial. -->
+    <div class="perm" id="perm"><div class="t"><b id="permT">ACCESS REQUIRED</b><span id="permS">The System needs usage access to lock apps.</span></div>
+      <button class="g" id="grant">GRANT</button></div>
+    <div class="countLine"><span>INSTALLED APPS</span><span>LOCKED <b id="lockCt">0</b></span></div>
+    <div class="grid disabled" id="grid"></div>
+    <div class="safe"><div class="kicker">Never locked</div><div class="row"><span>PHONE</span><span>MESSAGES</span><span>MAPS</span><span>BANKING</span></div></div>
+    <div class="foot"><button class="btn" id="s5btn" disabled>CONFIRM TARGETS</button></div>
+  </section>
+
+  <!-- ============ STEP 6 · REST PERIOD ============ -->
+  <section class="step" data-step="6">
+    <div class="head"><div class="kicker">Penalty configuration</div><div class="h-title">Rest period</div>
+      <p class="dimtxt" style="margin-top:6px">Locks never start while you sleep. Drag both markers.</p></div>
+    <div class="ringWrap">
+      <!-- EXPORT: rest-ring.svg (static parts); arc and handles are drawn in code -->
+      <svg id="ring" viewBox="0 0 330 330" xmlns="http://www.w3.org/2000/svg">
+        <g id="ticks"></g>
+        <circle cx="165" cy="165" r="120" fill="none" stroke="rgba(79,179,255,.15)" stroke-width="26"/>
+        <path id="arc" fill="none" stroke="#4FB3FF" stroke-width="26" stroke-linecap="butt" opacity=".55"/>
+        <path id="arcEdge" fill="none" stroke="#A9DCFF" stroke-width="2"/>
+        <g class="hdl" id="hS"><circle class="hit" r="26"/><circle r="15" fill="#05070D" stroke="#A9DCFF" stroke-width="2"/><path d="M-5 -1 a6 6 0 1 0 6 -5 a4.5 4.5 0 0 1 -6 5z" fill="#A9DCFF"/></g>
+        <g class="hdl" id="hE"><circle class="hit" r="26"/><circle r="15" fill="#05070D" stroke="#F5C96A" stroke-width="2"/><circle r="4" fill="#F5C96A"/><path d="M0 -9 V-7 M0 7 V9 M-9 0 H-7 M7 0 H9" stroke="#F5C96A" stroke-width="1.5"/></g>
+      </svg>
+      <div class="ringRead"><div class="tm num" id="rTm">23:00<span>→</span>07:00</div><div class="du" id="rDu">8 H 00 M REST</div><div class="er" id="rEr"></div></div>
+    </div>
+    <div class="legend"><span><i style="background:#A9DCFF"></i>SLEEP</span><span><i style="background:#F5C96A"></i>WAKE</span><span><i style="background:rgba(79,179,255,.5)"></i>NO LOCKS</span></div>
+    <div class="foot"><button class="btn" id="s6btn">SET REST PERIOD</button></div>
+  </section>
+
+  <!-- ============ STEP 7 · PENALTY TERMS ============ -->
+  <section class="step" data-step="7">
+    <div class="head"><div class="kicker">Final step</div><div class="h-title">Penalty terms</div></div>
+    <div class="terms" id="terms"></div>
+    <div class="foot"><div class="readMeter" id="readM">SCROLL TO READ ALL TERMS · 0/9</div>
+      <button class="btn hold red" id="hold7" data-dur="1000" disabled><span class="fill"></span><span class="lbl">HOLD TO ACCEPT</span><span class="pct">0%</span></button></div>
+    <div class="reg" id="reg">
+      <div class="frame"><span class="b tl"></span><span class="b tr"></span><span class="b bl"></span><span class="b br"></span>
+        <div class="win"><div class="in">
+          <div class="wtitle">[ PLAYER REGISTERED ]</div>
+          <div class="rows" id="regRows"></div>
+          <p class="dimtxt" style="margin:14px 0">The first daily quest is active. The System is watching.</p>
+          <button class="btn" id="enterBtn">ENTER</button>
+        </div></div>
+      </div>
+    </div>
+  </section>
+</div>
+<div class="jump" id="jump"></div>
+</div>
+
+<aside class="notes">
+  <h2>REVIEW NOTES</h2>
+  <p>Use the buttons under the phone to open any step as its own frame. The flow also runs end to end. Target run time: about 75–100 s.</p>
+  <h2>OPEN DECISIONS</h2>
+  <p class="gap"><b>Step 5 permission.</b> The GRANT strip stands in for 1–2 trips to Android settings (Usage Access, plus "Display over other apps" for the lock screen). Each trip needs a return screen and a "denied" state. Not designed yet.</p>
+  <p class="gap"><b>Step 6 cap.</b> Rest is capped at 4–10 h here. Without a cap, a user can set 20 h of sleep and never be locked.</p>
+  <p class="gap"><b>Never-locked list.</b> Phone, messages, maps, banking. Added as the emergency exit for Play review. Remove only after confirming policy.</p>
+  <p><b>Step 2</b> is a placeholder until Prompt 2 arrives.</p>
+  <p><b>Step 4</b> caps at rank C. The placement test only assigns E, D or C.</p>
+  <h2>ANIMATION MAP (FLUTTER)</h2>
+  <p><b>Contact:</b> 1300 ms particle converge (Ticker + CustomPainter), emblem fade 400 ms, window ScaleTransition Y 450 ms easeOutExpo + 320 ms flash, typewriter 28 ms/char, 55/110 Hz hum.</p>
+  <p><b>Hold buttons:</b> linear 1000 ms fill, 200 ms drain on release, haptic + 350 ms glow on complete.</p>
+  <p><b>Rank stamp:</b> 300 ms scale 2.4→1 easeInQuad, then flash, 220 ms shake, 450 ms shock ring.</p>
+  <p><b>Quest cards:</b> 260 ms slide, 140 ms stagger. Teaser fades in at 400 ms after the last card.</p>
+  <p><b>Terms:</b> 350 ms reveal per line at 70 % visibility.</p>
+  <p>Every duration is also in a CSS comment next to its rule.</p>
+</aside>
+
+<script>
+/* =========================================================
+   DATA
+   ========================================================= */
+const SYS = {
+  fitness:{name:'FITNESS',stats:'STR · VIT',
+    qs:[{t:'Push-ups you can do in one set with good form',u:'REPS',min:0,max:100,step:1,v:10,th:[10,25]},
+        {t:'Minutes you walk on a normal day',u:'MINUTES',min:0,max:180,step:5,v:20,th:[20,45]}],
+    quest:{E:[['Push-ups','20'],['Squats','20'],['Plank','60 s'],['Walk','3 km']],
+           D:[['Push-ups','35'],['Squats','35'],['Plank','90 s'],['Walk','4 km'],['Run','2 km']],
+           C:[['Push-ups','50'],['Squats','50'],['Plank','2 min'],['Walk','5 km'],['Run','3 km']]},
+    next:{E:'a 2 km run.',D:'interval sprints.',C:'a weighted carry.'},
+    pen:'Penalty: 50 push-ups before the locks lift.'},
+  personality:{name:'PERSONALITY',stats:'INT · CHA',
+    qs:[{t:'Pages you read in the last 7 days',u:'PAGES',min:0,max:500,step:5,v:20,th:[30,100]},
+        {t:'Conversations you started with someone new last month',u:'CONVERSATIONS',min:0,max:30,step:1,v:1,th:[2,6]}],
+    quest:{E:[['Read','10 pages'],['Journal','150 words'],['Start a conversation','1']],
+           D:[['Read','20 pages'],['Journal','250 words'],['Start a conversation','2'],['Explain one idea aloud','2 min']],
+           C:[['Read','30 pages'],['Journal','400 words'],['Start a conversation','3'],['Present work to someone','5 min']]},
+    next:{E:'explain one idea aloud for 2 minutes.',D:'present your work to someone.',C:'a recorded 5 minute talk.'},
+    pen:'Penalty: 20 pages and a 300 word reflection.'},
+  focus:{name:'FOCUS',stats:'DIS',
+    qs:[{t:'Your daily screen time, in hours',u:'HOURS',min:0,max:16,step:.5,v:6,th:[5,3],inv:true},
+        {t:'Your longest phone-free block yesterday',u:'MINUTES',min:0,max:240,step:5,v:30,th:[45,120]}],
+    quest:{E:[['Phone-free block','30 min'],['Social media cap','60 min'],['No phone at meals','2 meals']],
+           D:[['Phone-free block','60 min'],['Social media cap','45 min'],['No phone at meals','3 meals'],['First hour awake','phone-free']],
+           C:[['Phone-free block','2 h'],['Social media cap','30 min'],['No phone at meals','3 meals'],['First hour awake','phone-free']]},
+    next:{E:'a phone-free first hour after waking.',D:'a 2 hour deep-work block.',C:'a full phone-free evening.'},
+    pen:'Penalty: a 90 minute phone-free block.'}
+};
+const RANKC = {E:'var(--rank-e)',D:'var(--rank-d)',C:'var(--rank-c)',B:'var(--rank-b)'};
+const NEXTR = {E:'D',D:'C',C:'B'};
+/* App list = what the device reports. Icons are generic glyphs, never real logos. */
+const APPS = [['Instagram','sq'],['YouTube','tri'],['Reels','bars'],['X','x'],['Snapchat','ghost'],['Reddit','dots'],
+  ['Netflix','tri2'],['Discord','chat'],['Games','pad'],['Chess','king'],['Chrome','circ'],['Shorts','bars']];
+const GLYPH = {
+  sq:'<rect x="4" y="4" width="16" height="16" rx="5"/><circle cx="12" cy="12" r="4"/>',
+  tri:'<rect x="2" y="5" width="20" height="14" rx="4"/><path d="M10 9 L15 12 L10 15Z" fill="currentColor"/>',
+  bars:'<path d="M6 4 V20 M12 8 V20 M18 12 V20"/>', x:'<path d="M5 5 L19 19 M19 5 L5 19"/>',
+  ghost:'<path d="M6 20 V11 a6 6 0 0 1 12 0 V20 l-3 -2 -3 2 -3 -2 Z"/>', dots:'<circle cx="7" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="17" cy="12" r="2"/>',
+  tri2:'<path d="M7 4 V20 M17 4 V20 M7 4 L17 20"/>', chat:'<path d="M4 6 H20 V16 H10 L6 20 V16 H4Z"/>',
+  pad:'<rect x="2" y="7" width="20" height="11" rx="5"/><path d="M7 10 V15 M4.5 12.5 H9.5"/><circle cx="16" cy="12" r="1"/><circle cx="18" cy="14" r="1"/>',
+  king:'<path d="M12 3 V7 M10 5 H14 M8 20 H16 L15 10 H9 Z"/>', circ:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/>'
+};
+
+const S = {step:1,sys:null,ans:{},rank:'E',apps:new Set(['Instagram','YouTube','Reels']),granted:false,s:23*60,e:7*60,read:0};
+
+/* =========================================================
+   CORE
+   ========================================================= */
+const $ = q=>document.querySelector(q), $$ = q=>[...document.querySelectorAll(q)];
+const phone=$('#phone');
+$('#prog .segs').innerHTML='<div class="seg"><i></i></div>'.repeat(7);
+$('#jump').innerHTML=[1,2,3,4,5,6,7].map(n=>`<button data-j="${n}">${String(n).padStart(2,'0')}</button>`).join('');
+
+function flash(){const f=$('#flash');f.classList.remove('go');void f.offsetWidth;f.classList.add('go')}
+function shake(){phone.classList.remove('shake');void phone.offsetWidth;phone.classList.add('shake')}
+function buzz(ms){try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){}}
+
+function setProg(n){
+  $$('#prog .seg').forEach((s,i)=>{s.classList.toggle('done',i<n-1);s.classList.toggle('cur',i===n-1)});
+  $('#progCt').textContent=String(n).padStart(2,'0')+'/07';
+  $$('#jump button').forEach(b=>b.classList.toggle('on',+b.dataset.j===n));
+}
+function go(n,instant){
+  const cur=$('.step.active'), nxt=$(`.step[data-step="${n}"]`);
+  const show=()=>{
+    $$('.step').forEach(s=>s.classList.remove('active','exit','enter'));
+    nxt.classList.add('active','enter'); S.step=n; setProg(n);
+    phone.classList.toggle('black',n===1&&!S.contacted); ENTER[n]&&ENTER[n]();
+  };
+  if(cur&&cur!==nxt&&!instant){cur.classList.add('exit');setTimeout(show,200)}else show();
+  if(n!==1) hum.stop();
+}
+
+/* hold-to-confirm, used on step 1 and 7 */
+function bindHold(btn,onDone){
+  const dur=+btn.dataset.dur, fill=btn.querySelector('.fill'), pct=btn.querySelector('.pct');
+  let t0=0,raf=0,done=false;
+  const tick=()=>{const p=Math.min(1,(performance.now()-t0)/dur);fill.style.transform=`scaleX(${p})`;pct.textContent=Math.round(p*100)+'%';hum.charge(p);
+    if(p>=1){done=true;btn.classList.remove('charging');btn.classList.add('done');buzz(60);onDone();return}raf=requestAnimationFrame(tick)};
+  const start=e=>{if(btn.disabled||done)return;e.preventDefault();btn.setPointerCapture?.(e.pointerId);t0=performance.now();btn.classList.add('charging');fill.style.transition='none';raf=requestAnimationFrame(tick);buzz(10)};
+  const stop=()=>{if(done||!btn.classList.contains('charging'))return;cancelAnimationFrame(raf);btn.classList.remove('charging');
+    fill.style.transition='transform .2s ease-out';fill.style.transform='scaleX(0)';hum.charge(0)};
+  btn.addEventListener('pointerdown',start);['pointerup','pointercancel','pointerleave'].forEach(ev=>btn.addEventListener(ev,stop));
+  btn.addEventListener('contextmenu',e=>e.preventDefault());
+  btn.reset=()=>{done=false;btn.classList.remove('done','charging');fill.style.transition='none';fill.style.transform='scaleX(0)'};
+}
+
+/* low hum: two oscillators through a lowpass; pitch rises while a hold charges */
+const hum={ctx:null,g:null,o1:null,
+  start(){try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return;this.ctx=this.ctx||new C();const c=this.ctx;
+    const g=c.createGain();g.gain.value=0;const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=320;
+    const o1=c.createOscillator();o1.type='sine';o1.frequency.value=55;const o2=c.createOscillator();o2.type='triangle';o2.frequency.value=110;
+    const g2=c.createGain();g2.gain.value=.25;o1.connect(lp);o2.connect(g2).connect(lp);lp.connect(g).connect(c.destination);
+    o1.start();o2.start();g.gain.linearRampToValueAtTime(.09,c.currentTime+1.2);this.g=g;this.o1=o1;this.o2=o2}catch(e){}},
+  charge(p){if(this.o1){this.o1.frequency.setTargetAtTime(55+p*30,this.ctx.currentTime,.05);this.o2.frequency.setTargetAtTime(110+p*60,this.ctx.currentTime,.05)}},
+  stop(){if(this.g){const c=this.ctx;this.g.gain.setTargetAtTime(0,c.currentTime,.25);const o1=this.o1,o2=this.o2;setTimeout(()=>{try{o1.stop();o2.stop()}catch(e){}},900);this.g=this.o1=this.o2=null}}
+};
+
+/* =========================================================
+   STEP 1 — contact
+   ========================================================= */
+const MSG='You have met the conditions to become a Player.';
+function emblemTargets(cx,cy){
+  const pts=[];const dia=(r,n)=>{for(let i=0;i<n;i++){const t=i/n*4,s=Math.floor(t),f=t-s;const P=[[0,-r],[r,0],[0,r],[-r,0],[0,-r]];
+    pts.push([cx+P[s][0]+(P[s+1][0]-P[s][0])*f,cy+P[s][1]+(P[s+1][1]-P[s][1])*f])}};
+  dia(64,72);dia(38,44);for(let i=0;i<10;i++){pts.push([cx,cy-78+i*2.8]);pts.push([cx,cy+52+i*2.8])}
+  for(let i=0;i<8;i++){pts.push([cx-78+i*2.5,cy]);pts.push([cx+58+i*2.5,cy])}return pts;
+}
+function runContact(){
+  if(S.contacted)return;S.contacted=true;hum.start();$('#wake').style.display='none';phone.classList.remove('black');
+  const cv=$('#pcv'),dpr=window.devicePixelRatio||1;cv.width=390*dpr;cv.height=844*dpr;cv.style.width='390px';cv.style.height='844px';
+  const x=cv.getContext('2d');x.scale(dpr,dpr);
+  const T=emblemTargets(195,230).map(([tx,ty])=>{const a=Math.random()*Math.PI*2,r=220+Math.random()*260;
+    return{tx,ty,x:195+Math.cos(a)*r,y:420+Math.sin(a)*r,d:Math.random()*350}});
+  const DUR=1300,t0=performance.now();
+  /* ANIM converge: each particle eases (easeInOutCubic) from a random ring to its emblem point over 1300 ms with 0-350 ms random delay. */
+  const ease=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+  (function frame(now){const el=now-t0;x.clearRect(0,0,390,844);x.shadowColor='#4FB3FF';x.shadowBlur=8;
+    let all=true;for(const p of T){const k=Math.max(0,Math.min(1,(el-p.d)/(DUR-350)));if(k<1)all=false;const e=ease(k);
+      x.fillStyle=k>.95?'#A9DCFF':'rgba(79,179,255,'+(.3+.7*e)+')';x.fillRect(p.x+(p.tx-p.x)*e-1,p.y+(p.ty-p.y)*e-1,2,2)}
+    if(!all)requestAnimationFrame(frame);else{$('#emblemWrap').classList.add('on');cv.style.transition='opacity .4s';cv.style.opacity=0;setTimeout(powerOn,450)}
+  })(t0);
+}
+function powerOn(){
+  flash();buzz(30);$('#w1').classList.add('on');
+  /* ANIM typewriter: 28 ms per character; caret blinks 800 ms. */
+  const el=$('#typed');let i=0;setTimeout(function ty(){el.textContent=MSG.slice(0,++i);if(i<MSG.length)setTimeout(ty,28);else{el.classList.add('fin');$('#s1cta').classList.add('on')}},460);
+}
+$('#wake').addEventListener('click',runContact);
+bindHold($('#hold1'),()=>{flash();setTimeout(()=>go(2),350)});
+function setContactDone(){ // used when jumping straight to step 1 for review
+  S.contacted=true;$('#wake').style.display='none';$('#pcv').style.opacity=0;$('#emblemWrap').classList.add('on');
+  $('#w1').classList.add('on');$('#typed').textContent=MSG;$('#typed').classList.add('fin');$('#s1cta').classList.add('on')}
+
+/* =========================================================
+   STEP 2 — choose system
+   ========================================================= */
+$$('.sysCard').forEach(c=>c.addEventListener('click',()=>{
+  $$('.sysCard').forEach(o=>o.classList.toggle('sel',o===c));$('#sysList').classList.add('has');S.sys=c.dataset.sys;S.ans={};buzz(12);
+  $('#bindBtn').disabled=false;$('#bindBtn').textContent='BIND '+SYS[S.sys].name}));
+$('#bindBtn').addEventListener('click',()=>{flash();go(3)});
+
+/* =========================================================
+   STEP 3 — placement test
+   ========================================================= */
+function fmt(v,q){return q.step<1?v.toFixed(1):String(v)}
+function renderQs(){
+  const sys=SYS[S.sys];$('#s3k').textContent=sys.name+' System · '+sys.stats;
+  $('#qList').innerHTML=sys.qs.map((q,i)=>{const v=S.ans[i]??q.v;return`
+  <div class="frame q"><span class="b tl"></span><span class="b tr"></span><span class="b bl"></span><span class="b br"></span>
+   <div class="win"><div class="in">
+    <div class="qn">QUESTION ${i+1} / ${sys.qs.length}</div><div class="qt">${q.t}</div>
+    <div class="stepper"><button class="pm" data-i="${i}" data-d="-1" aria-label="minus">−</button>
+      <div class="val"><span class="n num" id="n${i}">${fmt(v,q)}</span><span class="u">${q.u}</span></div>
+      <button class="pm" data-i="${i}" data-d="1" aria-label="plus">+</button></div>
+    <div class="slide"><input type="range" id="r${i}" data-i="${i}" min="${q.min}" max="${q.max}" step="${q.step}" value="${v}">
+      <div class="ends"><span>${q.min}</span><span>${q.max}+</span></div></div>
+   </div></div></div>`}).join('');
+  sys.qs.forEach((q,i)=>setVal(i,S.ans[i]??q.v,true));
+  /* press-and-hold on +/- repeats: first repeat after 380 ms, then every 70 ms */
+  $$('.pm').forEach(b=>{let to,iv;const i=+b.dataset.i,d=+b.dataset.d,q=sys.qs[i];
+    const bump=()=>setVal(i,(S.ans[i]??q.v)+d*q.step);
+    const end=()=>{clearTimeout(to);clearInterval(iv)};
+    b.addEventListener('pointerdown',e=>{e.preventDefault();bump();buzz(6);to=setTimeout(()=>iv=setInterval(bump,70),380)});
+    ['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,end))});
+  $$('#qList input').forEach(r=>r.addEventListener('input',()=>setVal(+r.dataset.i,+r.value)));
+}
+function setVal(i,v,silent){const q=SYS[S.sys].qs[i];v=Math.round(Math.min(q.max,Math.max(q.min,v))/q.step)*q.step;
+  if(!silent&&v===S.ans[i])return;S.ans[i]=v;const n=$('#n'+i),r=$('#r'+i);n.textContent=fmt(v,q);r.value=v;
+  r.style.setProperty('--p',((v-q.min)/(q.max-q.min)*100)+'%');if(!silent){n.classList.remove('tick');void n.offsetWidth;n.classList.add('tick')}}
+function computeRank(){const sys=SYS[S.sys];let sc=0;
+  sys.qs.forEach((q,i)=>{const v=S.ans[i]??q.v;sc+=q.inv?(v<=q.th[1]?2:v<=q.th[0]?1:0):(v>=q.th[1]?2:v>=q.th[0]?1:0)});
+  return sc>=4?'C':sc>=2?'D':'E'}
+$('#submitBtn').addEventListener('click',()=>{S.rank=computeRank();go(4)});
+
+/* =========================================================
+   STEP 4 — rank stamp + quest deal
+   ========================================================= */
+function runRank(){
+  const sys=SYS[S.sys],r=S.rank,b=$('#badge');
+  b.style.color=RANKC[r];$('#badgeL').textContent=r;$('#s4').style.setProperty('--rc',RANKC[r]);
+  $('#rankTxt').textContent='RANK '+r;$('#rankSub').textContent=sys.name.charAt(0)+sys.name.slice(1).toLowerCase()+' · Day 1/30';
+  b.classList.remove('stamp');$('#rankMeta').classList.remove('on');$('#tease').classList.remove('on');$('#s4btn').disabled=true;
+  const q=sys.quest[r];
+  $('#cards').innerHTML=q.map((x,i)=>`<div class="qcard"><span class="ix num">${String(i+1).padStart(2,'0')}</span><span class="nm">${x[0]}</span><span class="tg num">${x[1]}</span></div>`).join('');
+  $('#tease').innerHTML=`At rank <b>${NEXTR[r]}</b> the System adds: ${sys.next[r]}`;
+  setTimeout(()=>{void b.offsetWidth;b.classList.add('stamp')},250);
+  setTimeout(()=>{flash();shake();buzz(40);$('#rankMeta').classList.add('on')},550);
+  const cs=$$('.qcard');cs.forEach((c,i)=>setTimeout(()=>c.classList.add('dealt'),1000+i*140));
+  setTimeout(()=>{$('#tease').classList.add('on');$('#s4btn').disabled=false},1000+cs.length*140+400);
+}
+$('#s4btn').addEventListener('click',()=>go(5));
+
+/* =========================================================
+   STEP 5 — lock targets
+   ========================================================= */
+$('#grid').innerHTML=APPS.map(([n,g])=>`<button class="app" data-a="${n}"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#7D8BA8" stroke-width="1.6" color="#7D8BA8">${GLYPH[g]}</svg></div>
+  <span class="an">${n}</span><svg class="lk" viewBox="0 0 18 18"><rect x="3" y="8" width="12" height="9" fill="#FF8A93"/><path d="M5.5 8 V5.5 a3.5 3.5 0 0 1 7 0 V8" fill="none" stroke="#FF8A93" stroke-width="1.6"/></svg></button>`).join('');
+function syncApps(){$$('.app').forEach(a=>a.classList.toggle('on',S.apps.has(a.dataset.a)));$('#lockCt').textContent=S.apps.size;
+  $('#s5btn').disabled=!(S.granted&&S.apps.size>0);$('#grid').classList.toggle('disabled',!S.granted);
+  $('#perm').classList.toggle('ok',S.granted);$('#permT').textContent=S.granted?'ACCESS GRANTED':'ACCESS REQUIRED';
+  $('#permS').textContent=S.granted?'The System can lock selected apps.':'The System needs usage access to lock apps.';$('#grant').textContent=S.granted?'DONE':'GRANT'}
+$$('.app').forEach(a=>a.addEventListener('click',()=>{const n=a.dataset.a;S.apps.has(n)?S.apps.delete(n):S.apps.add(n);buzz(10);syncApps()}));
+$('#grant').addEventListener('click',()=>{S.granted=true;flash();syncApps()});
+$('#s5btn').addEventListener('click',()=>go(6));
+
+/* =========================================================
+   STEP 6 — 24 h ring
+   ========================================================= */
+const CX=165,CY=165,R=120;
+(function ticks(){let h='';for(let i=0;i<96;i++){const a=i/96*Math.PI*2,big=i%12===0,mid=i%4===0;const r1=R+18,r2=r1+(big?10:mid?6:3);
+  h+=`<line x1="${CX+Math.sin(a)*r1}" y1="${CY-Math.cos(a)*r1}" x2="${CX+Math.sin(a)*r2}" y2="${CY-Math.cos(a)*r2}" stroke="${big?'#A9DCFF':'rgba(125,139,168,.5)'}" stroke-width="${big?1.5:1}"/>`;}
+  [0,6,12,18].forEach(hh=>{const a=hh/24*Math.PI*2,r=R-24;h+=`<text x="${CX+Math.sin(a)*r}" y="${CY-Math.cos(a)*r+4}" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#7D8BA8">${String(hh).padStart(2,'0')}</text>`});
+  $('#ticks').innerHTML=h})();
+const pt=(m,r=R)=>{const a=m/1440*Math.PI*2;return[CX+Math.sin(a)*r,CY-Math.cos(a)*r]};
+const hm=m=>String(Math.floor(m/60)%24).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+function drawRing(){const d=(S.e-S.s+1440)%1440,[x0,y0]=pt(S.s),[x1,y1]=pt(S.e),lg=d>720?1:0;
+  $('#arc').setAttribute('d',`M${x0} ${y0} A${R} ${R} 0 ${lg} 1 ${x1} ${y1}`);
+  const[a0,b0]=pt(S.s,R+13),[a1,b1]=pt(S.e,R+13);$('#arcEdge').setAttribute('d',`M${a0} ${b0} A${R+13} ${R+13} 0 ${lg} 1 ${a1} ${b1}`);
+  $('#hS').setAttribute('transform',`translate(${x0},${y0})`);$('#hE').setAttribute('transform',`translate(${x1},${y1})`);
+  $('#rTm').innerHTML=`${hm(S.s)}<span>→</span>${hm(S.e)}`;$('#rDu').textContent=`${Math.floor(d/60)} H ${String(d%60).padStart(2,'0')} M REST`;
+  const bad=d>600?'MAXIMUM REST IS 10 H':d<240?'MINIMUM REST IS 4 H':'';$('#rEr').textContent=bad;
+  $('#arc').setAttribute('stroke',bad?'#FF8A93':'#4FB3FF');$('#s6btn').disabled=!!bad}
+let drag=null;const svg=$('#ring');
+function toMin(e){const b=svg.getBoundingClientRect(),x=(e.clientX-b.left)/b.width*330-CX,y=(e.clientY-b.top)/b.height*330-CY;
+  let a=Math.atan2(x,-y);if(a<0)a+=Math.PI*2;return Math.round(a/(Math.PI*2)*1440/15)*15%1440}
+['hS','hE'].forEach(id=>$('#'+id).addEventListener('pointerdown',e=>{drag=id;svg.setPointerCapture(e.pointerId);buzz(8)}));
+svg.addEventListener('pointermove',e=>{if(!drag)return;const m=toMin(e);const k=drag==='hS'?'s':'e';if(m!==S[k]){S[k]=m;if(m%60===0)buzz(4);drawRing()}});
+svg.addEventListener('pointerup',()=>drag=null);svg.addEventListener('pointercancel',()=>drag=null);
+$('#s6btn').addEventListener('click',()=>go(7));
+
+/* =========================================================
+   STEP 7 — terms
+   ========================================================= */
+function renderTerms(){const sys=SYS[S.sys||'fitness'];
+  const L=[['Clear the daily quest before <em>23:59</em>. Partial completion is failure.'],
+    ['Failure opens the <em>Penalty Zone</em>.',1],
+    [`Your ${S.apps.size} lock targets close for <em>3 hours</em> at a time the System does not disclose.`,1],
+    [`Locks never begin during your rest period, ${hm(S.s)} to ${hm(S.e)}.`],
+    ['Calls, messages, maps and banking are never locked.'],
+    [sys.pen.replace('Penalty:','The System penalty:')+' Clear it to lift the locks early.',1],
+    ['Clear <strong>21 of 30 days</strong> and a <strong>Gate</strong> opens. A Gate starts a 3 day Dungeon.'],
+    ['Fail a Dungeon floor and the <em>Dungeon Penalty</em> doubles every penalty.',1],
+    ['The System does not negotiate.']];
+  $('#terms').innerHTML=L.map(([t,red],i)=>`<div class="term${red?' redline':''}"><span class="ix num">${String(i+1).padStart(2,'0')}</span><span class="tx">${t}</span></div>`).join('')+'<div style="height:120px"></div>';
+  S.read=0;const h=$('#hold7');h.disabled=true;h.reset&&h.reset();$('#reg').classList.remove('on');
+  const io=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting&&!e.target.classList.contains('seen')){e.target.classList.add('seen');S.read++;
+    $('#readM').textContent=S.read<L.length?`SCROLL TO READ ALL TERMS · ${S.read}/${L.length}`:'ALL TERMS READ';
+    if(S.read>=L.length)h.disabled=false}})},{root:$('#terms'),threshold:.7});
+  $$('.term').forEach(t=>io.observe(t))}
+bindHold($('#hold7'),()=>{flash();shake();const sys=SYS[S.sys||'fitness'];
+  $('#regRows').innerHTML=`<span>SYSTEM</span><span>${sys.name}</span><span>RANK</span><span style="color:${RANKC[S.rank]}">${S.rank}</span>
+   <span>LOCK TARGETS</span><span>${S.apps.size} apps</span><span>REST</span><span>${hm(S.s)} – ${hm(S.e)}</span><span>FIRST QUEST</span><span>Today, 23:59</span>`;
+  setTimeout(()=>$('#reg').classList.add('on'),300)});
+$('#enterBtn').addEventListener('click',()=>{S.contacted=false;location.reload()});
+
+/* =========================================================
+   STEP ENTER HOOKS + reviewer jump
+   ========================================================= */
+const ENTER={3:renderQs,4:runRank,5:syncApps,6:drawRing,7:renderTerms};
+$$('#jump button').forEach(b=>b.addEventListener('click',()=>{const n=+b.dataset.j;
+  if(!S.sys&&n>2){S.sys='fitness';const c=$('.sysCard[data-sys="fitness"]');c.click()}
+  if(n===1){setContactDone();phone.classList.remove('black')}
+  if(n===4&&!S.ans[0]&&S.ans[0]!==0){S.rank='E'}
+  if(n>=6)S.granted=true;
+  go(n,true)}));
+setProg(1);
+</script>
+</body>
+</html>

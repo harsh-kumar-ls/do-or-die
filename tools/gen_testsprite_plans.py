@@ -23,42 +23,48 @@ def check(text):
     return {"type": "assertion", "description": text}
 
 
-LOAD = act("Open the app at / and wait up to 30 seconds for the '[ SYSTEM ]' window to appear (a Flutter web app; it can take a while to load, and controls are exposed in the accessibility tree)")
+LOAD = act("Open the app at / and wait up to 30 seconds for a black screen with the text 'TOUCH TO ESTABLISH CONTACT' (a Flutter web app; it can take a while to load, and controls are exposed in the accessibility tree)")
+
+CONTACT = [
+    act("Click 'TOUCH TO ESTABLISH CONTACT'"),
+    act("Wait 6 seconds while the emblem forms and the '[ NOTIFICATION ]' window types its message"),
+    act("Click 'ACCEPT' once (this test build accepts a click in place of the hold)"),
+]
 
 
 # The web build can't list installed apps, so this step shows no apps there.
-CONFIRM_APPS = act("Click 'CONFIRM APPS' on the '[ LOCK TARGETS ]' window (the web build lists no apps; that is expected)")
+CONFIRM_APPS = act("Click 'CONFIRM TARGETS' on the 'LOCK TARGETS' screen (the web build lists no apps; that is expected)")
 
 
 def awakening(system="FITNESS", answers=None):
     """The Awakening up to the Daily Quest screen. [answers] are
     (question text, value) pairs typed into the placement test."""
-    steps = [
-        LOAD,
-        act("Click 'ACCEPT' on the '[ SYSTEM ]' window"),
-        act(f"On the '[ CHOOSE YOUR SYSTEM ]' window, click the '{system}' tile"),
-        act("Click 'CONFIRM SYSTEM'"),
+    steps = [LOAD, *CONTACT,
+        act(f"On the 'CHOOSE YOUR SYSTEM' screen, click the {system} card"),
+        act(f"Click 'BIND {system}'"),
     ]
     for question, value in answers or []:
         # Type with the keyboard: Flutter web ignores a value set directly
         # on the input element (a programmatic fill).
         steps += [
-            act(f"On the '[ PLACEMENT TEST ]' window, click inside the number box for '{question}'"),
-            act("Press the Backspace key three times to empty that box"),
+            act(f"On the 'PLACEMENT TEST' screen, click the big number for '{question}'"),
+            act("Press the Backspace key three times to empty it"),
             act(f"Type {value} with the keyboard (key presses, not a programmatic fill)"),
-            check(f"The number box for '{question}' now shows {value}"),
         ]
     steps += [
-        act("Click 'SUBMIT' on the '[ PLACEMENT TEST ]' window"),
-        act("Click 'CONTINUE' on the '[ YOUR DAILY QUEST ]' window"),
+        act("Click 'SUBMIT'"),
+        act("Wait 3 seconds for the rank badge and the '[ DAILY QUEST ]' cards to appear"),
+        act("Click 'CONTINUE'"),
         CONFIRM_APPS,
-        act("Click 'CONFIRM' on the '[ REST PERIOD ]' window"),
-        act("Click 'HOLD TO ACCEPT' once on the '[ PENALTY TERMS ]' window (this test build accepts a click in place of the hold)"),
+        act("Click 'SET REST PERIOD' on the 'REST PERIOD' screen"),
+        act("On the 'PENALTY TERMS' screen, scroll the list of terms down to the last term, 'The System does not negotiate.', until the text 'ALL TERMS READ' appears"),
+        act("Click 'HOLD TO ACCEPT' once (this test build accepts a click in place of the hold)"),
+        act("Click 'ENTER' on the '[ PLAYER REGISTERED ]' window"),
     ]
     return steps
 
 
-ON_QUEST = check("The '[ DAILY QUEST ]' screen is shown with a bottom bar containing 'QUEST', 'STATUS' and 'PENALTY'")
+ON_QUEST = check("The main '[ DAILY QUEST ]' screen is shown with a bottom bar containing 'QUEST', 'STATUS' and 'PENALTY'")
 
 
 PLANS = {
@@ -124,31 +130,31 @@ PLANS = {
         ],
     ),
     "14-system-explainer": (
-        "Awakening: tapping a System explains what it trains and its own penalty",
+        "Awakening: choosing a System explains its first quest and its own penalty",
         [
             LOAD,
-            act("Click 'ACCEPT' on the '[ SYSTEM ]' window"),
-            act("On the '[ CHOOSE YOUR SYSTEM ]' window, click the 'PERSONALITY' tile"),
-            check("The window now explains 'PERSONALITY SYSTEM' with 'TRAINS INT · CHA', a 'RANK E · WHERE YOU START' list including 'Read (pages) · 10', and an 'IF YOU FAIL A DAY' section that mentions '20 pages of reading' and a written reflection, and no push-ups"),
-            act("Click the 'FOCUS' tile"),
-            check("The explanation switches to 'FOCUS SYSTEM' and its failure section mentions 'a 60-minute phone-free block'"),
+            *CONTACT,
+            act("On the 'CHOOSE YOUR SYSTEM' screen, click the PERSONALITY card"),
+            check("The PERSONALITY card expands and shows 'RANK E STARTS WITH' followed by 'Read (pages) 10', and a 'FAIL A DAY' line that mentions '20 pages and a written reflection' and no push-ups; the button reads 'BIND PERSONALITY'"),
+            act("Click the FOCUS card"),
+            check("The FOCUS card is now expanded, its 'FAIL A DAY' line mentions 'a 60-minute phone-free block', and the button reads 'BIND FOCUS'"),
         ],
     ),
     "08-onboarding-validation": (
-        "Awakening: continuing without choosing a System is refused",
+        "Awakening: binding is disabled until a System is chosen",
         [
             LOAD,
-            act("Click 'ACCEPT' on the '[ SYSTEM ]' window"),
-            act("Click 'CONFIRM SYSTEM' without clicking any System card"),
-            check("The error text 'Choose a System.' is shown and the '[ CHOOSE YOUR SYSTEM ]' window is still displayed (no '[ PLACEMENT TEST ]' window)"),
+            *CONTACT,
+            check("The 'CHOOSE YOUR SYSTEM' screen shows three cards, FITNESS, PERSONALITY and FOCUS"),
+            check("The 'BIND SYSTEM' button at the bottom is disabled (dimmed and not clickable) because no card is selected; this is the expected behaviour, and no 'PLACEMENT TEST' screen is shown"),
+            act("Click the FITNESS card"),
+            check("The button now reads 'BIND FITNESS' and is enabled"),
         ],
     ),
     "09-custom-objective": (
         "Awakening: a strong placement test starts the Player at rank C, never higher",
-        awakening(answers=[("Most push-ups you can do in one set", 80), ("Minutes to walk or jog 1 km", 4)])[:-4] + [
-            check("The '[ YOUR DAILY QUEST ]' window shows 'FITNESS SYSTEM · RANK C' and the line 'Ranks above C are earned only through Dungeons.'"),
-        ] + awakening()[-4:] + [
-            check("The '[ DAILY QUEST ]' window lists 'Jog' showing '0.0 / 2.0 km' and 'Push-ups' showing '0 / 30'"),
+        awakening(answers=[("Most push-ups you can do in one set", 80), ("Minutes to walk or jog 1 km", 4)]) + [
+            check("The '[ DAILY QUEST ]' window lists 'Jog' showing '0.0 / 2.0 km' and 'Push-ups' showing '0 / 30' (the rank C quest), and the top bar shows 'RANK C'"),
         ],
     ),
     "10-mute-toggle": (

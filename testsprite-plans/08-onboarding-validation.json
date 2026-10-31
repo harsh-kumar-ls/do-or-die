@@ -1,23 +1,39 @@
 {
   "projectId": "d37f7ffc-2ffc-4da9-88ea-8ee0106eba69",
   "type": "frontend",
-  "name": "Awakening: continuing without choosing a System is refused",
+  "name": "Awakening: binding is disabled until a System is chosen",
   "planSteps": [
     {
       "type": "action",
-      "description": "Open the app at / and wait up to 30 seconds for the '[ SYSTEM ]' window to appear (a Flutter web app; it can take a while to load, and controls are exposed in the accessibility tree)"
+      "description": "Open the app at / and wait up to 30 seconds for a black screen with the text 'TOUCH TO ESTABLISH CONTACT' (a Flutter web app; it can take a while to load, and controls are exposed in the accessibility tree)"
     },
     {
       "type": "action",
-      "description": "Click 'ACCEPT' on the '[ SYSTEM ]' window"
+      "description": "Click 'TOUCH TO ESTABLISH CONTACT'"
     },
     {
       "type": "action",
-      "description": "Click 'CONFIRM SYSTEM' without clicking any System card"
+      "description": "Wait 6 seconds while the emblem forms and the '[ NOTIFICATION ]' window types its message"
+    },
+    {
+      "type": "action",
+      "description": "Click 'ACCEPT' once (this test build accepts a click in place of the hold)"
     },
     {
       "type": "assertion",
-      "description": "The error text 'Choose a System.' is shown and the '[ CHOOSE YOUR SYSTEM ]' window is still displayed (no '[ PLACEMENT TEST ]' window)"
+      "description": "The 'CHOOSE YOUR SYSTEM' screen shows three cards, FITNESS, PERSONALITY and FOCUS"
+    },
+    {
+      "type": "assertion",
+      "description": "The 'BIND SYSTEM' button at the bottom is disabled (dimmed and not clickable) because no card is selected; this is the expected behaviour, and no 'PLACEMENT TEST' screen is shown"
+    },
+    {
+      "type": "action",
+      "description": "Click the FITNESS card"
+    },
+    {
+      "type": "assertion",
+      "description": "The button now reads 'BIND FITNESS' and is enabled"
     }
   ]
 }

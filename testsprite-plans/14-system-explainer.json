@@ -1,31 +1,39 @@
 {
   "projectId": "d37f7ffc-2ffc-4da9-88ea-8ee0106eba69",
   "type": "frontend",
-  "name": "Awakening: tapping a System explains what it trains and its own penalty",
+  "name": "Awakening: choosing a System explains its first quest and its own penalty",
   "planSteps": [
     {
       "type": "action",
-      "description": "Open the app at / and wait up to 30 seconds for the '[ SYSTEM ]' window to appear (a Flutter web app; it can take a while to load, and controls are exposed in the accessibility tree)"
+      "description": "Open the app at / and wait up to 30 seconds for a black screen with the text 'TOUCH TO ESTABLISH CONTACT' (a Flutter web app; it can take a while to load, and controls are exposed in the accessibility tree)"
     },
     {
       "type": "action",
-      "description": "Click 'ACCEPT' on the '[ SYSTEM ]' window"
+      "description": "Click 'TOUCH TO ESTABLISH CONTACT'"
     },
     {
       "type": "action",
-      "description": "On the '[ CHOOSE YOUR SYSTEM ]' window, click the 'PERSONALITY' tile"
+      "description": "Wait 6 seconds while the emblem forms and the '[ NOTIFICATION ]' window types its message"
+    },
+    {
+      "type": "action",
+      "description": "Click 'ACCEPT' once (this test build accepts a click in place of the hold)"
+    },
+    {
+      "type": "action",
+      "description": "On the 'CHOOSE YOUR SYSTEM' screen, click the PERSONALITY card"
     },
     {
       "type": "assertion",
-      "description": "The window now explains 'PERSONALITY SYSTEM' with 'TRAINS INT \u00b7 CHA', a 'RANK E \u00b7 WHERE YOU START' list including 'Read (pages) \u00b7 10', and an 'IF YOU FAIL A DAY' section that mentions '20 pages of reading' and a written reflection, and no push-ups"
+      "description": "The PERSONALITY card expands and shows 'RANK E STARTS WITH' followed by 'Read (pages) 10', and a 'FAIL A DAY' line that mentions '20 pages and a written reflection' and no push-ups; the button reads 'BIND PERSONALITY'"
     },
     {
       "type": "action",
-      "description": "Click the 'FOCUS' tile"
+      "description": "Click the FOCUS card"
     },
     {
       "type": "assertion",
-      "description": "The explanation switches to 'FOCUS SYSTEM' and its failure section mentions 'a 60-minute phone-free block'"
+      "description": "The FOCUS card is now expanded, its 'FAIL A DAY' line mentions 'a 60-minute phone-free block', and the button reads 'BIND FOCUS'"
     }
   ]
 }

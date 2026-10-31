@@ -339,14 +339,39 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
   }
 
+  Future<void> pumpFor(WidgetTester tester, int ms) async {
+    for (var t = 0; t < ms; t += 100) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+  }
+
+  Future<void> holdText(WidgetTester tester, String text) async {
+    await tester.ensureVisible(find.text(text));
+    await tester.pump();
+    final g = await tester.startGesture(tester.getCenter(find.text(text)));
+    await pumpFor(tester, 1300);
+    await g.up();
+    await pumpFor(tester, 500);
+  }
+
+  /// From the black screen to the System choice.
+  Future<void> makeContact(WidgetTester tester) async {
+    await tester.tap(find.text('TOUCH TO ESTABLISH CONTACT'));
+    await pumpFor(tester, 4000); // particles, emblem, window, typing
+    await holdText(tester, 'ACCEPT');
+  }
+
   testWidgets('the Awakening refuses to continue without a System', (
     tester,
   ) async {
     OnboardingResult? result;
     await pumpOnboarding(tester, (r) => result = r);
-    await tapText(tester, 'ACCEPT');
-    await tapText(tester, 'CONFIRM SYSTEM');
-    expect(find.text('Choose a System.'), findsOneWidget);
+    await makeContact(tester);
+    expect(find.text('CHOOSE YOUR SYSTEM'), findsOneWidget);
+    await tester.tap(find.text('BIND SYSTEM'));
+    await pumpFor(tester, 500);
+    expect(find.text('CHOOSE YOUR SYSTEM'), findsOneWidget);
+    expect(find.text('PLACEMENT TEST'), findsNothing);
     expect(result, isNull);
   });
 
@@ -355,33 +380,42 @@ void main() {
   ) async {
     OnboardingResult? result;
     await pumpOnboarding(tester, (r) => result = r);
-    await tapText(tester, 'ACCEPT');
+    await makeContact(tester);
     await tapText(tester, 'FITNESS');
-    await tapText(tester, 'CONFIRM SYSTEM');
-    expect(find.text('[ PLACEMENT TEST ]'), findsOneWidget);
+    await tapText(tester, 'BIND FITNESS');
+    await pumpFor(tester, 500);
+    expect(find.text('PLACEMENT TEST'), findsOneWidget);
     final fields = find.byType(TextField);
     await tester.enterText(fields.at(0), '80');
     await tester.enterText(fields.at(1), '4');
     await tester.pump();
     await tapText(tester, 'SUBMIT');
-    expect(find.text('FITNESS SYSTEM · RANK C'), findsOneWidget);
+    await pumpFor(tester, 2500); // rank stamp, quest cards deal in
+    expect(find.text('RANK C'), findsOneWidget);
+    expect(find.text('Jog'), findsOneWidget);
     await tapText(tester, 'CONTINUE');
-    await tapText(tester, 'CONFIRM APPS');
-    await tapText(tester, 'CONFIRM');
-    expect(find.text('[ PENALTY TERMS ]'), findsOneWidget);
-    await tester.ensureVisible(find.text('HOLD TO ACCEPT'));
-    await tester.pump();
-    final hold = await tester.startGesture(
-      tester.getCenter(find.text('HOLD TO ACCEPT')),
+    await pumpFor(tester, 500);
+    await tapText(tester, 'CONFIRM TARGETS');
+    await pumpFor(tester, 500);
+    await tapText(tester, 'SET REST PERIOD');
+    await pumpFor(tester, 500);
+    expect(find.text('PENALTY TERMS'), findsOneWidget);
+    // Accepting is refused until every term has been read.
+    expect(find.textContaining('SCROLL TO READ ALL TERMS'), findsOneWidget);
+    await tester.drag(
+      find.textContaining('Clear every objective'),
+      const Offset(0, -3000),
     );
-    await tester.pump(const Duration(milliseconds: 150));
-    await tester.pump(const Duration(milliseconds: 1000));
-    await hold.up();
-    await tester.pump(const Duration(milliseconds: 300));
+    await pumpFor(tester, 500);
+    expect(find.text('ALL TERMS READ'), findsOneWidget);
+    await holdText(tester, 'HOLD TO ACCEPT');
+    expect(find.text('[ PLAYER REGISTERED ]'), findsOneWidget);
+    await tapText(tester, 'ENTER');
     expect(result, isNotNull);
     expect(result!.system, SystemKind.fitness);
     expect(result!.placement, Rank.c);
     expect(result!.answers, {'pushups': 80, 'km_minutes': 4});
+    expect(result!.sleep.startMinute, 23 * 60);
   });
 
   testWidgets('choosing the next System hides completed ones', (tester) async {
@@ -396,8 +430,11 @@ void main() {
     expect(find.text('PERSONALITY'), findsOneWidget);
     // Choosing one explains it, including its own penalty.
     await tapText(tester, 'PERSONALITY');
-    expect(find.text('PERSONALITY SYSTEM'), findsOneWidget);
-    expect(find.textContaining('20 pages of reading'), findsOneWidget);
+    expect(find.text('BIND PERSONALITY'), findsOneWidget);
+    expect(
+      find.textContaining('20 pages and a written reflection'),
+      findsOneWidget,
+    );
     expect(find.textContaining('push-ups'), findsNothing);
   });
 

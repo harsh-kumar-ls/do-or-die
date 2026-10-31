@@ -1,6 +1,10 @@
+import 'dart:async';
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../data/codec.dart';
 import '../../domain/penalty.dart';
 import '../../domain/penalty_kind.dart';
 import '../../domain/placement.dart';
@@ -8,12 +12,11 @@ import '../../domain/progression.dart';
 import '../../domain/system_catalogue.dart';
 import '../../domain/systems.dart';
 import '../../domain/tasks.dart';
-import '../../data/codec.dart';
 import '../../platform/blocker.dart';
-import 'app_picker_screen.dart';
+import '../fx.dart';
 import '../theme.dart';
-import '../widgets/hud_controls.dart';
-import '../widgets/system_window.dart';
+import '../widgets/awakening_art.dart';
+import '../widgets/system_frame.dart';
 
 class OnboardingResult {
   const OnboardingResult({
@@ -31,13 +34,14 @@ class OnboardingResult {
   final Set<String> blocked;
 }
 
-/// The Awakening: the System appears, the user chooses a System, takes the
-/// placement test, picks lock targets and a rest period, and accepts the
-/// terms.
+/// The Awakening, built from the Claude Design prototype
+/// (design/claude-design/awakening.html): system contact, choose a System,
+/// placement test, rank stamp and daily quest, lock targets, rest ring,
+/// penalty terms. The look and motion follow the design; the quests,
+/// placement questions and penalties are the real rules.
 ///
-/// With [nextSystemOnly], only the System choice and placement are shown
-/// (choosing the next System once the current one is complete); the lock
-/// targets and sleep window in the result are then empty defaults.
+/// With [nextSystemOnly], only the System choice, placement and quest are
+/// shown (choosing the next System once the current one is complete).
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({
     super.key,
@@ -62,53 +66,44 @@ class OnboardingScreen extends StatefulWidget {
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
-enum _Step { intro, system, placement, verdict, apps, sleep, terms }
+enum _Step { contact, system, placement, quest, apps, rest, terms }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   late final List<_Step> _steps = widget.nextSystemOnly
-      ? const [_Step.system, _Step.placement, _Step.verdict]
+      ? const [_Step.system, _Step.placement, _Step.quest]
       : _Step.values;
   int _index = 0;
   _Step get _step => _steps[_index];
 
+  final _fx = FlashController();
   SystemKind? _system;
   final _answers = <String, int>{};
-  TimeOfDay _sleepStart = const TimeOfDay(hour: 23, minute: 0);
-  TimeOfDay _sleepEnd = const TimeOfDay(hour: 7, minute: 0);
-  String? _error;
-
-  /// Apps the user picks to lock. Starts empty: nothing is chosen for them.
+  int _sleepStart = 23 * 60;
+  int _sleepEnd = 7 * 60;
   final _blocked = <String>{};
+  bool _registered = false;
+
+  /// Before first contact the whole screen is black.
+  bool _contacted = false;
 
   Rank get _placement => placementFor(_system!, _answers);
 
+  void _go(int index) => setState(() => _index = index);
+
   void _next() {
-    if (_step == _Step.system && _system == null) {
-      return setState(() => _error = 'Choose a System.');
-    }
-    if (_step == _Step.sleep && _sleepStart == _sleepEnd) {
-      return setState(() => _error = 'Sleep start and end must differ.');
-    }
     if (_index == _steps.length - 1) return _finish();
-    setState(() {
-      _error = null;
-      _index++;
-    });
+    _go(_index + 1);
   }
 
   void _back() {
-    if (_index == 0) return;
-    setState(() {
-      _error = null;
-      _index--;
-    });
+    if (_index > 0) _go(_index - 1);
   }
 
   void _choose(SystemKind k) {
+    HapticFeedback.selectionClick();
     setState(() {
       if (_system != k) _answers.clear();
       _system = k;
-      _error = null;
       for (final q in placementQuestions[k]!) {
         _answers.putIfAbsent(
           q.id,
@@ -126,11 +121,901 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         system: _system!,
         placement: _placement,
         answers: {..._answers},
-        sleep: SleepWindow(
-          startMinute: _sleepStart.hour * 60 + _sleepStart.minute,
-          endMinute: _sleepEnd.hour * 60 + _sleepEnd.minute,
-        ),
+        sleep: SleepWindow(startMinute: _sleepStart, endMinute: _sleepEnd),
         blocked: {..._blocked},
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _fx.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final body = switch (_step) {
+      _Step.contact => _ContactStep(
+        fx: _fx,
+        onContact: () => setState(() => _contacted = true),
+        onAccepted: () {
+          _fx.flash();
+          Future.delayed(const Duration(milliseconds: 350), () {
+            if (mounted) _next();
+          });
+        },
+      ),
+      _Step.system => _SystemStep(
+        choices: [
+          for (final k in SystemKind.values)
+            if (!widget.completed.contains(k)) k,
+        ],
+        chosen: _system,
+        nextSystemOnly: widget.nextSystemOnly,
+        onChoose: _choose,
+        onBind: () {
+          _fx.flash();
+          Fx.instance.play(Cue.window);
+          _next();
+        },
+      ),
+      _Step.placement => _PlacementStep(
+        kind: _system!,
+        answers: _answers,
+        onChanged: (id, v) => setState(() => _answers[id] = v),
+        onSubmit: _next,
+      ),
+      _Step.quest => _QuestStep(
+        key: ValueKey('$_system$_placement'),
+        kind: _system!,
+        rank: _placement,
+        fx: _fx,
+        label: widget.nextSystemOnly ? 'BEGIN THIS SYSTEM' : 'CONTINUE',
+        onContinue: _next,
+      ),
+      _Step.apps => _AppsStep(
+        blocker: widget.blocker,
+        selected: _blocked,
+        onToggle: (pkg) => setState(
+          () =>
+              _blocked.contains(pkg) ? _blocked.remove(pkg) : _blocked.add(pkg),
+        ),
+        onConfirm: _next,
+      ),
+      _Step.rest => _RestStep(
+        start: _sleepStart,
+        end: _sleepEnd,
+        onChanged: (s, e) => setState(() {
+          _sleepStart = s;
+          _sleepEnd = e;
+        }),
+        onConfirm: _next,
+      ),
+      _Step.terms => _TermsStep(
+        kind: _system!,
+        lockTargets: _blocked.length,
+        sleepStart: _sleepStart,
+        sleepEnd: _sleepEnd,
+        onAccepted: () {
+          _fx
+            ..flash()
+            ..shake();
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (mounted) setState(() => _registered = true);
+          });
+        },
+      ),
+    };
+    final contact = _step == _Step.contact;
+    return FlashLayer(
+      controller: _fx,
+      child: Stack(
+        children: [
+          if (contact && !_contacted)
+            const Positioned.fill(child: ColoredBox(color: Colors.black)),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  AnimatedOpacity(
+                    opacity: contact ? 0 : 1,
+                    duration: const Duration(milliseconds: 400),
+                    child: _Progress(index: _index, count: _steps.length),
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      reverseDuration: const Duration(milliseconds: 120),
+                      switchInCurve: Curves.easeOutCubic,
+                      transitionBuilder: (child, a) => FadeTransition(
+                        opacity: a,
+                        child: SlideTransition(
+                          position: Tween(
+                            begin: const Offset(0, .012),
+                            end: Offset.zero,
+                          ).animate(a),
+                          child: child,
+                        ),
+                      ),
+                      child: KeyedSubtree(key: ValueKey(_step), child: body),
+                    ),
+                  ),
+                  if (_index > 0 && !_registered)
+                    SizedBox(
+                      height: 40,
+                      child: Center(
+                        child: TextButton(
+                          onPressed: _back,
+                          child: Text(
+                            'BACK',
+                            style: Hud.mono(11, HudScope.of(context).dim),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          if (_registered)
+            Positioned.fill(
+              child: _Registered(
+                kind: _system!,
+                rank: _placement,
+                lockTargets: _blocked.length,
+                sleepStart: _sleepStart,
+                sleepEnd: _sleepEnd,
+                onEnter: _finish,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Shared pieces
+
+class _Progress extends StatelessWidget {
+  const _Progress({required this.index, required this.count});
+  final int index;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    return Row(
+      children: [
+        for (var i = 0; i < count; i++) ...[
+          if (i > 0) const SizedBox(width: 4),
+          Expanded(
+            child: Container(
+              height: 2,
+              color: p.sys.withValues(alpha: .18),
+              alignment: Alignment.centerLeft,
+              child: AnimatedFractionallySizedBox(
+                duration: const Duration(milliseconds: 400),
+                curve: Curves.easeOutCubic,
+                widthFactor: i < index ? 1 : (i == index ? .5 : 0),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: p.sys,
+                    boxShadow: [BoxShadow(color: p.glowColor, blurRadius: 8)],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(width: 10),
+        Text(
+          '${(index + 1).toString().padLeft(2, '0')}/${count.toString().padLeft(2, '0')}',
+          style: Hud.mono(10, p.dim, spacing: .14),
+        ),
+      ],
+    );
+  }
+}
+
+class _Head extends StatelessWidget {
+  const _Head({required this.kicker, required this.title, this.sub});
+  final String kicker;
+  final String title;
+  final String? sub;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(kicker.toUpperCase(), style: Hud.mono(10, p.dim, spacing: .24)),
+          const SizedBox(height: 6),
+          Text(
+            title.toUpperCase(),
+            style: Hud.head(
+              20,
+              p.hi,
+              spacing: .22,
+            ).copyWith(shadows: p.textGlow(1)),
+          ),
+          if (sub != null) ...[
+            const SizedBox(height: 6),
+            Text(sub!, style: Hud.mono(12, p.dim).copyWith(height: 1.5)),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+String _hm(int m) =>
+    '${(m ~/ 60 % 24).toString().padLeft(2, '0')}:${(m % 60).toString().padLeft(2, '0')}';
+
+// ---------------------------------------------------------------------------
+// Step 1: system contact
+
+class _ContactStep extends StatefulWidget {
+  const _ContactStep({
+    required this.fx,
+    required this.onAccepted,
+    required this.onContact,
+  });
+  final FlashController fx;
+  final VoidCallback onContact;
+  final VoidCallback onAccepted;
+
+  @override
+  State<_ContactStep> createState() => _ContactStepState();
+}
+
+class _ContactStepState extends State<_ContactStep>
+    with TickerProviderStateMixin {
+  static const _message = 'You have met the conditions to become a Player.';
+
+  late final _converge = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1300),
+  );
+  late final _window = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 450),
+  );
+  late final _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1200),
+  );
+  final _particles = ParticlePainter.make(Random());
+  bool _contacted = false;
+  bool _emblem = false;
+  int _typed = 0;
+  Timer? _typer;
+
+  @override
+  void dispose() {
+    _typer?.cancel();
+    _converge.dispose();
+    _window.dispose();
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  Future<void> _contact() async {
+    if (_contacted) return;
+    setState(() => _contacted = true);
+    widget.onContact();
+    HapticFeedback.mediumImpact();
+    await _converge.forward();
+    if (!mounted) return;
+    setState(() => _emblem = true);
+    unawaited(_pulse.repeat(reverse: true));
+    await Future.delayed(const Duration(milliseconds: 450));
+    if (!mounted) return;
+    widget.fx.flash();
+    Fx.instance.play(Cue.notice);
+    await _window.forward();
+    if (!mounted) return;
+    _typer = Timer.periodic(const Duration(milliseconds: 28), (t) {
+      if (!mounted) return t.cancel();
+      setState(() => _typed++);
+      if (_typed >= _message.length) t.cancel();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    if (!_contacted) {
+      return Semantics(
+        button: true,
+        label: 'Touch to establish contact',
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _contact,
+          child: ColoredBox(
+            color: Colors.black,
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _Blink(child: Text('_', style: Hud.mono(22, p.sys))),
+                  const SizedBox(height: 16),
+                  ExcludeSemantics(
+                    child: Text(
+                      'TOUCH TO ESTABLISH CONTACT',
+                      style: Hud.mono(10, p.dim, spacing: .24),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    final done = _typed >= _message.length;
+    return LayoutBuilder(
+      builder: (context, c) {
+        final centre = Offset(
+          c.maxWidth / 2,
+          min(150.0, c.maxHeight * .2) + 80,
+        );
+        return Stack(
+          children: [
+            if (!_emblem)
+              Positioned.fill(
+                child: AnimatedBuilder(
+                  animation: _converge,
+                  builder: (context, _) => CustomPaint(
+                    painter: ParticlePainter(
+                      _converge.value,
+                      centre,
+                      _particles,
+                    ),
+                  ),
+                ),
+              ),
+            Positioned(
+              left: centre.dx - 80,
+              top: centre.dy - 80,
+              child: AnimatedOpacity(
+                opacity: _emblem ? 1 : 0,
+                duration: const Duration(milliseconds: 400),
+                child: AnimatedBuilder(
+                  animation: _pulse,
+                  builder: (context, _) => CustomPaint(
+                    size: const Size(160, 160),
+                    painter: EmblemPainter(glow: 1 + _pulse.value),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              top: centre.dy + 110,
+              child: AnimatedBuilder(
+                animation: _window,
+                builder: (context, child) => Opacity(
+                  opacity: _window.value == 0 ? 0 : 1,
+                  child: Transform(
+                    alignment: Alignment.center,
+                    transform: Matrix4.diagonal3Values(
+                      1,
+                      .02 + .98 * Curves.easeOutExpo.transform(_window.value),
+                      1,
+                    ),
+                    child: child,
+                  ),
+                ),
+                child: HudFrame(
+                  title: '[ NOTIFICATION ]',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 52),
+                        child: Text(
+                          _message.substring(0, min(_typed, _message.length)) +
+                              (done ? '' : '_'),
+                          style: Hud.mono(16, p.text).copyWith(height: 1.6),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Acceptance binds you to the System.',
+                        style: Hud.mono(12, p.dim),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 8,
+              child: AnimatedOpacity(
+                opacity: done ? 1 : 0,
+                duration: const Duration(milliseconds: 300),
+                child: IgnorePointer(
+                  ignoring: !done,
+                  child: Column(
+                    children: [
+                      ChargeButton(
+                        label: 'ACCEPT',
+                        enabled: done,
+                        onConfirmed: () {
+                          Fx.instance.play(Cue.confirm);
+                          widget.onAccepted();
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      Text('Hold to accept', style: Hud.mono(12, p.dim)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _Blink extends StatefulWidget {
+  const _Blink({required this.child});
+  final Widget child;
+
+  @override
+  State<_Blink> createState() => _BlinkState();
+}
+
+class _BlinkState extends State<_Blink> with SingleTickerProviderStateMixin {
+  late final _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1000),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _c,
+    builder: (context, child) =>
+        Opacity(opacity: _c.value < .5 ? 1 : 0, child: child),
+    child: widget.child,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Step 2: choose your System
+
+class _SystemStep extends StatelessWidget {
+  const _SystemStep({
+    required this.choices,
+    required this.chosen,
+    required this.nextSystemOnly,
+    required this.onChoose,
+    required this.onBind,
+  });
+
+  final List<SystemKind> choices;
+  final SystemKind? chosen;
+  final bool nextSystemOnly;
+  final ValueChanged<SystemKind> onChoose;
+  final VoidCallback onBind;
+
+  static const _examples = {
+    SystemKind.fitness: 'Walks, push-ups, squats, planks, runs.',
+    SystemKind.personality:
+        'Reading, journaling, talking to people, presenting work.',
+    SystemKind.focus:
+        'Phone-free blocks, social media caps, no phone at meals.',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final name = chosen == null
+        ? null
+        : systemCatalogue[chosen]!.name.split(' ').first.toUpperCase();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _Head(
+          kicker: 'Awakening · System binding',
+          title: 'Choose your System',
+          sub: nextSystemOnly
+              ? 'Your System is complete. Choose the next one.'
+              : 'One System per Player. No switching until it is complete.',
+        ),
+        Expanded(
+          child: Column(
+            children: [
+              for (final (i, k) in choices.indexed) ...[
+                if (i > 0) const SizedBox(height: 12),
+                Expanded(
+                  flex: chosen == null ? 1 : (chosen == k ? 6 : 2),
+                  child: _SystemCard(
+                    spec: systemCatalogue[k]!,
+                    example: _examples[k]!,
+                    selected: chosen == k,
+                    dimmed: chosen != null && chosen != k,
+                    onTap: () => onChoose(k),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        CutButton(
+          name == null ? 'BIND SYSTEM' : 'BIND $name',
+          onPressed: chosen == null ? null : onBind,
+        ),
+      ],
+    );
+  }
+}
+
+class _SystemCard extends StatelessWidget {
+  const _SystemCard({
+    required this.spec,
+    required this.example,
+    required this.selected,
+    required this.dimmed,
+    required this.onTap,
+  });
+
+  final SystemSpec spec;
+  final String example;
+  final bool selected;
+  final bool dimmed;
+  final VoidCallback onTap;
+
+  static const _stat = {
+    Stat.strength: 'STR',
+    Stat.intellect: 'INT',
+    Stat.discipline: 'DIS',
+    Stat.vitality: 'VIT',
+    Stat.charisma: 'CHA',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    final short = spec.name.split(' ').first.toUpperCase();
+    final start = spec.at(Rank.e).daily.map(questTask).toList();
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: spec.name,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedOpacity(
+          opacity: dimmed ? .45 : 1,
+          duration: const Duration(milliseconds: 250),
+          child: ClipPath(
+            clipper: const ChamferClipper(
+              12,
+              corners: [true, false, true, false],
+            ),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              decoration: BoxDecoration(
+                color: selected ? p.sys.withValues(alpha: .10) : p.panel,
+                border: Border.all(
+                  color: selected ? p.sys : p.sys.withValues(alpha: .18),
+                ),
+              ),
+              child: ExcludeSemantics(
+                child: Stack(
+                  children: [
+                    Row(
+                      children: [
+                        CustomPaint(
+                          size: const Size(60, 60),
+                          painter: SystemGlyphPainter(spec.kind, lit: selected),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Center(
+                            child: SingleChildScrollView(
+                              primary: false,
+                              physics: const ClampingScrollPhysics(),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    short,
+                                    style:
+                                        Hud.head(
+                                          17,
+                                          selected ? p.hi : p.text,
+                                          spacing: .24,
+                                        ).copyWith(
+                                          shadows: selected
+                                              ? p.textGlow(.8)
+                                              : null,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    children: [
+                                      for (final s in spec.stats)
+                                        Container(
+                                          margin: const EdgeInsets.only(
+                                            right: 6,
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 7,
+                                            vertical: 3,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            border: Border.all(
+                                              color: p.sys.withValues(
+                                                alpha: .18,
+                                              ),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            _stat[s]!,
+                                            style: Hud.mono(
+                                              10,
+                                              p.hi,
+                                              spacing: .14,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  if (!dimmed) const SizedBox(height: 6),
+                                  if (!dimmed)
+                                    Text(
+                                      selected ? spec.tagline : example,
+                                      style: Hud.mono(
+                                        11,
+                                        p.dim,
+                                      ).copyWith(height: 1.45),
+                                    ),
+                                  if (selected) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'RANK E STARTS WITH',
+                                      style: Hud.mono(9, p.sys, spacing: .16),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      start
+                                          .map(
+                                            (t) => t.type == TaskType.checkbox
+                                                ? t.name
+                                                : '${t.name} ${questTarget(t)}',
+                                          )
+                                          .join(' · '),
+                                      style: Hud.mono(
+                                        11,
+                                        p.text,
+                                      ).copyWith(height: 1.45),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'FAIL A DAY: apps lock, plus ${penaltyShort(penaltyKindFor(spec.kind))}.',
+                                      style: Hud.mono(
+                                        10,
+                                        Hud.warn,
+                                      ).copyWith(height: 1.45),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Positioned(
+                      right: 2,
+                      top: 2,
+                      child: Transform.rotate(
+                        angle: pi / 4,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: 13,
+                          height: 13,
+                          decoration: BoxDecoration(
+                            color: selected ? p.sys : Colors.transparent,
+                            border: Border.all(
+                              color: selected
+                                  ? p.hi
+                                  : p.sys.withValues(alpha: .18),
+                            ),
+                            boxShadow: selected
+                                ? [BoxShadow(color: p.glowColor, blurRadius: 8)]
+                                : null,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Step 3: placement test
+
+class _PlacementStep extends StatelessWidget {
+  const _PlacementStep({
+    required this.kind,
+    required this.answers,
+    required this.onChanged,
+    required this.onSubmit,
+  });
+
+  final SystemKind kind;
+  final Map<String, int> answers;
+  final void Function(String id, int value) onChanged;
+  final VoidCallback onSubmit;
+
+  @override
+  Widget build(BuildContext context) {
+    final qs = placementQuestions[kind]!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _Head(
+          kicker: systemCatalogue[kind]!.name,
+          title: 'Placement test',
+          sub: 'These answers only set your starting rank. Your daily quest is shown next.',
+        ),
+        Expanded(
+          child: Center(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  for (final (i, q) in qs.indexed) ...[
+                    if (i > 0) const SizedBox(height: 16),
+                    HudFrame(
+                      child: _Stepper(
+                        key: ValueKey(q.id),
+                        index: i,
+                        count: qs.length,
+                        question: q,
+                        value: answers[q.id] ?? q.initial,
+                        onChanged: (v) => onChanged(q.id, v),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        CutButton('SUBMIT', onPressed: onSubmit),
+      ],
+    );
+  }
+}
+
+/// Big minus / number / plus with press-and-hold repeat, plus a slider. The
+/// number can also be typed.
+class _Stepper extends StatefulWidget {
+  const _Stepper({
+    super.key,
+    required this.index,
+    required this.count,
+    required this.question,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final int index;
+  final int count;
+  final PlacementQuestion question;
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  @override
+  State<_Stepper> createState() => _StepperState();
+}
+
+class _StepperState extends State<_Stepper> {
+  late final _c = TextEditingController(text: '${widget.value}');
+  final _focus = FocusNode();
+  Timer? _delay, _repeat;
+
+  @override
+  void didUpdateWidget(_Stepper old) {
+    super.didUpdateWidget(old);
+    if ('${widget.value}' != _c.text && !_focus.hasFocus) {
+      _c.text = '${widget.value}';
+    }
+  }
+
+  @override
+  void dispose() {
+    _stopRepeat();
+    _focus.dispose();
+    _c.dispose();
+    super.dispose();
+  }
+
+  void _set(int v) {
+    final q = widget.question;
+    final clamped = v.clamp(q.min, q.max);
+    _c.text = '$clamped';
+    widget.onChanged(clamped);
+  }
+
+  void _bump(int dir) {
+    HapticFeedback.selectionClick();
+    final cur = int.tryParse(_c.text) ?? widget.value;
+    _set(cur + dir * widget.question.step);
+  }
+
+  void _startRepeat(int dir) {
+    _stopRepeat();
+    _bump(dir);
+    _delay = Timer(const Duration(milliseconds: 380), () {
+      _repeat = Timer.periodic(
+        const Duration(milliseconds: 70),
+        (_) => _bump(dir),
+      );
+    });
+  }
+
+  void _stopRepeat() {
+    _delay?.cancel();
+    _repeat?.cancel();
+  }
+
+  Widget _pm(String label, int dir, String semantic) {
+    final p = HudScope.of(context);
+    return Semantics(
+      button: true,
+      label: semantic,
+      onTap: () => _bump(dir),
+      child: Listener(
+        onPointerDown: (_) => _startRepeat(dir),
+        onPointerUp: (_) => _stopRepeat(),
+        onPointerCancel: (_) => _stopRepeat(),
+        child: ClipPath(
+          clipper: const ChamferClipper(8, corners: [true, false, true, false]),
+          child: Container(
+            width: 60,
+            height: 60,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: p.sys.withValues(alpha: .06),
+              border: Border.all(color: p.sys),
+            ),
+            child: ExcludeSemantics(
+              child: Text(label, style: Hud.head(28, p.hi, spacing: 0)),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -138,405 +1023,1116 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final p = HudScope.of(context);
-    final body = switch (_step) {
-      _Step.intro => _intro(p),
-      _Step.system => _systemStep(p),
-      _Step.placement => _placementStep(p),
-      _Step.verdict => _verdictStep(p),
-      _Step.apps => _appStep(p),
-      _Step.sleep => _sleepStep(p),
-      _Step.terms => _termsStep(p),
-    };
-    return SafeArea(
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 6),
-            child: Row(
-              children: [
-                for (var i = 0; i < _steps.length; i++) ...[
-                  if (i > 0) const SizedBox(width: 6),
-                  Expanded(
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 250),
-                      height: 3,
-                      color: i <= _index ? p.sys : p.sys.withValues(alpha: .15),
+    final q = widget.question;
+    final v = widget.value.clamp(q.min, q.max);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'QUESTION ${widget.index + 1} / ${widget.count}',
+          style: Hud.mono(10, p.sys, spacing: .2),
+        ),
+        const SizedBox(height: 6),
+        Text(q.prompt, style: Hud.mono(13, p.text).copyWith(height: 1.5)),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            _pm('−', -1, 'Decrease'),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                children: [
+                  Semantics(
+                    label: q.prompt,
+                    child: TextField(
+                      controller: _c,
+                      focusNode: _focus,
+                      textAlign: TextAlign.center,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      style: Hud.head(
+                        40,
+                        Colors.white,
+                        spacing: 0,
+                      ).copyWith(shadows: p.textGlow(1)),
+                      cursorColor: p.sys,
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      onChanged: (s) {
+                        final n = int.tryParse(s);
+                        if (n != null) widget.onChanged(n.clamp(q.min, q.max));
+                      },
                     ),
+                  ),
+                  Text(
+                    q.unit.toUpperCase(),
+                    style: Hud.mono(10, p.dim, spacing: .2),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            _pm('+', 1, 'Increase'),
+          ],
+        ),
+        const SizedBox(height: 8),
+        SliderTheme(
+          data: SliderThemeData(
+            trackHeight: 2,
+            activeTrackColor: p.sys,
+            inactiveTrackColor: p.sys.withValues(alpha: .18),
+            thumbColor: p.voidColor,
+            overlayColor: p.sys.withValues(alpha: .12),
+            thumbShape: _DiamondThumb(p.hi),
+          ),
+          child: ExcludeSemantics(
+            child: Slider(
+              min: q.min.toDouble(),
+              max: q.max.toDouble(),
+              value: v.toDouble(),
+              onChanged: (x) {
+                final snapped = (x / q.step).round() * q.step;
+                if (snapped != widget.value) _set(snapped);
+              },
+            ),
+          ),
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('${q.min}', style: Hud.mono(10, p.dim)),
+            Text('${q.max}+', style: Hud.mono(10, p.dim)),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _DiamondThumb extends SliderComponentShape {
+  const _DiamondThumb(this.color);
+  final Color color;
+
+  @override
+  Size getPreferredSize(bool isEnabled, bool isDiscrete) => const Size(22, 22);
+
+  @override
+  void paint(
+    PaintingContext context,
+    Offset center, {
+    required Animation<double> activationAnimation,
+    required Animation<double> enableAnimation,
+    required bool isDiscrete,
+    required TextPainter labelPainter,
+    required RenderBox parentBox,
+    required SliderThemeData sliderTheme,
+    required TextDirection textDirection,
+    required double value,
+    required double textScaleFactor,
+    required Size sizeWithOverflow,
+  }) {
+    final path = Path()
+      ..moveTo(center.dx, center.dy - 10)
+      ..lineTo(center.dx + 10, center.dy)
+      ..lineTo(center.dx, center.dy + 10)
+      ..lineTo(center.dx - 10, center.dy)
+      ..close();
+    context.canvas
+      ..drawPath(path, Paint()..color = const Color(0xFF05070D))
+      ..drawPath(
+        path,
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2,
+      );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Step 4: rank stamp and daily quest
+
+class _QuestStep extends StatefulWidget {
+  const _QuestStep({
+    super.key,
+    required this.kind,
+    required this.rank,
+    required this.fx,
+    required this.label,
+    required this.onContinue,
+  });
+
+  final SystemKind kind;
+  final Rank rank;
+  final FlashController fx;
+  final String label;
+  final VoidCallback onContinue;
+
+  @override
+  State<_QuestStep> createState() => _QuestStepState();
+}
+
+class _QuestStepState extends State<_QuestStep> with TickerProviderStateMixin {
+  late final _stamp = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 300),
+  );
+  late final _ring = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 450),
+  );
+  int _dealt = 0;
+  bool _ready = false;
+  final _timers = <Timer>[];
+
+  late final _spec = systemCatalogue[widget.kind]!;
+  late final _quest = _spec.at(widget.rank).daily.map(questTask).toList();
+
+  @override
+  void initState() {
+    super.initState();
+    _timers.add(
+      Timer(const Duration(milliseconds: 250), () async {
+        await _stamp.forward();
+        if (!mounted) return;
+        widget.fx
+          ..flash()
+          ..shake();
+        HapticFeedback.heavyImpact();
+        Fx.instance.play(Cue.levelUp);
+        unawaited(_ring.forward());
+        setState(() {});
+      }),
+    );
+    for (var i = 0; i < _quest.length; i++) {
+      _timers.add(
+        Timer(Duration(milliseconds: 1000 + i * 140), () {
+          if (mounted) setState(() => _dealt = i + 1);
+        }),
+      );
+    }
+    _timers.add(
+      Timer(Duration(milliseconds: 1000 + _quest.length * 140 + 400), () {
+        if (mounted) setState(() => _ready = true);
+      }),
+    );
+  }
+
+  @override
+  void dispose() {
+    for (final t in _timers) {
+      t.cancel();
+    }
+    _stamp.dispose();
+    _ring.dispose();
+    super.dispose();
+  }
+
+  String get _tease {
+    final r = widget.rank;
+    if (r == Rank.s) {
+      return 'Rank S. Hold it for 30 days to complete the System.';
+    }
+    final next = Rank.values[r.index + 1];
+    final have = {for (final q in _spec.at(r).daily) q.id};
+    final added = [
+      for (final q in _spec.at(next).daily)
+        if (!have.contains(q.id)) q.label,
+    ];
+    final n = next.name.toUpperCase();
+    return added.isEmpty
+        ? 'At rank $n the System raises every target.'
+        : 'At rank $n the System adds: ${added.join(', ')}.';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    final rc = Hud.rankColor(widget.rank);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 124),
+          child: Row(
+            children: [
+              AnimatedBuilder(
+                animation: Listenable.merge([_stamp, _ring]),
+                builder: (context, _) {
+                  final t = Curves.easeInQuad.transform(_stamp.value);
+                  return Opacity(
+                    opacity: _stamp.value,
+                    child: Transform.scale(
+                      scale: 2.4 - 1.4 * t,
+                      child: CustomPaint(
+                        size: const Size(116, 124),
+                        painter: RankHexPainter(widget.rank, ring: _ring.value),
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: AnimatedOpacity(
+                  opacity: _stamp.isCompleted ? 1 : 0,
+                  duration: const Duration(milliseconds: 300),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'RANK ASSIGNED',
+                        style: Hud.mono(10, p.dim, spacing: .24),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'RANK ${widget.rank.name.toUpperCase()}',
+                        style: Hud.head(22, rc, spacing: .2),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _spec.name.toUpperCase(),
+                        style: Hud.mono(11, p.text, spacing: .12),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Ranks above C are earned only through Dungeons.',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Hud.mono(10, p.dim).copyWith(height: 1.3),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Expanded(
+          child: HudFrame(
+            title: '[ DAILY QUEST ]',
+            expand: true,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        'CLEAR BEFORE 23:59',
+                        overflow: TextOverflow.ellipsis,
+                        style: Hud.mono(10, p.dim, spacing: .16),
+                      ),
+                    ),
+                    Text(
+                      '+100 XP',
+                      style: Hud.mono(10, Hud.gold, spacing: .16),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        for (final (i, t) in _quest.indexed)
+                          _DealtCard(shown: i < _dealt, index: i + 1, task: t),
+                      ],
+                    ),
+                  ),
+                ),
+                AnimatedOpacity(
+                  opacity: _ready ? 1 : 0,
+                  duration: const Duration(milliseconds: 400),
+                  child: Container(
+                    margin: const EdgeInsets.only(top: 10),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Hud.gold.withValues(alpha: .4)),
+                    ),
+                    child: Text(
+                      _tease,
+                      style: Hud.mono(12, Hud.gold).copyWith(height: 1.5),
+                    ),
+                  ),
+                ),
+                if (widget.kind == SystemKind.fitness) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Conservative progressions, not medical advice. With a health condition, ask a doctor first.',
+                    style: Hud.mono(10, Hud.warn).copyWith(height: 1.4),
                   ),
                 ],
               ],
             ),
           ),
-          Expanded(
-            child: Padding(
-              key: ValueKey(_step),
-              padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
-              child: body,
-            ),
+        ),
+        const SizedBox(height: 14),
+        CutButton(widget.label, onPressed: _ready ? widget.onContinue : null),
+      ],
+    );
+  }
+}
+
+class _DealtCard extends StatelessWidget {
+  const _DealtCard({
+    required this.shown,
+    required this.index,
+    required this.task,
+  });
+  final bool shown;
+  final int index;
+  final TaskDefinition task;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    return AnimatedSlide(
+      offset: shown ? Offset.zero : const Offset(.12, 0),
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+      child: AnimatedOpacity(
+        opacity: shown ? 1 : 0,
+        duration: const Duration(milliseconds: 260),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            color: p.sys.withValues(alpha: .04),
+            border: Border.all(color: p.sys.withValues(alpha: .18)),
           ),
-          if (_error != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Text(
-                _error!,
-                textAlign: TextAlign.center,
-                style: Hud.mono(12, Hud.warn),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 26,
+                child: Text(
+                  index.toString().padLeft(2, '0'),
+                  style: Hud.mono(11, p.sys, weight: FontWeight.w700),
+                ),
               ),
-            ),
-          SizedBox(
-            height: 44,
-            child: _index > 0
-                ? Center(
-                    child: TextButton(
-                      onPressed: _back,
-                      child: Text('BACK', style: Hud.mono(11, p.dim)),
-                    ),
-                  )
-                : null,
+              Expanded(child: Text(task.name, style: Hud.mono(13, p.text))),
+              const SizedBox(width: 8),
+              Text(
+                questTarget(task),
+                style: Hud.mono(15, Colors.white, weight: FontWeight.w700),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
+}
 
-  /// A full-height System window: [top] from the top, [bottom] pinned to
-  /// the bottom, spare space between. Scrolls only if the content is taller
-  /// than the screen.
-  Widget _page({
-    String? title,
-    String? subtitle,
-    required List<Widget> top,
-    required List<Widget> bottom,
-    bool center = false,
-  }) => LayoutBuilder(
-    builder: (context, c) => SingleChildScrollView(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(minHeight: c.maxHeight),
-        child: IntrinsicHeight(
-          child: SystemWindow(
-            expand: true,
-            title: title,
-            subtitle: subtitle,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+// ---------------------------------------------------------------------------
+// Step 5: lock targets
+
+class _AppsStep extends StatefulWidget {
+  const _AppsStep({
+    required this.blocker,
+    required this.selected,
+    required this.onToggle,
+    required this.onConfirm,
+  });
+
+  final AppBlocker blocker;
+  final Set<String> selected;
+  final ValueChanged<String> onToggle;
+  final VoidCallback onConfirm;
+
+  @override
+  State<_AppsStep> createState() => _AppsStepState();
+}
+
+class _AppsStepState extends State<_AppsStep> with WidgetsBindingObserver {
+  late final Future<List<InstalledApp>> _apps = widget.blocker.installedApps();
+  SystemStatus? _status;
+  bool _asked = false;
+
+  bool get _granted =>
+      !widget.blocker.canBlock ||
+      (_status?.usageAccess == true && _status?.overlay == true);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _check();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // Back from Android settings: read the permissions again.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _check();
+  }
+
+  Future<void> _check() async {
+    if (!widget.blocker.canBlock) return;
+    try {
+      final s = await widget.blocker.systemStatus();
+      if (mounted) setState(() => _status = s);
+    } catch (_) {}
+  }
+
+  Future<void> _grant() async {
+    setState(() => _asked = true);
+    if (_status?.usageAccess != true) {
+      await widget.blocker.requestUsageAccess();
+    } else if (_status?.overlay != true) {
+      await widget.blocker.requestOverlay();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    final android = widget.blocker.canBlock;
+    final granted = _granted;
+    final missing = _status?.usageAccess != true
+        ? 'usage access'
+        : 'display over other apps';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _Head(
+          kicker: 'Penalty configuration',
+          title: 'Lock targets',
+          sub: 'Selected apps lock on a failed day. Screen-time quests measure them.',
+        ),
+        if (android) ...[
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: (granted ? p.sys : Hud.warn).withValues(alpha: .06),
+              border: Border.all(
+                color: granted
+                    ? p.sys.withValues(alpha: .18)
+                    : Hud.warn.withValues(alpha: .5),
+              ),
+            ),
+            child: Row(
               children: [
-                if (center) const Spacer(),
-                ...top,
-                const Spacer(),
-                const SizedBox(height: 16),
-                ...bottom,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        granted ? 'ACCESS GRANTED' : 'ACCESS REQUIRED',
+                        style: Hud.head(
+                          11,
+                          granted ? Hud.rankColor(Rank.d) : Hud.warn,
+                          spacing: .2,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        granted
+                            ? 'The System can lock selected apps.'
+                            : 'The System needs $missing to lock apps.'
+                                  '${_asked ? ' If Android says "Access denied": App info, top-right menu, "Allow restricted settings", then grant again.' : ''}',
+                        style: Hud.mono(11, p.text).copyWith(height: 1.45),
+                      ),
+                    ],
+                  ),
+                ),
+                if (!granted) ...[
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    width: 96,
+                    child: CutButton('GRANT', onPressed: _grant, danger: true),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('INSTALLED APPS', style: Hud.mono(11, p.dim)),
+            Text.rich(
+              TextSpan(
+                text: 'LOCKED ',
+                style: Hud.mono(11, p.dim),
+                children: [
+                  TextSpan(
+                    text: '${widget.selected.length}',
+                    style: Hud.mono(11, Hud.warn, weight: FontWeight.w700),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Expanded(
+          child: AnimatedOpacity(
+            opacity: granted ? 1 : .35,
+            duration: const Duration(milliseconds: 300),
+            child: IgnorePointer(
+              ignoring: !granted,
+              child: FutureBuilder<List<InstalledApp>>(
+                future: _apps,
+                builder: (context, snap) {
+                  if (snap.connectionState != ConnectionState.done) {
+                    return Center(
+                      child: Text(
+                        'Scanning apps...',
+                        style: Hud.mono(11, p.dim),
+                      ),
+                    );
+                  }
+                  final apps = snap.data ?? const <InstalledApp>[];
+                  if (apps.isEmpty) {
+                    return Center(
+                      child: Text(
+                        'No apps to list on this device.',
+                        style: Hud.mono(11, p.dim),
+                      ),
+                    );
+                  }
+                  return GridView.builder(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 4,
+                          mainAxisSpacing: 10,
+                          crossAxisSpacing: 10,
+                          childAspectRatio: .78,
+                        ),
+                    itemCount: apps.length,
+                    itemBuilder: (context, i) => _AppTile(
+                      app: apps[i],
+                      locked: widget.selected.contains(apps[i].package),
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        widget.onToggle(apps[i].package);
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text('NEVER LOCKED', style: Hud.mono(10, p.dim, spacing: .24)),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: [
+            for (final s in const [
+              'PHONE',
+              'MESSAGES',
+              'MAPS',
+              'SETTINGS',
+              'DO OR DIE',
+            ])
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  border: Border.all(color: p.sys.withValues(alpha: .18)),
+                ),
+                child: Text(s, style: Hud.mono(10, Hud.rankColor(Rank.d))),
+              ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        CutButton(
+          'CONFIRM TARGETS',
+          onPressed: granted && (!android || widget.selected.isNotEmpty)
+              ? widget.onConfirm
+              : null,
+        ),
+      ],
+    );
+  }
+}
+
+class _AppTile extends StatelessWidget {
+  const _AppTile({
+    required this.app,
+    required this.locked,
+    required this.onTap,
+  });
+  final InstalledApp app;
+  final bool locked;
+  final VoidCallback onTap;
+
+  static const _grey = ColorFilter.matrix([
+    .2, .4, .1, 0, 0, //
+    .2, .4, .1, 0, 0, //
+    .2, .4, .1, 0, 0, //
+    0, 0, 0, 1, 0, //
+  ]);
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    final icon = SizedBox(
+      width: 46,
+      height: 46,
+      child: app.icon == null
+          ? Icon(Icons.apps, color: p.dim)
+          : Image.memory(app.icon!, gaplessPlayback: true),
+    );
+    return Semantics(
+      button: true,
+      selected: locked,
+      label: '${locked ? 'Unlock' : 'Lock'} ${app.label}',
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          decoration: BoxDecoration(
+            color: locked
+                ? Hud.warn.withValues(alpha: .07)
+                : Colors.transparent,
+            border: Border.all(
+              color: locked
+                  ? Hud.warn.withValues(alpha: .55)
+                  : Colors.transparent,
+            ),
+          ),
+          child: ExcludeSemantics(
+            child: Stack(
+              children: [
+                Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      locked
+                          ? ColorFiltered(colorFilter: _grey, child: icon)
+                          : icon,
+                      const SizedBox(height: 6),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2),
+                        child: Text(
+                          app.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: Hud.mono(10, locked ? Hud.warn : p.dim),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: AnimatedScale(
+                    scale: locked ? 1 : .4,
+                    duration: const Duration(milliseconds: 200),
+                    child: AnimatedOpacity(
+                      opacity: locked ? 1 : 0,
+                      duration: const Duration(milliseconds: 200),
+                      child: const Icon(Icons.lock, size: 16, color: Hud.warn),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
+}
 
-  Widget _intro(HudPalette p) => _page(
-    title: '[ SYSTEM ]',
-    top: [
-      const SizedBox(height: 24),
-      Center(
-        child: Icon(
-          Icons.blur_on,
-          size: 96,
-          color: p.sys,
-          shadows: p.textGlow(2),
-        ),
-      ),
-      const SizedBox(height: 28),
-      for (final line in const [
-        'You have met the conditions to become a Player.',
-        'Choose one System. It will issue a quest every day.',
-        'Clear it, and you grow. Fail it, and a penalty follows.',
-        'Clear 21 days in 30, and a Gate opens to the next rank.',
-      ])
-        Padding(
-          padding: const EdgeInsets.only(bottom: 14),
-          child: Text(
-            line,
-            textAlign: TextAlign.center,
-            style: Hud.mono(14, p.text).copyWith(height: 1.5),
-          ),
-        ),
-    ],
-    bottom: [
-      Text(
-        'Will you accept?',
-        textAlign: TextAlign.center,
-        style: Hud.head(16, p.hi, spacing: .12),
-      ),
-      const SizedBox(height: 14),
-      HudButton('ACCEPT', onPressed: _next),
-    ],
-  );
+// ---------------------------------------------------------------------------
+// Step 6: rest period ring
 
-  Widget _systemStep(HudPalette p) {
-    final choices = [
-      for (final k in SystemKind.values)
-        if (!widget.completed.contains(k)) k,
-    ];
-    final chosen = _system;
-    return _page(
-      title: '[ CHOOSE YOUR SYSTEM ]',
-      subtitle: widget.nextSystemOnly
-          ? 'Your System is complete. Choose the next one.'
-          : 'One System at a time. No switching until it is complete.',
-      top: [
-        Row(
-          children: [
-            for (final (i, k) in choices.indexed) ...[
-              if (i > 0) const SizedBox(width: 8),
-              Expanded(
-                child: _SystemTile(
-                  spec: systemCatalogue[k]!,
-                  selected: chosen == k,
-                  onTap: () => _choose(k),
+class _RestStep extends StatelessWidget {
+  const _RestStep({
+    required this.start,
+    required this.end,
+    required this.onChanged,
+    required this.onConfirm,
+  });
+
+  final int start;
+  final int end;
+  final void Function(int start, int end) onChanged;
+  final VoidCallback onConfirm;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    final d = RestRing.restMinutes(start, end);
+    final problem = RestRing.problem(start, end);
+    Widget legend(Color c, String t) => Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(width: 10, height: 10, color: c),
+        const SizedBox(width: 6),
+        Text(t, style: Hud.mono(10, p.dim, spacing: .12)),
+      ],
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _Head(
+          kicker: 'Penalty configuration',
+          title: 'Rest period',
+          sub: 'Locks never start while you sleep. Drag both markers.',
+        ),
+        Expanded(
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Positioned.fill(
+                child: RestRing(start: start, end: end, onChanged: onChanged),
+              ),
+              IgnorePointer(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '${_hm(start)} → ${_hm(end)}',
+                      style: Hud.mono(
+                        22,
+                        Colors.white,
+                        weight: FontWeight.w700,
+                      ).copyWith(shadows: p.textGlow(1)),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${d ~/ 60} H ${(d % 60).toString().padLeft(2, '0')} M REST',
+                      style: Hud.head(13, p.hi, spacing: .2),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      problem ?? '',
+                      style: Hud.mono(10, Hud.warn, spacing: .14),
+                    ),
+                  ],
                 ),
               ),
             ],
+          ),
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            legend(const Color(0xFFA9DCFF), 'SLEEP'),
+            const SizedBox(width: 18),
+            legend(Hud.gold, 'WAKE'),
+            const SizedBox(width: 18),
+            legend(p.sys.withValues(alpha: .5), 'NO LOCKS'),
           ],
         ),
         const SizedBox(height: 14),
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 250),
-          child: chosen == null
-              ? Padding(
-                  key: const ValueKey('none'),
-                  padding: const EdgeInsets.symmetric(vertical: 40),
-                  child: Text(
-                    'Tap a System to see what it trains, what it asks of you, and what failure costs.',
-                    textAlign: TextAlign.center,
-                    style: Hud.mono(13, p.dim).copyWith(height: 1.5),
-                  ),
-                )
-              : _SystemDetail(
-                  key: ValueKey(chosen),
-                  spec: systemCatalogue[chosen]!,
-                ),
-        ),
-      ],
-      bottom: [HudButton('CONFIRM SYSTEM', onPressed: _next)],
-    );
-  }
-
-  Widget _placementStep(HudPalette p) {
-    final kind = _system!;
-    return _page(
-      title: '[ PLACEMENT TEST ]',
-      center: true,
-      subtitle: 'These answers only set your starting rank. Your daily quest is shown next.',
-      top: [
-        const SizedBox(height: 8),
-        for (final q in placementQuestions[kind]!)
-          _NumberField(
-            key: ValueKey(q.id),
-            question: q,
-            value: _answers[q.id] ?? q.initial,
-            onChanged: (v) => setState(() => _answers[q.id] = v),
-          ),
-        if (kind == SystemKind.focus && widget.yesterdaySocialMinutes != null)
-          Text(
-            'Read from usage access on this phone.',
-            textAlign: TextAlign.center,
-            style: Hud.mono(10, p.dim),
-          ),
-      ],
-      bottom: [
-        Text(
-          'Answer honestly. A rank too high only makes the first weeks harder.',
-          textAlign: TextAlign.center,
-          style: Hud.mono(11, p.dim),
-        ),
-        const SizedBox(height: 12),
-        HudButton('SUBMIT', onPressed: _next),
-      ],
-    );
-  }
-
-  Widget _verdictStep(HudPalette p) {
-    final kind = _system!;
-    final rank = _placement;
-    final spec = systemCatalogue[kind]!;
-    final quest = spec.at(rank).daily.map(questTask).toList();
-    final next = rank == Rank.s ? null : Rank.values[rank.index + 1];
-    final have = {for (final q in spec.at(rank).daily) q.id};
-    final added = next == null
-        ? const <TaskDefinition>[]
-        : [
-            for (final q in spec.at(next).daily)
-              if (!have.contains(q.id)) questTask(q),
-          ];
-    return _page(
-      title: '[ YOUR DAILY QUEST ]',
-      top: [
-        Center(child: RankBadge(rank: rank, size: 72)),
-        const SizedBox(height: 12),
-        Text(
-          '${spec.name.toUpperCase()} · RANK ${rank.name.toUpperCase()}',
-          textAlign: TextAlign.center,
-          style: Hud.head(15, p.hi, spacing: .12),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'The System will issue this every day. Every objective must be cleared before midnight.',
-          textAlign: TextAlign.center,
-          style: Hud.mono(11, p.dim).copyWith(height: 1.5),
-        ),
-        const SizedBox(height: 16),
-        for (final (i, t) in quest.indexed) _QuestLine(index: i + 1, task: t),
-        if (added.isNotEmpty) ...[
-          const SizedBox(height: 14),
-          Text(
-            'AT RANK ${next!.name.toUpperCase()} THE SYSTEM ADDS',
-            textAlign: TextAlign.center,
-            style: Hud.mono(10, p.dim, spacing: .12),
-          ),
-          const SizedBox(height: 6),
-          for (final t in added)
-            Text(
-              t.name,
-              textAlign: TextAlign.center,
-              style: Hud.mono(12, p.text),
-            ),
-        ],
-      ],
-      bottom: [
-        Text(
-          'Ranks above C are earned only through Dungeons.',
-          textAlign: TextAlign.center,
-          style: Hud.mono(10, p.dim),
-        ),
-        if (kind == SystemKind.fitness) ...[
-          const SizedBox(height: 6),
-          Text(
-            'These are conservative progressions, not medical advice. With a health condition, ask a doctor first.',
-            textAlign: TextAlign.center,
-            style: Hud.mono(10, Hud.warn),
-          ),
-        ],
-        const SizedBox(height: 12),
-        HudButton(
-          widget.nextSystemOnly ? 'BEGIN THIS SYSTEM' : 'CONTINUE',
-          onPressed: _next,
+        CutButton(
+          'SET REST PERIOD',
+          onPressed: problem == null ? onConfirm : null,
         ),
       ],
     );
   }
+}
 
-  Widget _appStep(HudPalette p) => SystemWindow(
-    expand: true,
-    title: '[ LOCK TARGETS ]',
-    subtitle: 'Choose the apps that lock when you fail a day. Screen-time quests measure these apps.',
-    child: Column(
+// ---------------------------------------------------------------------------
+// Step 7: penalty terms
+
+class _TermsStep extends StatefulWidget {
+  const _TermsStep({
+    required this.kind,
+    required this.lockTargets,
+    required this.sleepStart,
+    required this.sleepEnd,
+    required this.onAccepted,
+  });
+
+  final SystemKind kind;
+  final int lockTargets;
+  final int sleepStart;
+  final int sleepEnd;
+  final VoidCallback onAccepted;
+
+  @override
+  State<_TermsStep> createState() => _TermsStepState();
+}
+
+class _TermsStepState extends State<_TermsStep> {
+  final _scroll = ScrollController();
+  final _listKey = GlobalKey();
+  final _seen = <int>{};
+  late final List<(String, bool)> _lines = [
+    (
+      'Clear every objective of the daily quest before 23:59. Partial completion is failure.',
+      false,
+    ),
+    ('Failure opens the Penalty Zone the next day.', true),
+    (
+      'Your ${widget.lockTargets} lock target${widget.lockTargets == 1 ? '' : 's'} close for 4 hours (+20 minutes per level), at a time the System does not disclose.',
+      true,
+    ),
+    (
+      'Locks never begin during your rest period, ${_hm(widget.sleepStart)} to ${_hm(widget.sleepEnd)}.',
+      false,
+    ),
+    (
+      'Calls, messages, maps and settings are never locked. A 15-minute release always exists; every one is counted.',
+      false,
+    ),
+    (
+      'The System penalty: ${penaltyTerms(penaltyKindFor(widget.kind))}. Anything unpaid doubles at midnight.',
+      true,
+    ),
+    (
+      'Clear 21 of 30 days and a Gate opens. It starts a 3-day Dungeon; Floor 2 must be cleared by 18:00; Floor 3 is the Rank Trial.',
+      false,
+    ),
+    (
+      'Fail a Dungeon floor and the Dungeon Penalty doubles every penalty. Ranks never go down.',
+      true,
+    ),
+    (
+      'A quest can be lowered by up to 20% for injury or illness, from the next day, at half XP.',
+      false,
+    ),
+    (
+      'The first 3 days are a dry run: failures are shown, never enforced.',
+      false,
+    ),
+    ('The System does not negotiate.', false),
+  ];
+  late final _keys = [for (final _ in _lines) GlobalKey()];
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_measure);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  /// A line counts as read once 70% of it has been on screen.
+  void _measure() {
+    if (!mounted) return;
+    final list = _listKey.currentContext?.findRenderObject() as RenderBox?;
+    if (list == null || !list.hasSize) return;
+    final height = list.size.height;
+    var changed = false;
+    for (var i = 0; i < _keys.length; i++) {
+      if (_seen.contains(i)) continue;
+      final box = _keys[i].currentContext?.findRenderObject() as RenderBox?;
+      if (box == null || !box.hasSize) continue;
+      final top = box.localToGlobal(Offset.zero, ancestor: list).dy;
+      // Read once 70% of it has come into view; a line scrolled past (even
+      // quickly) has been on screen too.
+      if (top + box.size.height * .7 <= height) {
+        _seen.add(i);
+        changed = true;
+      }
+    }
+    if (changed) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    final all = _seen.length >= _lines.length;
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        const _Head(kicker: 'Final step', title: 'Penalty terms'),
         Expanded(
-          child: AppPickerList(
-            blocker: widget.blocker,
-            selected: _blocked,
-            onChanged: (pkg, lock) =>
-                setState(() => lock ? _blocked.add(pkg) : _blocked.remove(pkg)),
-          ),
-        ),
-        const SizedBox(height: 10),
-        Text(
-          _blocked.isEmpty
-              ? 'No apps chosen yet. You can add them later from the Penalty tab.'
-              : '${_blocked.length} app${_blocked.length == 1 ? '' : 's'} will lock on a failed day.',
-          textAlign: TextAlign.center,
-          style: Hud.mono(11, _blocked.isEmpty ? Hud.warn : p.dim),
-        ),
-        const SizedBox(height: 10),
-        HudButton('CONFIRM APPS', onPressed: _next),
-      ],
-    ),
-  );
-
-  Widget _sleepStep(HudPalette p) => _page(
-    title: '[ REST PERIOD ]',
-    center: true,
-    subtitle: 'Penalty locks never start or run while you sleep.',
-    top: [
-      const SizedBox(height: 20),
-      Center(child: Icon(Icons.nights_stay_outlined, size: 72, color: p.sys)),
-      const SizedBox(height: 24),
-      _timeRow(p, 'SLEEP STARTS', _sleepStart, (t) => _sleepStart = t),
-      _timeRow(p, 'SLEEP ENDS', _sleepEnd, (t) => _sleepEnd = t),
-    ],
-    bottom: [HudButton('CONFIRM', onPressed: _next)],
-  );
-
-  Widget _timeRow(
-    HudPalette p,
-    String label,
-    TimeOfDay value,
-    ValueChanged<TimeOfDay> set,
-  ) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 8),
-    child: Row(
-      children: [
-        Expanded(child: Text(label, style: Hud.mono(13, p.dim, spacing: .08))),
-        SizedBox(
-          width: 120,
-          child: HudButton(
-            value.format(context),
-            onPressed: () async {
-              final picked = await showTimePicker(
-                context: context,
-                initialTime: value,
-              );
-              if (picked != null) setState(() => set(picked));
+          child: NotificationListener<ScrollMetricsNotification>(
+            onNotification: (_) {
+              WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
+              return false;
             },
-          ),
-        ),
-      ],
-    ),
-  );
-
-  Widget _termsStep(HudPalette p) => _page(
-    title: '[ PENALTY TERMS ]',
-    subtitle: 'Read carefully. These rules are enforced.',
-    top: [
-      for (final line in [
-        'If any objective is incomplete at midnight, the day is failed.',
-        'The next day, chosen apps lock for 4 hours (+20 minutes per level), starting at an undisclosed time while you are awake.',
-        'You also owe ${penaltyTerms(penaltyKindFor(_system))}.',
-        'Anything unpaid doubles and carries into the following day.',
-        'Clear 21 of 30 days and a Gate opens. Enter it within 48 hours.',
-        'A Dungeon is three floors on three days. Floor 2 must be cleared by 18:00. The third floor is the Rank Trial.',
-        'Fail a floor and the Dungeon Penalty follows: double lock and a double penalty. The Gate stays shut for 7 days.',
-        'Ranks never go down. One System at a time, until it is complete.',
-        'A quest can be lowered by up to 20% for injury or illness, from the next day. Those days earn half XP.',
-        'For the first 3 days, failures are a dry run: shown, never enforced.',
-        'Calls, messages, maps and settings are never locked. Releases from a lock always exist, and every one is logged.',
-      ])
-        Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('›  ', style: Hud.mono(12, p.sys)),
-              Expanded(
-                child: Text(
-                  line,
-                  style: Hud.mono(12, p.text).copyWith(height: 1.5),
+            child: ShaderMask(
+              shaderCallback: (r) => const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.transparent,
+                  Colors.black,
+                  Colors.black,
+                  Colors.transparent,
+                ],
+                stops: [0, .03, .92, 1],
+              ).createShader(r),
+              blendMode: BlendMode.dstIn,
+              child: SingleChildScrollView(
+                key: _listKey,
+                controller: _scroll,
+                padding: const EdgeInsets.only(top: 6, bottom: 60),
+                child: Column(
+                  children: [
+                    for (final (i, (text, red)) in _lines.indexed)
+                      AnimatedSlide(
+                        key: _keys[i],
+                        offset: _seen.contains(i)
+                            ? Offset.zero
+                            : const Offset(0, .15),
+                        duration: const Duration(milliseconds: 350),
+                        curve: Curves.easeOutCubic,
+                        child: AnimatedOpacity(
+                          opacity: _seen.contains(i) ? 1 : .08,
+                          duration: const Duration(milliseconds: 350),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 16,
+                              horizontal: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              border: Border(
+                                bottom: BorderSide(
+                                  color: p.sys.withValues(alpha: .18),
+                                ),
+                              ),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                SizedBox(
+                                  width: 28,
+                                  child: Text(
+                                    (i + 1).toString().padLeft(2, '0'),
+                                    style: Hud.mono(
+                                      11,
+                                      red ? const Color(0xFFFF3B4A) : Hud.warn,
+                                      weight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Text(
+                                    text,
+                                    style: Hud.mono(
+                                      14,
+                                      red ? const Color(0xFFFFD6DA) : p.text,
+                                    ).copyWith(height: 1.55),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
         ),
-    ],
-    bottom: [
-      HoldButton(
-        label: 'HOLD TO ACCEPT',
-        doneLabel: 'ACCEPTED',
-        onConfirmed: _finish,
-      ),
-    ],
-  );
+        Text(
+          all
+              ? 'ALL TERMS READ'
+              : 'SCROLL TO READ ALL TERMS · ${_seen.length}/${_lines.length}',
+          textAlign: TextAlign.center,
+          style: Hud.mono(10, p.dim, spacing: .16),
+        ),
+        const SizedBox(height: 10),
+        ChargeButton(
+          label: 'HOLD TO ACCEPT',
+          danger: true,
+          enabled: all,
+          onConfirmed: () {
+            Fx.instance.play(Cue.penalty);
+            widget.onAccepted();
+          },
+        ),
+      ],
+    );
+  }
 }
+
+class _Registered extends StatelessWidget {
+  const _Registered({
+    required this.kind,
+    required this.rank,
+    required this.lockTargets,
+    required this.sleepStart,
+    required this.sleepEnd,
+    required this.onEnter,
+  });
+
+  final SystemKind kind;
+  final Rank rank;
+  final int lockTargets;
+  final int sleepStart;
+  final int sleepEnd;
+  final VoidCallback onEnter;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    Widget row(String k, String v, [Color? c]) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(k, style: Hud.mono(11, p.dim, spacing: .14)),
+          ),
+          Expanded(child: Text(v, style: Hud.mono(13, c ?? p.text))),
+        ],
+      ),
+    );
+    return ColoredBox(
+      color: const Color(0xDB05070D),
+      child: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: HudFrame(
+              title: '[ PLAYER REGISTERED ]',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  row('SYSTEM', systemCatalogue[kind]!.name.toUpperCase()),
+                  row('RANK', rank.name.toUpperCase(), Hud.rankColor(rank)),
+                  row(
+                    'LOCK TARGETS',
+                    '$lockTargets app${lockTargets == 1 ? '' : 's'}',
+                  ),
+                  row('REST', '${_hm(sleepStart)} – ${_hm(sleepEnd)}'),
+                  row('FIRST QUEST', 'Today, 23:59'),
+                  const SizedBox(height: 14),
+                  Text(
+                    'The first daily quest is active. The System is watching.',
+                    style: Hud.mono(12, p.dim).copyWith(height: 1.5),
+                  ),
+                  const SizedBox(height: 14),
+                  CutButton('ENTER', onPressed: onEnter),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Shared helpers used elsewhere in the app
 
 /// A task's target in words: "12 min", "1.5 km", "max 60 min", "once".
 String questTarget(TaskDefinition t) => switch (t.type) {
@@ -554,281 +2150,14 @@ String penaltyTerms(PenaltyKind kind) => switch (kind) {
   PenaltyKind.focus => 'a 60-minute phone-free block (+5 minutes per level, up to 3 hours), run in the app with your chosen apps locked',
 };
 
-IconData systemIcon(SystemKind k) => switch (k) {
-  SystemKind.fitness => Icons.fitness_center,
-  SystemKind.personality => Icons.auto_stories_outlined,
-  SystemKind.focus => Icons.center_focus_strong_outlined,
+/// A System's penalty in a few words, for the System cards.
+String penaltyShort(PenaltyKind kind) => switch (kind) {
+  PenaltyKind.exercise => '50 push-ups',
+  PenaltyKind.reading => '20 pages and a written reflection',
+  PenaltyKind.focus => 'a 60-minute phone-free block',
 };
 
-/// One of the three Systems, as a selectable tile.
-class _SystemTile extends StatelessWidget {
-  const _SystemTile({
-    required this.spec,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final SystemSpec spec;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = HudScope.of(context);
-    final short = spec.name.split(' ').first.toUpperCase();
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: spec.name,
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 6),
-          decoration: BoxDecoration(
-            color: selected ? p.sys.withValues(alpha: .18) : p.panel,
-            border: Border.all(
-              color: selected ? p.sys : p.line,
-              width: selected ? 1.5 : 1,
-            ),
-            boxShadow: selected
-                ? [BoxShadow(color: p.glowColor, blurRadius: p.glow * 1.5)]
-                : null,
-          ),
-          child: ExcludeSemantics(
-            child: Column(
-              children: [
-                Icon(
-                  systemIcon(spec.kind),
-                  size: 34,
-                  color: selected ? p.hi : p.dim,
-                ),
-                const SizedBox(height: 10),
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    short,
-                    maxLines: 1,
-                    style: Hud.head(12, selected ? p.hi : p.text, spacing: .12),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// What a System trains, its first and final quests, and what failure costs.
-class _SystemDetail extends StatelessWidget {
-  const _SystemDetail({super.key, required this.spec});
-
-  final SystemSpec spec;
-
-  static const _stat = {
-    Stat.strength: 'STR',
-    Stat.intellect: 'INT',
-    Stat.discipline: 'DIS',
-    Stat.vitality: 'VIT',
-    Stat.charisma: 'CHA',
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final p = HudScope.of(context);
-    Widget label(String t) => Padding(
-      padding: const EdgeInsets.only(top: 14, bottom: 6),
-      child: Text(t, style: Hud.mono(10, p.sys, spacing: .14)),
-    );
-    Widget item(String t) => Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('›  ', style: Hud.mono(12, p.sys)),
-          Expanded(child: Text(t, style: Hud.mono(12, p.text))),
-        ],
-      ),
-    );
-    final first = spec.at(Rank.e).daily.map(questTask);
-    final last = spec.at(Rank.s).daily.map(questTask);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          spec.name.toUpperCase(),
-          textAlign: TextAlign.center,
-          style: Hud.head(18, p.hi, spacing: .14),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          spec.tagline,
-          textAlign: TextAlign.center,
-          style: Hud.mono(12, p.dim),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'TRAINS ${spec.stats.map((s) => _stat[s]).join(' · ')}',
-          textAlign: TextAlign.center,
-          style: Hud.mono(11, Hud.gold, spacing: .1),
-        ),
-        label('RANK E · WHERE YOU START'),
-        for (final t in first)
-          item(
-            t.type == TaskType.checkbox
-                ? t.name
-                : '${t.name} · ${questTarget(t)}',
-          ),
-        label('RANK S · WHERE IT ENDS'),
-        for (final t in last) item(t.name),
-        label('IF YOU FAIL A DAY'),
-        item('Your chosen apps lock for 4 hours, at a time you are not told.'),
-        item(_capitalise(penaltyTerms(penaltyKindFor(spec.kind)))),
-      ],
-    );
-  }
-
-  static String _capitalise(String s) =>
-      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
-}
-
-/// One numbered objective of the daily quest, with its target.
-class _QuestLine extends StatelessWidget {
-  const _QuestLine({required this.index, required this.task});
-
-  final int index;
-  final TaskDefinition task;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = HudScope.of(context);
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      decoration: BoxDecoration(
-        color: p.sys.withValues(alpha: .06),
-        border: Border.all(color: p.line),
-      ),
-      child: Row(
-        children: [
-          Text('$index', style: Hud.head(16, p.sys, spacing: 0)),
-          const SizedBox(width: 12),
-          Expanded(child: Text(task.name, style: Hud.mono(13, p.text))),
-          const SizedBox(width: 8),
-          Text(
-            questTarget(task),
-            style: Hud.mono(13, p.hi, weight: FontWeight.w500),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NumberField extends StatefulWidget {
-  const _NumberField({
-    super.key,
-    required this.question,
-    required this.value,
-    required this.onChanged,
-  });
-
-  final PlacementQuestion question;
-  final int value;
-  final ValueChanged<int> onChanged;
-
-  @override
-  State<_NumberField> createState() => _NumberFieldState();
-}
-
-class _NumberFieldState extends State<_NumberField> {
-  late final _c = TextEditingController(text: '${widget.value}');
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  void _set(int v) {
-    final q = widget.question;
-    final clamped = v.clamp(q.min, q.max);
-    _c.text = '$clamped';
-    widget.onChanged(clamped);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final p = HudScope.of(context);
-    final q = widget.question;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(q.prompt, style: Hud.mono(12, p.text)),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              SizedBox(
-                width: 44,
-                child: HudButton(
-                  '−',
-                  semanticLabel: 'Decrease',
-                  onPressed: () => _set(widget.value - 1),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Semantics(
-                  label: q.prompt,
-                  child: TextField(
-                    controller: _c,
-                    textAlign: TextAlign.center,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    style: Hud.mono(15, p.hi),
-                    cursorColor: p.sys,
-                    decoration: InputDecoration(
-                      isDense: true,
-                      suffixText: q.unit,
-                      suffixStyle: Hud.mono(10, p.dim),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.zero,
-                        borderSide: BorderSide(color: p.line),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.zero,
-                        borderSide: BorderSide(color: p.sys),
-                      ),
-                    ),
-                    onChanged: (v) {
-                      final n = int.tryParse(v);
-                      if (n != null) widget.onChanged(n.clamp(q.min, q.max));
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 44,
-                child: HudButton(
-                  '+',
-                  semanticLabel: 'Increase',
-                  onPressed: () => _set(widget.value + 1),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// A rank letter in its rank colour, framed like a System badge.
+/// A rank letter in its rank colour on the hexagonal badge.
 class RankBadge extends StatelessWidget {
   const RankBadge({super.key, required this.rank, this.size = 40});
 
@@ -836,26 +2165,11 @@ class RankBadge extends StatelessWidget {
   final double size;
 
   @override
-  Widget build(BuildContext context) {
-    final c = Hud.rankColor(rank);
-    return Semantics(
-      label: 'Rank ${rank.name.toUpperCase()}',
-      child: Container(
-        width: size,
-        height: size,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          border: Border.all(color: c, width: 1.5),
-          color: c.withValues(alpha: .1),
-          boxShadow: [
-            BoxShadow(color: c.withValues(alpha: .35), blurRadius: 14),
-          ],
-        ),
-        child: Text(
-          rank.name.toUpperCase(),
-          style: Hud.head(size * .5, c, spacing: 0),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Semantics(
+    label: 'Rank ${rank.name.toUpperCase()}',
+    child: CustomPaint(
+      size: Size(size, size * 124 / 116),
+      painter: RankHexPainter(rank),
+    ),
+  );
 }
