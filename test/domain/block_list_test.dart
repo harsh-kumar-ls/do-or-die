@@ -46,4 +46,13 @@ void main() {
     }).add(monday, 'com.doordie.do_or_die');
     expect(list.packagesOn(monday), {insta});
   });
+
+  test('banking and UPI apps can never be blocked', () {
+    final list = BlockList.initial(monday, {
+      insta,
+      'com.sbi.lotusintouch',
+      'com.phonepe.app',
+    }).add(monday, 'com.google.android.apps.nbu.paisa.user');
+    expect(list.packagesOn(monday), {insta});
+  });
 }

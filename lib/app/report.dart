@@ -221,6 +221,9 @@ class TrialReport {
     if (watcherOutages > 0) {
       return 'Cleared $clearRate%. The lock was down $watcherOutages time${watcherOutages == 1 ? '' : 's'}. That was not an accident.';
     }
+    if (honourConfirmations * 100 > (cleared + failed) * 60) {
+      return 'Cleared $clearRate%. Most of it rests on your word.';
+    }
     return 'Cleared $clearRate%. Nothing to add.';
   }
 

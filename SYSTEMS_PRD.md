@@ -125,6 +125,20 @@ A System that **writes the quest**, **raises it with rank**, and makes each rank
 - A System is **complete** when its S-rank Rank Trial is cleared (hold S for 30 consecutive cleared days).
 - Only then can the user choose a **second System**, which starts with its own placement test. The completed System keeps its S rank for good and appears on the Status screen as completed.
 - Reason: clearing two Systems at once isn't realistic for a normal person; focus beats breadth.
+- Reaffirmed 2026-10-31: exactly one System is active and running in the background at any time. No switching, not even at a cost.
+
+### 5.5 Releases and the reduction valve (decided 2026-10-31)
+- **The 15-minute release stays free.** It costs no XP and no extra lock. Every release is counted and shown in the report's honesty section and verdict.
+- **The reduction valve is limited to 6 reduced days in any 30.** Past the limit the full quest returns automatically until older reduced days leave the window. Status shows the days left. The limit is computed only from the valve settings, so a past day's quest never changes.
+
+### 5.6 Never-locked apps
+Phone, messages, contacts, maps, emergency, Settings, this app, the launcher, and banking and UPI apps (YONO SBI, Google Pay, PhonePe, Paytm, BHIM, CRED and the major bank apps) can never be lock targets, whatever the user picks. Saved lists drop them on load.
+
+### 5.7 Attributes: deferred to V2 or V3 (decided 2026-10-31)
+STR, VIT, INT, CHA and DIS are earned and shown, and stat points can be assigned, but **they have no effect on play in V1.** Claude Design's review flagged that points which do nothing will feel fake within a week. To decide in V2 or V3:
+- Either attributes change play (for example harder targets and more XP in the trained stats, or unlocking optional objectives),
+- or Status shows only the two stats the active System trains, and stat points are removed.
+Until then the UI dims untrained stats and makes no promise about what points do.
 
 ---
 
@@ -211,7 +225,7 @@ Generated every 30 days and at the end of each Dungeon:
 - Consistency calendar and longest streak.
 - Honesty section: releases, Penalty Zones, Dungeon Penalty Zones, watcher outages.
 - The System's verdict (short, cold, original text) and the next Gate it expects.
-- Saved locally; shareable as an image.
+- Saved locally; shareable as a 1080 x 1350 image through the phone's share sheet. Before sharing, the user can drop the honesty figures (Penalty Zones, releases, reduced days, share confirmed on their word).
 
 ### 6.8 Data and migration
 - New state: active System, per-System rank and history, Gate state, Dungeon state (floor, deadlines), switch cooldown, new CHA stat.
@@ -264,11 +278,14 @@ Generated every 30 days and at the end of each Dungeon:
 | 2 | ~~Quest-reduction valve~~ **Decided:** keep it (up to 20%, next day, logged, XP capped at 50% that day) | Done |
 | 3 | Should the S rank have its own final Dungeon, or is "hold S for 30 days" the end? | No |
 | 4 | Health Connect for steps: add in S6 or later? | No |
-| 5 | Report: share as an image outside the app, or keep it private only? | No |
+| 5 | ~~Report sharing~~ **Decided:** share as an image, honesty figures optional (6.7) | Done |
+| 6 | ~~Release cost~~ **Decided:** the release stays free (5.5) | Done |
+| 7 | Attributes: change play, or show only the trained stats? Deferred to V2 or V3 (5.7) | No |
 
 ---
 
 ## Changelog
+- **v0.6 (2026-10-31, user decisions after the Claude Design review):** release stays free; one System at a time is reaffirmed; attributes deferred to V2 or V3 with no effect in V1; the reduction valve is limited to 6 days in any 30; banking and UPI apps are never locked; the report can be shared as an image, with the honesty figures optional; the verdict adds "Most of it rests on your word" when more than 60% of judged days carry an honour confirmation.
 - **v0.5 (2026-10-31, from the Claude Design review):** the Personality reflection needs five lines of at least four words each; counted objectives and penalty reps have an undo (never below zero); the reduction valve is locked while a Dungeon is in progress; System notices queue by priority (gate, rank-up, failure, cleared) with a "NOTICE i / n" counter, and ACKNOWLEDGE arms only after the notice has played; a cleared quest with a screen-time cap says the cap still holds until 23:59; the report's verdict opens with one rule-based headline (under half cleared, more releases than locks served, lock outages, or the clear rate).
 - **v0.4 (2026-10-31, from the first device test):** each System has its own penalty besides the app lock: Fitness owes push-ups (squats past the cap); Personality owes pages (20 +2/level, cap 60) and a written reflection of at least five lines (kept in the log); Focus owes a phone-free block (60 min +5/level, cap 180) run in the app with the chosen apps locked. Anything unpaid still doubles. Personality rank E adds "Say hello to someone you rarely talk to". Each day's quest is frozen when first issued, so an app update never changes a quest already shown. The System choice explains each System (what it trains, rank E and S quests, its penalty); the placement test says it only sets the rank; the rank step reveals the daily quest.
 - **v0.3 (2026-10-27, from the QA review):** a System chosen after completing one starts the next day (never judged on the day it is chosen); Dungeon floors are built on the full daily quest and ignore the reduction valve (full XP); the Dungeon Penalty keeps the 150 push-up cap, with the excess added as squats; Floor 2 screen-time caps are measured up to 18:00; a cap with no reading at judging is not kept unless it was confirmed on the honour system; the report is always available from Status (it is built live, so it covers the end of each Dungeon), and the 30-day notice is issued even if the app wasn't opened on day 31.

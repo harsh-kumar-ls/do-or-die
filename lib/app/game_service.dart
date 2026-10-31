@@ -509,6 +509,17 @@ class GameService {
   int get reductionTomorrow =>
       _game.systems?.progress.reductionOn(today.addDays(1)) ?? 0;
 
+  /// Reduced days left in the current window, and whether tomorrow's
+  /// setting is refused because the limit is used up.
+  int get reducedDaysLeft =>
+      maxReducedDays - (_game.systems?.progress.reducedDaysUsed(today) ?? 0);
+  bool get reductionLimitedTomorrow {
+    final p = _game.systems?.progress;
+    if (p == null) return false;
+    final d = today.addDays(1);
+    return p.settingOn(d) > 0 && p.reductionOn(d) == 0;
+  }
+
   /// Chooses the next System once the current one is complete. Its quests
   /// start today. Returns false when choosing isn't allowed.
   Future<bool> chooseSystem(

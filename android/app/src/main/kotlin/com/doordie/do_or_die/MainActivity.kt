@@ -179,10 +179,20 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    /** Apps that must never be locked on this device: phone, SMS, launcher, settings, this app. */
+    /** Banking and UPI apps; mirrors bankingPackages in lib/domain/block_list.dart. */
+    private val BANKING_PACKAGES = setOf(
+        "com.sbi.lotusintouch", "com.sbi.SBIFreedomPlus",
+        "com.google.android.apps.nbu.paisa.user", "com.phonepe.app", "net.one97.paytm",
+        "in.org.npci.upiapp",
+        "com.csam.icici.bank.imobile", "com.snapwork.hdfc", "com.axis.mobile",
+        "com.msf.kbank.mobile", "com.bankofbaroda.mconnect", "com.dreamplug.androidapp",
+    )
+
+    /** Apps that must never be locked on this device: phone, SMS, launcher, settings, banking, this app. */
     private fun protectedPackages(): Set<String> {
         val pm = packageManager
         val out = mutableSetOf(packageName, "com.android.settings")
+        out += BANKING_PACKAGES
         (getSystemService(Context.TELECOM_SERVICE) as? TelecomManager)
             ?.defaultDialerPackage?.let { out += it }
         Telephony.Sms.getDefaultSmsPackage(this)?.let { out += it }

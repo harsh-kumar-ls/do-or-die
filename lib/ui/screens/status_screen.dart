@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../domain/dungeon.dart';
 import '../../domain/progression.dart';
+import '../../domain/systems.dart' show maxReducedDays, reductionWindowDays;
 import '../game_model.dart';
 import '../theme.dart';
 import '../widgets/hud_kit.dart';
@@ -512,11 +513,13 @@ class _Reduction extends StatelessWidget {
     final locked = model.service.dungeonInProgress;
     final caption = locked
         ? 'Locked during the Dungeon. Floors use the full quest.'
+        : model.reductionLimitedTomorrow
+        ? 'Limit reached · $maxReducedDays reduced days in $reductionWindowDays. Full quest tomorrow.'
         : tomorrow == 0
         ? (model.reductionToday == 0
               ? 'Full quest · full XP.'
               : 'Today ${model.reductionToday}% · back to the full quest tomorrow.')
-        : '−$tomorrow% targets · applies tomorrow · half XP';
+        : '−$tomorrow% targets · applies tomorrow · half XP · ${model.reducedDaysLeft} of $maxReducedDays days left';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -541,7 +544,11 @@ class _Reduction extends StatelessWidget {
         const SizedBox(height: 6),
         Text(
           caption,
-          style: Hud.mono(10, tomorrow > 0 ? Hud.warn : p.dim, spacing: .1),
+          style: Hud.mono(
+            10,
+            tomorrow > 0 || model.reductionLimitedTomorrow ? Hud.warn : p.dim,
+            spacing: .1,
+          ),
         ),
       ],
     );

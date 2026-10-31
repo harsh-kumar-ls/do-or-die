@@ -183,6 +183,36 @@ void main() {
       expect(p.reductionOn(tuesday), 20);
     });
 
+    test('works on at most 6 days in any 30, then the full quest returns', () {
+      final p = const SystemProgress()
+          .choose(SystemKind.fitness, Rank.e)
+          .setReduction(monday, 20);
+      final reduced = [
+        for (var i = 1; i <= 40; i++)
+          if (p.reductionOn(monday.addDays(i)) > 0) i,
+      ];
+      // Days 1-6 reduced; the window frees a day again on day 31.
+      expect(reduced.take(6), [1, 2, 3, 4, 5, 6]);
+      expect(reduced.where((i) => i > 6 && i <= 30), isEmpty);
+      expect(reduced.where((i) => i > 30), [31, 32, 33, 34, 35, 36]);
+      expect(p.reducedDaysUsed(monday.addDays(10)), 6);
+      expect(p.settingOn(monday.addDays(10)), 20);
+    });
+
+    test('a past day keeps its answer when the valve is changed later', () {
+      final base = const SystemProgress()
+          .choose(SystemKind.fitness, Rank.e)
+          .setReduction(monday, 10);
+      final later = base.setReduction(monday.addDays(3), 0);
+      for (var i = 1; i <= 3; i++) {
+        expect(
+          later.reductionOn(monday.addDays(i)),
+          base.reductionOn(monday.addDays(i)),
+        );
+      }
+      expect(later.reductionOn(monday.addDays(5)), 0);
+    });
+
     test('is capped at 20%', () {
       final p = const SystemProgress()
           .choose(SystemKind.fitness, Rank.e)

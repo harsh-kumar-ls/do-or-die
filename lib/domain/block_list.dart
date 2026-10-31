@@ -13,6 +13,24 @@ const neverBlockPackages = {
   'com.google.android.apps.messaging',
   'com.google.android.apps.maps',
   'com.android.emergency',
+  ...bankingPackages,
+};
+
+/// Banking and UPI apps: money must stay reachable during a lock. Mirrored
+/// in MainActivity.kt so they never appear in the app picker.
+const bankingPackages = {
+  'com.sbi.lotusintouch', // YONO SBI
+  'com.sbi.SBIFreedomPlus', // YONO Lite SBI
+  'com.google.android.apps.nbu.paisa.user', // Google Pay
+  'com.phonepe.app',
+  'net.one97.paytm',
+  'in.org.npci.upiapp', // BHIM
+  'com.csam.icici.bank.imobile',
+  'com.snapwork.hdfc',
+  'com.axis.mobile',
+  'com.msf.kbank.mobile', // Kotak
+  'com.bankofbaroda.mconnect',
+  'com.dreamplug.androidapp', // CRED
 };
 
 class BlockListVersion {

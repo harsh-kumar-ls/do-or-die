@@ -69,7 +69,7 @@
     },
     {
       "type": "assertion",
-      "description": "The 'QUEST REDUCTION' row now shows '\u221220% targets \u00b7 applies tomorrow \u00b7 half XP'"
+      "description": "The 'QUEST REDUCTION' row now shows '\u221220% targets \u00b7 applies tomorrow \u00b7 half XP \u00b7 6 of 6 days left'"
     },
     {
       "type": "action",

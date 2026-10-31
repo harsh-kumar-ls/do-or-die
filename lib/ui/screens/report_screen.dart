@@ -11,6 +11,7 @@ import '../theme.dart';
 import '../widgets/awakening_art.dart';
 import '../widgets/hud_background.dart';
 import '../widgets/hud_kit.dart';
+import '../widgets/share_card.dart';
 import '../widgets/system_frame.dart';
 
 /// The 30-day report, built from design/claude-design/status.html: clear
@@ -187,9 +188,29 @@ class _ReportScreenState extends State<ReportScreen> {
                           top: BorderSide(color: p.sys.withValues(alpha: .18)),
                         ),
                       ),
-                      child: CutButton(
-                        'CLOSE',
-                        onPressed: () => Navigator.of(context).pop(),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: CutButton(
+                              'SHARE',
+                              onPressed: r.days == 0
+                                  ? null
+                                  : () => showModalBottomSheet<void>(
+                                      context: context,
+                                      isScrollControlled: true,
+                                      backgroundColor: const Color(0xF205070D),
+                                      builder: (_) => _ShareSheet(r: r),
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: CutButton(
+                              'CLOSE',
+                              onPressed: () => Navigator.of(context).pop(),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -667,6 +688,121 @@ class _Honesty extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// Preview of the share card, a switch to drop the honesty figures, and the
+/// share action.
+class _ShareSheet extends StatefulWidget {
+  const _ShareSheet({required this.r});
+  final TrialReport r;
+
+  @override
+  State<_ShareSheet> createState() => _ShareSheetState();
+}
+
+class _ShareSheetState extends State<_ShareSheet> {
+  final _card = GlobalKey();
+  bool _honesty = true;
+  bool _busy = false;
+
+  Future<void> _share() async {
+    setState(() => _busy = true);
+    try {
+      await shareCardImage(_card);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(content: Text('The image could not be shared.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return HudScope(
+      palette: HudPalette.system,
+      child: Builder(
+        builder: (context) {
+          final p = HudScope.of(context);
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    '[ SHARE REPORT ]',
+                    textAlign: TextAlign.center,
+                    style: Hud.head(14, p.hi),
+                  ),
+                  const SizedBox(height: 10),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.sizeOf(context).height * .55,
+                    ),
+                    child: FittedBox(
+                      child: RepaintBoundary(
+                        key: _card,
+                        child: ShareCard(r: widget.r, honesty: _honesty),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Semantics(
+                    container: true,
+                    checked: _honesty,
+                    label: 'Include honesty figures',
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => setState(() => _honesty = !_honesty),
+                      child: SizedBox(
+                        height: 48,
+                        child: ExcludeSemantics(
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 20,
+                                height: 20,
+                                decoration: BoxDecoration(
+                                  color: _honesty
+                                      ? p.sys.withValues(alpha: .25)
+                                      : Colors.transparent,
+                                  border: Border.all(color: p.sys),
+                                ),
+                                child: _honesty
+                                    ? Icon(Icons.check, size: 14, color: p.hi)
+                                    : null,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'INCLUDE HONESTY FIGURES',
+                                  style: Hud.mono(11, p.text, spacing: .16),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  CutButton(
+                    _busy ? 'PREPARING' : 'SHARE AS IMAGE',
+                    onPressed: _busy ? null : _share,
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }

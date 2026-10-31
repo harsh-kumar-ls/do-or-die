@@ -1944,6 +1944,7 @@ class _AppsStepState extends State<_AppsStep> with WidgetsBindingObserver {
               'PHONE',
               'MESSAGES',
               'MAPS',
+              'BANKING',
               'SETTINGS',
               'DO OR DIE',
             ])
@@ -2192,7 +2193,7 @@ class _TermsStepState extends State<_TermsStep> {
       false,
     ),
     (
-      'Calls, messages, maps and settings are never locked. A 15-minute release always exists; every one is counted.',
+      'Calls, messages, maps, banking apps and settings are never locked. A 15-minute release always exists; every one is counted.',
       false,
     ),
     (

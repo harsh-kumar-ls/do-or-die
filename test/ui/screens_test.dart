@@ -163,7 +163,7 @@ void main() {
     await pumpFor(tester, 300);
     expect(model.reductionTomorrow, 20);
     expect(
-      find.text('−20% targets · applies tomorrow · half XP'),
+      find.text('−20% targets · applies tomorrow · half XP · 6 of 6 days left'),
       findsOneWidget,
     );
   });
@@ -430,6 +430,28 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     expect(find.text('Cleared 100%. Nothing to add.'), findsOneWidget);
+  });
+
+  testUi('the report share card can drop the honesty figures', (tester) async {
+    final clock = FixedClock(DateTime(2026, 10, 19, 9));
+    await pumpShell(
+      tester,
+      clock: clock,
+      prepare: (g) => clearDays(g, clock, 3),
+    );
+    await acknowledgeAll(tester);
+    await openTab(tester, 'STATUS');
+    await tester.tap(find.text('REPORT'));
+    await pumpFor(tester, 1500);
+    await tester.tap(find.text('SHARE'));
+    await pumpFor(tester, 800);
+    expect(find.text('[ SHARE REPORT ]'), findsOneWidget);
+    expect(find.text('ON MY WORD'), findsOneWidget);
+    expect(find.text('RANK E'), findsOneWidget);
+    await tester.tap(find.text('INCLUDE HONESTY FIGURES'));
+    await pumpFor(tester, 300);
+    expect(find.text('ON MY WORD'), findsNothing);
+    expect(find.text('SHARE AS IMAGE'), findsOneWidget);
   });
 
   // -------------------------------------------------------------------------

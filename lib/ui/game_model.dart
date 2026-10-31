@@ -296,6 +296,8 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
 
   int get reductionToday => service.reductionToday;
   int get reductionTomorrow => service.reductionTomorrow;
+  int get reducedDaysLeft => service.reducedDaysLeft;
+  bool get reductionLimitedTomorrow => service.reductionLimitedTomorrow;
 
   Future<void> setReduction(int percent) =>
       _run(() => service.setReduction(percent));

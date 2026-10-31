@@ -106,6 +106,12 @@ class SystemSpec {
 /// The reduction valve: a System quest can be made up to this much easier.
 const maxQuestReduction = 20;
 
+/// The valve works on at most this many days in any [reductionWindowDays]
+/// days; past the limit the full quest returns until older reduced days
+/// leave the window.
+const maxReducedDays = 6;
+const reductionWindowDays = 30;
+
 /// A placement test can start a user no higher than this.
 const highestPlacement = Rank.c;
 
@@ -193,13 +199,45 @@ class SystemProgress {
     );
   }
 
-  /// The reduction in force on [day].
-  int reductionOn(DayKey day) {
+  /// The valve setting on [day], before the reduced-day limit.
+  int settingOn(DayKey day) {
     var value = 0;
     for (final (from, percent) in reductions) {
       if (!from.isAfter(day)) value = percent;
     }
     return value;
+  }
+
+  /// Reduced days granted from the first setting up to [day] inclusive,
+  /// oldest first. Depends only on the settings, so a past day always gives
+  /// the same answer.
+  List<DayKey> _reducedDaysThrough(DayKey day) {
+    final granted = <DayKey>[];
+    if (reductions.isEmpty) return granted;
+    for (var d = reductions.first.$1; !d.isAfter(day); d = d.addDays(1)) {
+      if (settingOn(d) == 0) continue;
+      final windowStart = d.addDays(1 - reductionWindowDays);
+      final inWindow = granted.where((g) => !g.isBefore(windowStart)).length;
+      if (inWindow < maxReducedDays) granted.add(d);
+    }
+    return granted;
+  }
+
+  /// The reduction in force on [day]: the valve setting, or 0 once
+  /// [maxReducedDays] have been used in the last [reductionWindowDays].
+  int reductionOn(DayKey day) {
+    final value = settingOn(day);
+    if (value == 0) return 0;
+    final granted = _reducedDaysThrough(day);
+    return granted.isNotEmpty && granted.last == day ? value : 0;
+  }
+
+  /// Reduced days used in the [reductionWindowDays] ending on [day].
+  int reducedDaysUsed(DayKey day) {
+    final windowStart = day.addDays(1 - reductionWindowDays);
+    return _reducedDaysThrough(day)
+        .where((g) => !g.isBefore(windowStart))
+        .length;
   }
 
   /// Today's daily quest for the active System and rank, with the valve

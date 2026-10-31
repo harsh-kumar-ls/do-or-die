@@ -191,7 +191,7 @@ PLANS = {
             act("Click 'STATUS' in the bottom bar"),
             check("The 'QUEST REDUCTION' row on the '[ STATUS ]' screen shows 'Full quest · full XP.'"),
             act("In the 'QUEST REDUCTION' row, click '20%'"),
-            check("The 'QUEST REDUCTION' row now shows '−20% targets · applies tomorrow · half XP'"),
+            check("The 'QUEST REDUCTION' row now shows '−20% targets · applies tomorrow · half XP · 6 of 6 days left'"),
             act("Click 'QUEST' in the bottom bar"),
             check("The 'Push-ups (knees allowed)' objective still shows '0 / 10' today (the reduction is not applied until tomorrow)"),
         ],
