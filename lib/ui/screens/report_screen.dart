@@ -1,29 +1,53 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 import '../../app/report.dart';
+import '../../domain/day.dart';
 import '../../domain/progression.dart';
 import '../../domain/system_catalogue.dart';
 import '../game_model.dart';
 import '../theme.dart';
+import '../widgets/awakening_art.dart';
 import '../widgets/hud_background.dart';
-import '../widgets/hud_controls.dart';
-import '../widgets/system_window.dart';
-import 'onboarding_screen.dart' show RankBadge;
+import '../widgets/hud_kit.dart';
+import '../widgets/system_frame.dart';
 
-/// The 30-day report: rank journey, then and now, attributes, consistency,
-/// honesty, and the System's verdict. Built only from the trial log.
-class ReportScreen extends StatelessWidget {
+/// The 30-day report, built from design/claude-design/status.html: clear
+/// rate dial, rank journey, then and now, a tappable consistency calendar,
+/// honesty figures and the verdict. Built only from the trial log.
+class ReportScreen extends StatefulWidget {
   const ReportScreen({super.key, required this.model});
-
   final GameModel model;
 
   @override
+  State<ReportScreen> createState() => _ReportScreenState();
+}
+
+class _ReportScreenState extends State<ReportScreen> {
+  int? _selected;
+
+  static const _mon = [
+    'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', //
+    'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC',
+  ];
+  static String _d(DayKey d) => '${d.day} ${_mon[d.month - 1]}';
+
+  @override
   Widget build(BuildContext context) {
+    final m = widget.model;
     final r = TrialReport.from(
-      model.service.game,
-      model.service.today,
+      m.service.game,
+      m.service.today,
       systemCatalogue,
     );
+    final sys = m.systems;
+    final range = r.calendar.isEmpty
+        ? 'NO JUDGED DAYS YET'
+        : '${_d(r.calendar.first.$1)} – ${_d(r.calendar.last.$1)}';
+    final sysName = r.system == null
+        ? ''
+        : '${systemCatalogue[r.system]!.name.split(' ').first.toUpperCase()} · ';
     return HudScope(
       palette: HudPalette.system,
       child: Scaffold(
@@ -32,187 +56,141 @@ class ReportScreen extends StatelessWidget {
             child: Builder(
               builder: (context) {
                 final p = HudScope.of(context);
-                return ListView(
-                  padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    SystemWindow(
-                      title: '[ REPORT ]',
-                      subtitle: r.days == 0
-                          ? 'No day has been judged yet.'
-                          : 'The last ${r.days} judged day${r.days == 1 ? '' : 's'}.',
-                      child: Column(
-                        children: [
-                          Text(
-                            '${r.clearRate}%',
-                            style: Hud.head(
-                              56,
-                              p.hi,
-                              spacing: 0,
-                            ).copyWith(height: 1, shadows: p.textGlow(2)),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'CLEARED',
-                            style: Hud.mono(11, p.dim, spacing: .2),
-                          ),
-                          const SizedBox(height: 12),
-                          _kv(p, 'DAYS CLEARED', '${r.cleared}'),
-                          _kv(p, 'DAYS FAILED', '${r.failed}'),
-                          _kv(p, 'LONGEST STREAK', '${r.longestStreak} days'),
-                          _kv(p, 'CURRENT STREAK', '${r.currentStreak} days'),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SystemWindow(
-                      title: 'RANK JOURNEY',
-                      delay: const Duration(milliseconds: 80),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          if (r.startRank != null && r.rank != null)
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                RankBadge(rank: r.startRank!, size: 44),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: SizedBox(
+                        height: 56,
+                        child: Row(
+                          children: [
+                            Semantics(
+                              button: true,
+                              label: 'Back',
+                              child: GestureDetector(
+                                onTap: () => Navigator.of(context).pop(),
+                                child: Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                      color: p.sys.withValues(alpha: .18),
+                                    ),
                                   ),
-                                  child: Text(
-                                    '›',
-                                    style: Hud.head(22, p.dim, spacing: 0),
+                                  child: Icon(Icons.chevron_left, color: p.hi),
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.only(right: 48),
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        '[ 30-DAY REPORT ]',
+                                        style: Hud.head(
+                                          14,
+                                          p.hi,
+                                          spacing: .26,
+                                        ).copyWith(shadows: p.textGlow(.8)),
+                                      ),
+                                      Text(
+                                        '$sysName$range',
+                                        style: Hud.mono(
+                                          10,
+                                          p.dim,
+                                          spacing: .14,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                RankBadge(rank: r.rank!, size: 44),
-                              ],
-                            ),
-                          if (r.system != null) ...[
-                            const SizedBox(height: 8),
-                            Text(
-                              systemCatalogue[r.system]!.name.toUpperCase(),
-                              textAlign: TextAlign.center,
-                              style: Hud.mono(11, p.dim, spacing: .14),
-                            ),
-                          ],
-                          const SizedBox(height: 8),
-                          _kv(p, 'GATES OPENED', '${r.gatesOpened}'),
-                          _kv(p, 'DUNGEONS CLEARED', '${r.dungeonsCleared}'),
-                          _kv(p, 'DUNGEONS FAILED', '${r.dungeonsFailed}'),
-                          for (final t in r.titles)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Text(
-                                t,
-                                textAlign: TextAlign.center,
-                                style: Hud.mono(11, Hud.gold),
                               ),
                             ),
-                        ],
-                      ),
-                    ),
-                    if (r.targets.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      SystemWindow(
-                        title: 'THEN AND NOW',
-                        subtitle: 'Daily quest at the starting rank and today.',
-                        delay: const Duration(milliseconds: 120),
-                        child: Column(
-                          children: [
-                            for (final t in r.targets)
-                              _kv(
-                                p,
-                                t.label.toUpperCase(),
-                                '${t.before}${t.unit} › ${t.after}${t.unit}',
-                              ),
                           ],
                         ),
                       ),
-                    ],
-                    const SizedBox(height: 12),
-                    SystemWindow(
-                      title: 'ATTRIBUTES',
-                      delay: const Duration(milliseconds: 160),
-                      child: Column(
-                        children: [
-                          _kv(p, 'LEVEL', '${r.level}'),
-                          for (final s in Stat.values)
-                            _kv(p, _short[s]!, '${r.stats[s] ?? 0}'),
-                        ],
-                      ),
                     ),
-                    const SizedBox(height: 12),
-                    SystemWindow(
-                      title: 'CONSISTENCY',
-                      delay: const Duration(milliseconds: 200),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                    Expanded(
+                      child: ListView(
+                        padding: const EdgeInsets.fromLTRB(16, 6, 16, 14),
                         children: [
-                          _Calendar(calendar: r.calendar),
-                          const SizedBox(height: 10),
-                          Wrap(
-                            alignment: WrapAlignment.center,
-                            spacing: 14,
-                            runSpacing: 6,
-                            children: [
-                              _legend(p, Hud.gold, 'CLEARED'),
-                              _legend(p, Hud.warn, 'FAILED'),
-                              _legend(
-                                p,
-                                p.sys.withValues(alpha: .4),
-                                'DRY RUN',
-                              ),
-                            ],
+                          Panel(child: _DialRow(r: r)),
+                          const SizedBox(height: 14),
+                          const Kicker('Rank journey'),
+                          const SizedBox(height: 8),
+                          _Journey(r: r),
+                          if (r.targets.isNotEmpty) ...[
+                            const SizedBox(height: 14),
+                            const Kicker('Then and now'),
+                            const SizedBox(height: 8),
+                            _ThenNow(r: r),
+                          ],
+                          const SizedBox(height: 14),
+                          const Kicker('Consistency'),
+                          const SizedBox(height: 8),
+                          _Calendar(
+                            r: r,
+                            reduced: (d) =>
+                                (sys?.progress.reductionOn(d) ?? 0) > 0,
+                            selected: _selected,
+                            onTap: (i) => setState(() => _selected = i),
                           ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SystemWindow(
-                      title: 'HONESTY',
-                      subtitle: 'Every escape is counted.',
-                      delay: const Duration(milliseconds: 240),
-                      child: Column(
-                        children: [
-                          _kv(p, 'PENALTY ZONES', '${r.penaltyZones}'),
-                          _kv(p, 'DUNGEON PENALTIES', '${r.dungeonPenalties}'),
-                          _kv(p, 'RELEASES TAKEN', '${r.releases}'),
-                          _kv(p, 'BLOCKER OUTAGES', '${r.watcherOutages}'),
-                          _kv(
-                            p,
-                            'HONOUR CONFIRMATIONS',
-                            '${r.honourConfirmations}',
-                          ),
-                          _kv(p, 'REDUCED DAYS', '${r.reducedDays}'),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SystemWindow(
-                      title: '[ VERDICT ]',
-                      delay: const Duration(milliseconds: 280),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          for (final line in r.verdict)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: Text(
-                                line,
-                                textAlign: TextAlign.center,
-                                style: Hud.mono(
-                                  13,
-                                  p.text,
-                                ).copyWith(height: 1.5),
+                          const SizedBox(height: 14),
+                          const Kicker('Honesty'),
+                          const SizedBox(height: 8),
+                          _Honesty(r: r),
+                          const SizedBox(height: 14),
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: Colors.black38,
+                              border: Border.all(
+                                color: p.sys.withValues(alpha: .55),
                               ),
                             ),
+                            child: Column(
+                              children: [
+                                Text(
+                                  'VERDICT',
+                                  style: Hud.mono(9, p.dim, spacing: .24),
+                                ),
+                                const SizedBox(height: 6),
+                                for (final line in r.verdict)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 4),
+                                    child: Text(
+                                      line,
+                                      textAlign: TextAlign.center,
+                                      style: Hud.head(
+                                        line == r.headline ? 15 : 12,
+                                        line == r.headline ? p.text : p.dim,
+                                        spacing: .04,
+                                      ).copyWith(height: 1.45),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 14),
-                    HudButton(
-                      'CLOSE',
-                      onPressed: () => Navigator.of(context).pop(),
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xE605070D),
+                        border: Border(
+                          top: BorderSide(color: p.sys.withValues(alpha: .18)),
+                        ),
+                      ),
+                      child: CutButton(
+                        'CLOSE',
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
                     ),
                   ],
                 );
@@ -223,84 +201,472 @@ class ReportScreen extends StatelessWidget {
       ),
     );
   }
-
-  static const _short = {
-    Stat.strength: 'STR',
-    Stat.intellect: 'INT',
-    Stat.discipline: 'DIS',
-    Stat.vitality: 'VIT',
-    Stat.charisma: 'CHA',
-  };
-
-  static Widget _legend(HudPalette p, Color c, String label) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Container(width: 10, height: 10, color: c),
-      const SizedBox(width: 6),
-      Text(label, style: Hud.mono(10, p.dim, spacing: .1)),
-    ],
-  );
-
-  static Widget _kv(HudPalette p, String k, String v) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 4),
-    child: Row(
-      children: [
-        Expanded(
-          child: Text(
-            k,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Hud.mono(12, p.dim, spacing: .06),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Text(v, style: Hud.mono(12, p.text, weight: FontWeight.w500)),
-      ],
-    ),
-  );
 }
 
-/// Up to 30 squares, ten to a row, oldest first.
-class _Calendar extends StatelessWidget {
-  const _Calendar({required this.calendar});
-
-  final List<(dynamic, DayMark)> calendar;
+class _DialRow extends StatelessWidget {
+  const _DialRow({required this.r});
+  final TrialReport r;
 
   @override
   Widget build(BuildContext context) {
     final p = HudScope.of(context);
-    if (calendar.isEmpty) {
-      return Text(
-        'Nothing to show yet.',
-        textAlign: TextAlign.center,
-        style: Hud.mono(11, p.dim),
-      );
+    final dry = r.calendar.where((c) => c.$2 == DayMark.dryRun).length;
+    Widget row(Color? c, String k, String v) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          if (c != null) ...[
+            Container(width: 9, height: 9, color: c),
+            const SizedBox(width: 6),
+          ],
+          Expanded(child: Text(k, style: Hud.mono(12, p.dim))),
+          Text(v, style: Hud.mono(12, p.text, weight: FontWeight.w700)),
+        ],
+      ),
+    );
+    return Row(
+      children: [
+        TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0, end: r.clearRate / 100),
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.easeOutCubic,
+          builder: (context, k, _) => SizedBox(
+            width: 140,
+            height: 140,
+            child: CustomPaint(
+              painter: _Dial(k),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '${(k * 100).round()}%',
+                      style: Hud.mono(34, Colors.white, weight: FontWeight.w700)
+                          .copyWith(
+                            shadows: [
+                              Shadow(
+                                color: Hud.gold.withValues(alpha: .5),
+                                blurRadius: 10,
+                              ),
+                            ],
+                          ),
+                    ),
+                    Text('CLEAR RATE', style: Hud.mono(9, p.dim, spacing: .2)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            children: [
+              row(Hud.gold, 'Cleared', '${r.cleared}'),
+              row(const Color(0xFFFF3B4A), 'Failed', '${r.failed}'),
+              row(p.sys.withValues(alpha: .6), 'Dry run', '$dry'),
+              row(null, 'Counted days', '${r.cleared + r.failed}'),
+              row(null, 'Best streak', '${r.longestStreak}'),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _Dial extends CustomPainter {
+  _Dial(this.k);
+  final double k;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = size.center(Offset.zero);
+    final r = size.width * 58 / 140;
+    canvas.drawCircle(
+      c,
+      r,
+      Paint()
+        ..color = const Color(0x2E7D8BA8)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 10,
+    );
+    canvas.drawArc(
+      Rect.fromCircle(center: c, radius: r),
+      -pi / 2,
+      2 * pi * k,
+      false,
+      Paint()
+        ..color = Hud.gold
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 10
+        ..maskFilter = const MaskFilter.blur(BlurStyle.solid, 4),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_Dial old) => old.k != k;
+}
+
+class _Journey extends StatelessWidget {
+  const _Journey({required this.r});
+  final TrialReport r;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    if (r.startRank == null || r.rank == null) {
+      return Text('No System yet.', style: Hud.mono(11, p.dim));
     }
-    return LayoutBuilder(
-      builder: (context, c) {
-        const gap = 5.0;
-        final size = (c.maxWidth - gap * 9) / 10;
-        return Wrap(
-          spacing: gap,
-          runSpacing: gap,
+    final cleared = r.dungeonsCleared;
+    Widget badge(Rank rk, String label) => SizedBox(
+      width: 72,
+      child: Column(
+        children: [
+          CustomPaint(size: const Size(64, 68), painter: RankHexPainter(rk)),
+          const SizedBox(height: 2),
+          Text(label, style: Hud.mono(9, p.dim, spacing: .14)),
+        ],
+      ),
+    );
+    return Row(
+      children: [
+        badge(r.startRank!, 'START'),
+        Expanded(
+          child: SizedBox(
+            height: 68,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    height: 1,
+                    color: p.sys.withValues(alpha: .55),
+                  ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    for (var i = 0; i < max(1, cleared * 3); i++)
+                      Transform.rotate(
+                        angle: pi / 4,
+                        child: Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: cleared > 0
+                                ? Hud.gold
+                                : const Color(0xFF05070D),
+                            border: Border.all(color: Hud.gold),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                Positioned(
+                  bottom: 2,
+                  child: Text(
+                    cleared == 0
+                        ? 'NO DUNGEON CLEARED YET'
+                        : '$cleared DUNGEON${cleared == 1 ? '' : 'S'} · ${cleared * 3} FLOORS CLEARED',
+                    style: Hud.mono(9, p.dim, spacing: .12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        badge(r.rank!, 'NOW'),
+      ],
+    );
+  }
+}
+
+class _ThenNow extends StatelessWidget {
+  const _ThenNow({required this.r});
+  final TrialReport r;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    String v(int x, String unit) => unit == 'm'
+        ? '${(x / 1000).toStringAsFixed(1)} km'
+        : unit.isEmpty
+        ? '$x'
+        : '$x $unit';
+    return Table(
+      columnWidths: const {
+        0: FlexColumnWidth(),
+        1: IntrinsicColumnWidth(),
+        2: FixedColumnWidth(26),
+        3: IntrinsicColumnWidth(),
+        4: IntrinsicColumnWidth(),
+      },
+      defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+      children: [
+        TableRow(
           children: [
-            for (final (_, mark) in calendar)
-              Container(
-                width: size,
-                height: size,
-                decoration: BoxDecoration(
-                  color: switch (mark) {
-                    DayMark.cleared => Hud.gold.withValues(alpha: .85),
-                    DayMark.failed => Hud.warn.withValues(alpha: .85),
-                    DayMark.dryRun => p.sys.withValues(alpha: .4),
-                    DayMark.none => Colors.transparent,
-                  },
-                  border: Border.all(color: p.line),
+            for (final h in const ['TARGET', 'THEN', '', 'NOW', 'CHANGE'])
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6, left: 6),
+                child: Text(
+                  h,
+                  textAlign: TextAlign.right,
+                  style: Hud.mono(9, p.dim, spacing: .18),
                 ),
               ),
           ],
-        );
-      },
+        ),
+        for (final t in r.targets)
+          TableRow(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Text(t.label, style: Hud.mono(12, p.text)),
+              ),
+              Text(
+                v(t.before, t.unit),
+                textAlign: TextAlign.right,
+                style: Hud.mono(12, p.dim),
+              ),
+              Icon(Icons.arrow_right_alt, size: 14, color: p.dim),
+              Text(
+                v(t.after, t.unit),
+                textAlign: TextAlign.right,
+                style: Hud.mono(12, Colors.white, weight: FontWeight.w700),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: Text(
+                  t.before == 0
+                      ? 'new'
+                      : '${t.after >= t.before ? '+' : ''}${((t.after - t.before) * 100 / t.before).round()}%',
+                  textAlign: TextAlign.right,
+                  style: Hud.mono(11, const Color(0xFF5BD69A)),
+                ),
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+}
+
+class _Calendar extends StatelessWidget {
+  const _Calendar({
+    required this.r,
+    required this.reduced,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final TrialReport r;
+  final bool Function(DayKey) reduced;
+  final int? selected;
+  final ValueChanged<int> onTap;
+
+  static const _days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+  static const _mon = [
+    'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', //
+    'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    if (r.calendar.isEmpty) {
+      return Text('Nothing to show yet.', style: Hud.mono(11, p.dim));
+    }
+    Color fill(DayMark m) => switch (m) {
+      DayMark.cleared => Hud.gold.withValues(alpha: .85),
+      DayMark.failed => const Color(0xCCFF3B4A),
+      DayMark.dryRun => p.sys.withValues(alpha: .45),
+      DayMark.none => Colors.transparent,
+    };
+    String detail(int i) {
+      final (d, m) = r.calendar[i];
+      final dt = DateTime(d.year, d.month, d.day);
+      final st = switch (m) {
+        DayMark.cleared => 'CLEARED',
+        DayMark.failed => 'FAILED · PENALTY ZONE',
+        DayMark.dryRun => 'DRY RUN · NO PENALTY',
+        DayMark.none => 'NOT JUDGED',
+      };
+      return 'DAY ${i + 1} · ${_days[dt.weekday - 1]} ${d.day} ${_mon[d.month - 1]} · $st${reduced(d) ? ' · REDUCED' : ''}';
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        LayoutBuilder(
+          builder: (context, c) {
+            const gap = 5.0;
+            final size = (c.maxWidth - gap * 9) / 10;
+            return Wrap(
+              spacing: gap,
+              runSpacing: gap,
+              children: [
+                for (final (i, (d, mark)) in r.calendar.indexed)
+                  Semantics(
+                    button: true,
+                    label: detail(i),
+                    child: GestureDetector(
+                      onTap: () => onTap(i),
+                      child: AnimatedScale(
+                        scale: selected == i ? 1.12 : 1,
+                        duration: const Duration(milliseconds: 100),
+                        child: Container(
+                          width: size,
+                          height: size,
+                          decoration: BoxDecoration(
+                            color: fill(mark),
+                            border: Border.all(
+                              color: selected == i
+                                  ? Colors.white
+                                  : p.sys.withValues(alpha: .18),
+                            ),
+                          ),
+                          child: reduced(d)
+                              ? Align(
+                                  alignment: Alignment.topRight,
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(2),
+                                    child: Transform.rotate(
+                                      angle: pi / 4,
+                                      child: Container(
+                                        width: 5,
+                                        height: 5,
+                                        color: const Color(0xFF05070D),
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : null,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 10,
+          runSpacing: 6,
+          children: [
+            for (final (c, l) in [
+              (Hud.gold, 'CLEARED'),
+              (const Color(0xFFFF3B4A), 'FAILED'),
+              (p.sys.withValues(alpha: .5), 'DRY RUN'),
+            ])
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(width: 9, height: 9, color: c),
+                  const SizedBox(width: 5),
+                  Text(l, style: Hud.mono(9, p.dim, spacing: .12)),
+                ],
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          selected == null ? 'Tap a day.' : detail(selected!),
+          style: Hud.mono(11, p.text, spacing: .04),
+        ),
+      ],
+    );
+  }
+}
+
+class _Honesty extends StatelessWidget {
+  const _Honesty({required this.r});
+  final TrialReport r;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    final counted = r.cleared + r.failed;
+    final tiles = [
+      ('PENALTY ZONES', '${r.penaltyZones}', 'of $counted counted days', false),
+      (
+        'DUNGEON PENALTIES',
+        '${r.dungeonPenalties}',
+        r.dungeonsCleared > 0 ? 'Rank Trial cleared' : '—',
+        false,
+      ),
+      (
+        'RELEASES TAKEN',
+        '${r.releases}',
+        r.penaltyZones + r.dungeonPenalties == 0
+            ? 'no lock served yet'
+            : '${(r.releases / (r.penaltyZones + r.dungeonPenalties)).toStringAsFixed(1)} per penalty',
+        r.releases > 0,
+      ),
+      (
+        'BLOCKER OUTAGES',
+        '${r.watcherOutages}',
+        'the lock was down',
+        r.watcherOutages > 0,
+      ),
+      (
+        'HONOUR CONFIRMATIONS',
+        '${r.honourConfirmations}',
+        'caps confirmed on your word',
+        r.honourConfirmations > 0,
+      ),
+      ('REDUCED DAYS', '${r.reducedDays}', 'quest lowered, half XP', false),
+    ];
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 6,
+      crossAxisSpacing: 6,
+      childAspectRatio: 1.8,
+      children: [
+        for (final (label, v, sub, warn) in tiles)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+            decoration: BoxDecoration(
+              color: Colors.black26,
+              border: Border.all(
+                color: warn
+                    ? Hud.warn.withValues(alpha: .4)
+                    : p.sys.withValues(alpha: .18),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  v,
+                  style: Hud.mono(
+                    20,
+                    warn ? Hud.warn : Colors.white,
+                    weight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Hud.mono(9, p.dim, spacing: .14),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  sub,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Hud.mono(10, p.dim),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }

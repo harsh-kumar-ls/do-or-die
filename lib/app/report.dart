@@ -208,17 +208,26 @@ class TrialReport {
     return n == 0 ? 0 : (cleared * 100 / n).round();
   }
 
-  /// The System's verdict: short and cold.
+  /// The System's verdict: one cold line, first matching rule wins
+  /// (design/claude-design/status.html).
+  String get headline {
+    if (cleared + failed == 0) return 'Insufficient data. Continue.';
+    if (clearRate < 50) {
+      return 'Fewer than half the days were cleared. The System expected more.';
+    }
+    if (releases > penaltyZones + dungeonPenalties) {
+      return 'You cleared $clearRate% of days and escaped more locks than you served.';
+    }
+    if (watcherOutages > 0) {
+      return 'Cleared $clearRate%. The lock was down $watcherOutages time${watcherOutages == 1 ? '' : 's'}. That was not an accident.';
+    }
+    return 'Cleared $clearRate%. Nothing to add.';
+  }
+
+  /// The headline, what releases cost, and the next Gate.
   List<String> get verdict {
     final lines = <String>[
-      if (cleared + failed == 0)
-        'Insufficient data. Continue.'
-      else if (clearRate >= 90)
-        'Performance acceptable. The System expects more.'
-      else if (clearRate >= 70)
-        'Inconsistent. Weakness has been recorded.'
-      else
-        'Unacceptable. The penalty will continue until this changes.',
+      headline,
       if (releases > 0)
         '$releases release${releases == 1 ? '' : 's'} taken. They were counted.',
     ];

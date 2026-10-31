@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Do or Die — Daily Quest (prototype)</title>
+<!-- Fonts load from Google Fonts here; bundle them as assets in the Flutter build. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* =========================================================
+   BRAND TOKENS
+   ========================================================= */
+:root{
+  --void:#05070D; --void-glow:#0B1730; --panel:rgba(10,18,34,0.72);
+  --sys:#4FB3FF; --hi:#A9DCFF; --text:#DBE7FF; --dim:#7D8BA8;
+  --gold:#F5C96A; --warn:#FF8A93;
+  --pz-red:#FF3B4A; --pz-bg:#090204;
+  --dp-crimson:#D7263D; --dp-gold:#F5C96A; --dp-bg:#060102;
+  --rank-e:#9AA4B8; --rank-d:#5BD69A; --rank-c:#4FB3FF; --rank-b:#B07CFF; --rank-a:#FF9F45; --rank-s:#F5C96A;
+  --f-title:"Chakra Petch",system-ui,sans-serif;
+  --f-body:"JetBrains Mono",ui-monospace,monospace;
+  --safe-top:44px; --safe-bottom:34px; --pad:16px; --touch:48px;
+  /* accent: the System blue by default, swapped by the Dungeon variant */
+  --acc:var(--sys); --acc-hi:var(--hi); --acc-line:rgba(79,179,255,.55); --acc-dim:rgba(79,179,255,.18); --acc-fill:rgba(79,179,255,.08);
+  --glow:0 0 8px rgba(79,179,255,.55);
+  --ease:cubic-bezier(.2,.8,.2,1);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{min-height:100%;background:#020308;color:var(--text);font-family:var(--f-body)}
+body{display:flex;gap:28px;justify-content:center;align-items:flex-start;padding:24px}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+
+/* ---------- reviewer panel (outside the phone) ---------- */
+.rev{width:300px;font-size:12px;line-height:1.6;color:var(--dim)}
+.rev h2{font-family:var(--f-title);letter-spacing:.18em;font-size:13px;color:var(--hi);margin:16px 0 8px}
+.rev .opts{display:flex;flex-wrap:wrap;gap:6px}
+.rev .opts button{font-size:11px;letter-spacing:.08em;color:var(--dim);border:1px solid rgba(79,179,255,.18);padding:8px 10px;min-height:36px}
+.rev .opts button.on{color:var(--hi);border-color:var(--sys)}
+.rev p{margin-bottom:8px}.rev b{color:var(--text);font-weight:500}.rev .gap{color:var(--warn)}
+@media (max-width:760px){body{flex-direction:column;align-items:center}.rev{width:390px}}
+
+/* =========================================================
+   PHONE
+   ========================================================= */
+.phone{width:390px;height:844px;position:relative;overflow:hidden;border-radius:38px;flex:none;user-select:none;-webkit-user-select:none;
+  background:radial-gradient(120% 55% at 50% -10%,var(--void-glow) 0%,var(--void) 62%);
+  box-shadow:0 0 0 1px #111a2c,0 30px 80px rgba(0,0,0,.6);display:flex;flex-direction:column;
+  padding:var(--safe-top) var(--pad) 0}
+.phone::before{content:"";position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(79,179,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(79,179,255,.04) 1px,transparent 1px);
+  background-size:26px 26px;mask-image:radial-gradient(90% 70% at 50% 40%,#000 30%,transparent 100%)}
+.phone::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:60;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.18) 0 1px,transparent 1px 3px);mix-blend-mode:multiply}
+/* Dungeon variant: crimson frame lines, gold titles, red-black void */
+.phone.dungeon{--acc:var(--dp-crimson);--acc-hi:var(--gold);--acc-line:rgba(215,38,61,.7);--acc-dim:rgba(215,38,61,.25);--acc-fill:rgba(215,38,61,.08);
+  --glow:0 0 8px rgba(215,38,61,.6);background:radial-gradient(120% 55% at 50% -10%,#2a0710 0%,var(--dp-bg) 62%)}
+.phone.dungeon::before{background-image:linear-gradient(rgba(215,38,61,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(215,38,61,.05) 1px,transparent 1px)}
+
+.kicker{font-size:10px;letter-spacing:.22em;color:var(--dim);text-transform:uppercase}
+.num{font-family:var(--f-body);font-weight:700;font-variant-numeric:tabular-nums}
+
+/* ---------- top bar ---------- */
+.top{position:relative;z-index:2;display:flex;align-items:center;gap:8px;height:56px;flex:none}
+.top .dt{flex:1}
+.top .dt .d{font-family:var(--f-title);font-weight:700;letter-spacing:.2em;font-size:14px;color:var(--text)}
+.top .dt .k{font-size:10px;letter-spacing:.16em;color:var(--dim);margin-top:2px}
+.ibtn{width:48px;height:48px;display:flex;align-items:center;justify-content:center;border:1px solid var(--acc-dim);color:var(--acc-hi)}
+.ibtn svg{width:20px;height:20px}
+.ibtn:active{background:var(--acc-fill)}
+.ibtn.off{color:var(--dim)}
+.rbadge{width:48px;height:52px;color:var(--rc)}
+.rbadge svg{width:100%;height:100%;filter:drop-shadow(0 0 6px var(--rc))}
+
+/* ---------- gate banner ---------- */
+.gate{position:relative;z-index:2;flex:none;margin:4px 0 10px;padding:1px;display:none;
+  background:linear-gradient(120deg,var(--gold),rgba(245,201,106,.25) 50%,var(--rank-b));
+  clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px)}
+.gate.on{display:block;animation:gateIn .45s var(--ease)}
+/* ANIM gate banner: slides down 16 px + fades in, 450 ms; border shimmer loops every 3 s. */
+@keyframes gateIn{from{opacity:0;transform:translateY(-16px)}}
+.gate .gi{display:flex;gap:12px;align-items:center;padding:12px;background:linear-gradient(180deg,#151127,#0b0a18);
+  clip-path:polygon(9.5px 0,100% 0,100% calc(100% - 9.5px),calc(100% - 9.5px) 100%,0 100%,0 9.5px)}
+.gate svg.gsvg{width:46px;height:56px;flex:none;filter:drop-shadow(0 0 8px rgba(176,124,255,.7))}
+.gate .gt{flex:1;min-width:0}
+.gate .gt b{display:block;font-family:var(--f-title);letter-spacing:.22em;font-size:13px;color:var(--gold)}
+.gate .gt span{display:block;font-size:11px;color:var(--text);margin-top:2px}
+.gate .gt .gc{font-size:11px;color:var(--rank-b);margin-top:4px;letter-spacing:.06em}
+.gate::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.25) 50%,transparent 70%);
+  background-size:250% 100%;animation:sweep 3s linear infinite;pointer-events:none;mix-blend-mode:overlay}
+@keyframes sweep{from{background-position:150% 0}to{background-position:-100% 0}}
+
+/* ---------- quest window ---------- */
+.qw{position:relative;z-index:2;flex:1;min-height:0;display:flex;flex-direction:column;margin-bottom:8px}
+.qw>.b{position:absolute;width:14px;height:14px;border-color:var(--acc-hi);border-style:solid;z-index:3;pointer-events:none}
+.qw>.b.tl{top:-4px;left:-4px;border-width:2px 0 0 2px}.qw>.b.tr{top:-4px;right:-4px;border-width:2px 2px 0 0}
+.qw>.b.bl{bottom:-4px;left:-4px;border-width:0 0 2px 2px}.qw>.b.br{bottom:-4px;right:-4px;border-width:0 2px 2px 0}
+.qw .win{flex:1;min-height:0;padding:1px;background:linear-gradient(160deg,var(--acc),var(--acc-dim) 45%,var(--acc-line));
+  clip-path:polygon(12px 0,calc(100% - 12px) 0,100% 12px,100% calc(100% - 12px),calc(100% - 12px) 100%,12px 100%,0 calc(100% - 12px),0 12px)}
+.qw .in{height:100%;display:flex;flex-direction:column;background:linear-gradient(180deg,rgba(13,24,46,.97),rgba(8,14,27,.97));
+  clip-path:polygon(11.5px 0,calc(100% - 11.5px) 0,100% 11.5px,100% calc(100% - 11.5px),calc(100% - 11.5px) 100%,11.5px 100%,0 calc(100% - 11.5px),0 11.5px)}
+.dungeon .qw .in{background:linear-gradient(180deg,rgba(30,8,14,.97),rgba(12,3,6,.97))}
+.wtitle{font-family:var(--f-title);font-weight:700;font-size:14px;letter-spacing:.26em;color:var(--acc-hi);text-align:center;
+  text-shadow:var(--glow);padding:14px 12px 4px}
+.wsub{display:flex;justify-content:space-between;font-size:10px;letter-spacing:.16em;color:var(--dim);padding:6px 14px 10px;border-bottom:1px solid var(--acc-dim)}
+.wsub .ok{color:var(--gold)}
+.mult{display:inline-block;margin-left:6px;padding:1px 6px;border:1px solid var(--dp-crimson);color:#ffb3bd;font-size:9px}
+.alldone{display:none;text-align:center;font-family:var(--f-title);font-weight:700;letter-spacing:.14em;font-size:14px;color:var(--gold);
+  padding:10px;border-bottom:1px solid rgba(245,201,106,.3);background:rgba(245,201,106,.06);text-shadow:0 0 10px rgba(245,201,106,.5)}
+.alldone.on{display:block;animation:fadeUp .4s var(--ease)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}}
+
+.list{flex:1;min-height:0;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px;scrollbar-width:none}
+.list::-webkit-scrollbar{display:none}
+
+/* ---------- objective rows ---------- */
+.obj{flex:none;position:relative;border:1px solid var(--acc-dim);background:var(--acc-fill);padding:10px 12px;overflow:hidden;
+  transition:border-color .3s,background .3s}
+.oh{display:flex;align-items:center;gap:10px;min-height:28px}
+.oh .ix{font-size:11px;color:var(--acc);width:20px;flex:none}
+.oh .on{flex:1;font-size:13px;line-height:1.35}
+.oh .op{font-size:14px;color:#fff;white-space:nowrap}
+.oh .op small{font-size:10px;color:var(--dim);font-weight:400}
+.obar{height:3px;background:rgba(125,139,168,.18);margin:8px 0 0;position:relative;overflow:hidden}
+.obar i{position:absolute;inset:0 auto 0 0;width:0;background:var(--acc);box-shadow:var(--glow);transition:width .3s var(--ease)}
+/* ANIM progress: bar width tweens 300 ms easeOutCubic; the value number pops scale 1.15 -> 1 in 160 ms. */
+.op.pop{animation:pop .16s ease-out}
+@keyframes pop{from{transform:scale(1.15)}}
+.octl{display:flex;gap:6px;margin-top:10px;max-height:240px;transition:max-height .35s var(--ease),margin .35s,opacity .2s}
+.cbtn{flex:1;min-height:var(--touch);border:1px solid var(--acc-line);color:var(--acc-hi);font-size:13px;font-weight:700;background:rgba(79,179,255,.04);
+  clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);transition:transform .1s,background .15s}
+.cbtn:active{transform:scale(.95);background:var(--acc-fill)}
+.cbtn.undo{flex:0 0 48px;color:var(--dim);border-color:var(--acc-dim);font-weight:400}
+.cbtn.warn{border-color:var(--warn);color:var(--warn);font-family:var(--f-title);letter-spacing:.18em}
+.cbtn.big{font-family:var(--f-title);letter-spacing:.2em;font-size:14px}
+
+/* hold-to-confirm square (checkbox objectives) */
+.hsq{position:relative;width:48px;height:48px;flex:none;border:1.5px solid var(--acc-line);touch-action:none;overflow:hidden}
+.hsq::before{content:"";position:absolute;inset:0;background:var(--acc);opacity:.55;transform:scaleY(var(--p,0));transform-origin:bottom}
+.hsq::after{content:"HOLD";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;letter-spacing:.12em;color:var(--dim)}
+.hsq.charging::after{content:""}
+/* ANIM hold square: fills bottom->top over 800 ms; drains 200 ms on early release. */
+
+/* timer clock (timed objectives) */
+.clock{display:flex;align-items:center;gap:12px;width:100%}
+.clock svg{width:112px;height:112px;flex:none}
+.clock .ring-p{transition:stroke-dashoffset .3s linear}
+.clock .ccol{flex:1;display:flex;flex-direction:column;gap:6px}
+.clock .ccol .hint{font-size:10px;color:var(--dim);letter-spacing:.1em;text-align:center}
+.clock.run svg{filter:drop-shadow(0 0 8px var(--acc))}
+.clock.run .ring-p{stroke:var(--acc-hi)}
+
+/* phone-free block */
+.blk{width:100%}
+.blk .live{display:none;align-items:center;gap:10px;margin-bottom:8px;padding:8px 10px;border:1px solid rgba(255,138,147,.4);background:rgba(255,138,147,.06)}
+.blk.run .live{display:flex}
+.blk .live .t{flex:1;font-size:22px;color:#fff}
+.blk .live .lk{font-size:10px;letter-spacing:.14em;color:var(--warn);animation:blinkS 1.6s ease-in-out infinite}
+@keyframes blinkS{50%{opacity:.4}}
+.blk .startB{display:flex}.blk.run .startB{display:none}
+.blk .endB{display:none}.blk.run .endB{display:flex}
+.holdb{position:relative;overflow:hidden;touch-action:none}
+.holdb .fill{position:absolute;inset:0;background:rgba(255,138,147,.3);transform:scaleX(var(--p,0));transform-origin:left}
+.holdb span{position:relative}
+
+/* cap (lower is better, measured by the System) */
+.cap .obar{height:8px;margin-top:10px}
+.cap .obar i{background:linear-gradient(90deg,var(--rank-d),var(--rank-d))}
+.cap .obar .lim{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--warn);right:0}
+.cap .cnote{display:flex;justify-content:space-between;font-size:10px;letter-spacing:.12em;color:var(--dim);margin-top:8px}
+.cap .cnote b{color:var(--rank-d);font-weight:500}
+.cap.over .obar i{background:var(--pz-red)}
+.cap.over .cnote b{color:var(--pz-red)}
+
+/* completed row: collapses, gold check, one shimmer pass */
+/* ANIM complete: controls collapse max-height -> 0 in 350 ms; border to gold 300 ms; check stroke draws 300 ms;
+   a light band sweeps left->right once in 600 ms. Flutter: AnimatedSize + ShaderMask sweep. */
+.obj.done{border-color:rgba(245,201,106,.45);background:rgba(245,201,106,.05)}
+.obj.done .octl,.obj.done .obar,.obj.done .cnote{max-height:0;margin:0;opacity:0;overflow:hidden;pointer-events:none;height:0}
+.obj.done .on{color:var(--gold)}
+.obj.done .op{color:var(--gold)}
+.obj .chk{display:none;width:20px;height:20px;flex:none}
+.obj.done .chk{display:block}
+.obj.done .ix,.obj.done .hsq{display:none}
+.obj.done .chk path{stroke-dasharray:24;stroke-dashoffset:24;animation:draw .3s .1s ease-out forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.obj.shim::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 20%,rgba(245,201,106,.35) 50%,transparent 80%);
+  transform:translateX(-100%);animation:shim .6s ease-out forwards;pointer-events:none}
+@keyframes shim{to{transform:translateX(100%)}}
+
+/* ---------- footer inside window ---------- */
+.ftr{border-top:1px solid var(--acc-dim);padding:10px 14px 12px}
+.cdrow{display:flex;justify-content:space-between;align-items:baseline}
+.cd{font-size:24px;color:#fff;text-shadow:var(--glow)}
+.cd.urgent{color:var(--warn);animation:blinkS 1s ease-in-out infinite}
+.wl{font-size:11px;color:var(--warn);margin-top:4px}
+.ftr.safe .wl{color:var(--gold)}
+.xp{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:10px;color:var(--dim);letter-spacing:.1em}
+.xpb{flex:1;height:6px;background:rgba(125,139,168,.18);position:relative;overflow:hidden}
+.xpb .cur{position:absolute;inset:0 auto 0 0;background:var(--sys);box-shadow:0 0 6px var(--sys);transition:width .6s var(--ease)}
+.xpb .pend{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(135deg,rgba(245,201,106,.85) 0 4px,rgba(245,201,106,.35) 4px 8px);transition:left .6s var(--ease),width .6s var(--ease)}
+/* ANIM XP claim: pending stripes slide into the solid bar, 600 ms easeOutCubic; the number counts up over the same 600 ms. */
+.xp .v{color:var(--text)}.xp .v b{color:var(--gold);font-weight:500}
+
+/* ---------- bottom nav ---------- */
+.nav{position:relative;z-index:2;flex:none;display:flex;height:calc(64px + var(--safe-bottom));padding-bottom:var(--safe-bottom);margin:0 calc(var(--pad) * -1);border-top:1px solid var(--acc-dim);background:rgba(5,7,13,.85)}
+.dungeon .nav{background:rgba(6,1,2,.85)}
+.nav button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-family:var(--f-title);font-size:11px;letter-spacing:.2em;color:var(--dim);position:relative}
+.nav button svg{width:20px;height:20px}
+.nav button.on{color:var(--acc-hi);text-shadow:var(--glow)}
+.nav button.on::before{content:"";position:absolute;top:-1px;left:28%;right:28%;height:2px;background:var(--acc);box-shadow:var(--glow)}
+.nav .dotw{position:absolute;top:12px;right:calc(50% - 18px);width:7px;height:7px;background:var(--warn);transform:rotate(45deg);display:none}
+.nav .dotw.on{display:block}
+
+/* ---------- overlays ---------- */
+.ov{position:absolute;inset:0;z-index:40;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(5,7,13,.78)}
+.ov.on{display:flex;animation:ovIn .35s var(--ease)}
+/* ANIM reward window: scaleY 0.04 -> 1 with flash, 400 ms easeOutExpo (same power-on as onboarding). */
+@keyframes ovIn{from{opacity:0}}
+.ov .frm{position:relative;width:100%;animation:power .4s cubic-bezier(.16,1,.3,1)}
+@keyframes power{from{transform:scaleY(.04)}}
+.ov .frm>.b{position:absolute;width:14px;height:14px;border-color:var(--gold);border-style:solid}
+.ov .frm>.b.tl{top:-5px;left:-5px;border-width:2px 0 0 2px}.ov .frm>.b.tr{top:-5px;right:-5px;border-width:2px 2px 0 0}
+.ov .frm>.b.bl{bottom:-5px;left:-5px;border-width:0 0 2px 2px}.ov .frm>.b.br{bottom:-5px;right:-5px;border-width:0 2px 2px 0}
+.ov .w{padding:1px;background:linear-gradient(160deg,var(--gold),rgba(245,201,106,.25) 50%,var(--gold));
+  clip-path:polygon(12px 0,calc(100% - 12px) 0,100% 12px,100% calc(100% - 12px),calc(100% - 12px) 100%,12px 100%,0 calc(100% - 12px),0 12px)}
+.ov .wi{padding:18px;background:linear-gradient(180deg,#17140c,#0b0a07);
+  clip-path:polygon(11.5px 0,calc(100% - 11.5px) 0,100% 11.5px,100% calc(100% - 11.5px),calc(100% - 11.5px) 100%,11.5px 100%,0 calc(100% - 11.5px),0 11.5px)}
+.ov .tt{font-family:var(--f-title);font-weight:700;letter-spacing:.26em;font-size:14px;color:var(--gold);text-align:center;padding-bottom:12px;border-bottom:1px solid rgba(245,201,106,.25);margin-bottom:14px;text-shadow:0 0 10px rgba(245,201,106,.5)}
+.ov .xpbig{text-align:center;font-size:40px;color:var(--gold);text-shadow:0 0 14px rgba(245,201,106,.6);margin:6px 0 2px}
+.ov .rows{display:grid;grid-template-columns:1fr auto;gap:8px 12px;font-size:12px;margin:14px 0 18px}
+.ov .rows span:nth-child(odd){color:var(--dim)}
+.ov .gbtn{width:100%;min-height:52px;border:1px solid var(--gold);color:var(--gold);font-family:var(--f-title);font-weight:700;letter-spacing:.26em;background:rgba(245,201,106,.08)}
+.ov .gbtn:active{transform:scale(.97)}
+.flash{position:absolute;inset:0;z-index:50;background:#cfeaff;opacity:0;pointer-events:none}
+.flash.go{animation:flash .32s ease-out}
+.flash.gold{background:#ffe7b0}
+@keyframes flash{15%{opacity:.5}100%{opacity:0}}
+.toast{position:absolute;left:24px;right:24px;bottom:calc(var(--safe-bottom) + 80px);z-index:45;padding:10px 12px;font-size:11px;letter-spacing:.08em;text-align:center;
+  border:1px solid var(--acc-line);background:rgba(5,7,13,.95);color:var(--text);opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:none}
+.toast.on{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<div class="phone" id="phone">
+  <div class="top">
+    <div class="dt"><div class="d" id="dDate">SAT · 31 OCT</div><div class="k" id="dDay">DAY 12 / 30 · FITNESS</div></div>
+    <button class="ibtn" id="snd" aria-label="Sound on">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8 H6 L11 4 V16 L6 12 H3 Z"/><path class="w1" d="M14 7 a4 4 0 0 1 0 6"/><path class="w2" d="M16 5 a7 7 0 0 1 0 10"/><path class="x" d="M14 8 L18 12 M18 8 L14 12" style="display:none"/></svg>
+    </button>
+    <!-- EXPORT: rank-badge-small.svg -->
+    <div class="rbadge" id="rbadge" style="--rc:var(--rank-d)">
+      <svg viewBox="0 0 48 52"><path d="M24 2 L46 14 V38 L24 50 L2 38 V14 Z" fill="rgba(10,18,34,.9)" stroke="currentColor" stroke-width="2"/>
+        <path d="M24 8 L40 17 V35 L24 44 L8 35 V17 Z" fill="none" stroke="currentColor" stroke-width=".8" opacity=".5"/>
+        <text x="24" y="33" text-anchor="middle" font-family="Chakra Petch" font-weight="700" font-size="20" fill="currentColor" id="rL">D</text></svg>
+    </div>
+  </div>
+
+  <div class="gate" id="gate"><div class="gi">
+    <!-- EXPORT: gate-portal.svg -->
+    <svg class="gsvg" viewBox="0 0 46 56" fill="none"><path d="M23 2 L44 14 V42 L23 54 L2 42 V14 Z" stroke="#F5C96A" stroke-width="1.5"/>
+      <ellipse cx="23" cy="28" rx="11" ry="17" stroke="#B07CFF" stroke-width="2"/><ellipse cx="23" cy="28" rx="5" ry="10" fill="#B07CFF" opacity=".5"/></svg>
+    <div class="gt"><b>[ GATE OPEN ]</b><span>21 of 30 days cleared. Rank Trial D → C.</span><div class="gc num">CLOSES IN <span id="gateCd" style="display:inline">47:59:12</span></div></div>
+  </div>
+    <div style="padding:0 12px 12px;background:#0b0a18">
+      <button class="cbtn big holdb" id="gateHold" style="width:100%;border-color:var(--gold);color:var(--gold)"><i class="fill" style="background:rgba(245,201,106,.3)"></i><span>HOLD TO ENTER</span></button>
+    </div>
+  </div>
+
+  <div class="qw">
+    <span class="b tl"></span><span class="b tr"></span><span class="b bl"></span><span class="b br"></span>
+    <div class="win"><div class="in">
+      <div class="wtitle" id="wTitle">[ DAILY QUEST ]</div>
+      <div class="wsub"><span id="wSubL">RANK D · FITNESS</span><span id="wSubR">0 / 4 CLEARED</span></div>
+      <div class="alldone" id="allDone">All objectives complete.</div>
+      <div class="list" id="list"></div>
+      <div class="ftr" id="ftr">
+        <div class="cdrow"><span class="kicker" id="cdLbl">Time remaining</span><span class="cd num" id="cd">16:47:18</span></div>
+        <p class="wl" id="wl">Failure to complete will result in a penalty.</p>
+        <div class="xp"><span>XP</span><div class="xpb"><i class="cur" id="xpCur"></i><i class="pend" id="xpPend"></i></div><span class="v num" id="xpV">340 / 500 <b>+100</b></span></div>
+      </div>
+    </div></div>
+  </div>
+
+  <nav class="nav">
+    <button class="on" data-tab="QUEST"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 2 L18 10 L10 18 L2 10 Z"/><path d="M7 10 H13"/></svg>QUEST</button>
+    <button data-tab="STATUS"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 16 V10 M10 16 V4 M16 16 V8"/></svg>STATUS</button>
+    <button data-tab="PENALTY"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 2 L19 17 H1 Z"/><path d="M10 8 V12 M10 14 V15"/></svg>PENALTY<i class="dotw" id="penDot"></i></button>
+  </nav>
+
+  <div class="ov" id="reward"><div class="frm"><span class="b tl"></span><span class="b tr"></span><span class="b bl"></span><span class="b br"></span>
+    <div class="w"><div class="wi">
+      <div class="tt" id="rwT">[ QUEST CLEARED ]</div>
+      <div class="kicker" style="text-align:center">Reward</div>
+      <div class="xpbig num" id="rwXp">+100 XP</div>
+      <div class="rows" id="rwRows"></div>
+      <button class="gbtn" id="rwOk">CLAIM</button>
+    </div></div></div></div>
+  <div class="flash" id="flash"></div>
+  <div class="toast" id="toast"></div>
+</div>
+
+<aside class="rev">
+  <h2>STATE</h2>
+  <div class="opts" id="optState"></div>
+  <h2>SYSTEM</h2>
+  <div class="opts" id="optSys"></div>
+  <h2>SIMULATED TIME</h2>
+  <div class="opts" id="optSpeed"></div>
+  <h2>NOTES</h2>
+  <p>Every control works. Timers and blocks run on the simulated clock, so use ×30 to watch a plank or block finish.</p>
+  <p class="gap"><b>Self-report.</b> Holds, counts and distance are honour-based. Verify walks with step data and Focus objectives with Usage Access, or the penalty is trivially avoided.</p>
+  <p class="gap"><b>Caps settle at midnight.</b> A "lower is better" cap can't be cleared early, so Focus shows "All objectives complete" with the cap still holding until 23:59. Decide whether exceeding the cap after that still fails the day.</p>
+  <p class="gap"><b>Undo.</b> Counts and distance have a small undo button. Without it, one mis-tap can't be fixed. Undo locks once a row is complete.</p>
+  <p><b>Rank D quests</b> here are placeholders until the rank tables exist. Dungeon Floor 2 multiplies targets by 1.5.</p>
+  <p><b>STATUS</b> and <b>PENALTY</b> tabs aren't designed yet.</p>
+</aside>
+
+<script>
+const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)];
+/* ---------- objective definitions (rank D, placeholders) ---------- */
+const DEFS={
+  fitness:[{n:'Walk',type:'distance',t:2000,steps:[100,500]},{n:'Push-ups',type:'count',t:20,steps:[1,5,10]},
+           {n:'Squats',type:'count',t:25,steps:[1,5,10]},{n:'Plank',type:'timed',t:60}],
+  personality:[{n:'Read',type:'count',t:15,unit:'pages',steps:[1,5,10]},{n:'Write five journal lines',type:'check'},
+           {n:'Start a conversation with someone new',type:'check'},{n:'Explain one idea aloud',type:'timed',t:120}],
+  focus:[{n:'No phone for 30 min after waking',type:'check'},{n:'Phone-free block',type:'block',t:3600},
+         {n:'Social media cap',type:'cap',t:60},{n:'No phone at meals',type:'count',t:2,unit:'meals',steps:[1]}]
+};
+/* ---------- states ---------- */
+const STATES={
+  fresh:{label:'Fresh day',now:'07:12:04',prog:'zero'},
+  half:{label:'Half done',now:'16:18:40',prog:'half'},
+  done:{label:'All done',now:'19:40:05',prog:'full'},
+  dungeon:{label:'Dungeon F2',now:'15:05:30',prog:'dg',dungeon:2,deadline:18*3600,mult:1.5},
+  gate:{label:'Gate open',now:'08:30:00',prog:'zero',gate:true}
+};
+const R={state:'fresh',sys:'fitness',speed:1,snd:true,objs:[],now:0,deadline:86400,xp:340,xpMax:500,reward:100,claimed:false,rewardShown:false,gateLeft:47*3600+59*60+12,floor:0};
+const flash=g=>{const f=$('#flash');f.className='flash'+(g?' gold':'');void f.offsetWidth;f.classList.add('go')};
+const buzz=ms=>{try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){}};
+let tt;const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),1800)};
+const hms=s=>{s=Math.max(0,Math.floor(s));return[s/3600|0,(s%3600)/60|0,s%60].map(x=>String(x).padStart(2,'0')).join(':')};
+const ms=s=>{s=Math.max(0,Math.floor(s));return String(s/60|0).padStart(2,'0')+':'+String(s%60).padStart(2,'0')};
+
+/* ---------- sound: tiny synth blips ---------- */
+let AC;function blip(f,d=.08,type='sine',v=.06){if(!R.snd)return;try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();
+  const o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.value=f;g.gain.value=v;g.gain.exponentialRampToValueAtTime(.0001,AC.currentTime+d);
+  o.connect(g).connect(AC.destination);o.start();o.stop(AC.currentTime+d)}catch(e){}}
+const chime=()=>{blip(880,.12);setTimeout(()=>blip(1320,.18),90)};
+
+/* ---------- build objectives for state ---------- */
+function build(){
+  const st=STATES[R.state],m=st.mult||1;
+  R.objs=DEFS[R.sys].map((d,i)=>{const o={...d,i,val:0,done:false,run:false};
+    if(o.t&&o.type!=='cap')o.t=o.type==='distance'?Math.round(o.t*m/100)*100:o.type==='timed'||o.type==='block'?Math.round(o.t*m/60)*60:Math.ceil(o.t*m);
+    if(o.type==='cap')o.val=st.prog==='zero'?4:st.prog==='half'?20:st.prog==='full'?38:31;
+    else if(st.prog==='full')o.val=o.type==='check'?1:o.t;
+    else if(st.prog==='half')o.val=i%2===0?(o.type==='check'?1:o.t):(o.type==='check'?0:Math.round(o.t*.4/(o.type==='distance'?100:1))*(o.type==='distance'?100:1));
+    else if(st.prog==='dg')o.val=i===0?(o.type==='check'?1:o.t):(o.type==='check'?0:Math.round(o.t*.3/(o.type==='distance'?100:1))*(o.type==='distance'?100:1));
+    if(o.type==='timed'&&st.prog==='half'&&i%2)o.val=Math.round(o.t*.45);
+    o.done=o.type!=='cap'&&(o.type==='check'?o.val>=1:o.val>=o.t);return o});
+  const [h,mi,s]=st.now.split(':').map(Number);R.now=h*3600+mi*60+s;
+  R.deadline=st.deadline||86400;R.floor=st.dungeon||0;R.claimed=st.prog==='full';R.rewardShown=st.prog==='full';
+  R.reward=R.floor===2?150:R.floor===1?125:100;R.xp=R.claimed?440:340;
+  render();
+}
+
+/* ---------- rendering ---------- */
+const CHK='<svg class="chk" viewBox="0 0 20 20" fill="none"><path d="M3 10 L8 15 L17 5" stroke="#F5C96A" stroke-width="2.5" stroke-linecap="square"/></svg>';
+function progTxt(o){switch(o.type){
+  case 'count':return `${o.val} / ${o.t}${o.unit?` <small>${o.unit}</small>`:''}`;
+  case 'distance':return `${(o.val/1000).toFixed(1)} / ${(o.t/1000).toFixed(1)} <small>km</small>`;
+  case 'timed':return o.done?'100%':Math.floor(o.val/o.t*100)+'%';
+  case 'block':return `${Math.floor(o.val/60)} / ${o.t/60} <small>min</small>`;
+  case 'cap':return `${o.val} / ${o.t} <small>min</small>`;
+  case 'check':return o.done?'1 / 1':'0 / 1';}}
+function ctlHTML(o){
+  if(o.type==='count'||o.type==='distance'){const lab=v=>o.type==='distance'?(v>=1000?`+${v/1000} km`:`+${v} m`):`+${v}`;
+    return `<div class="octl">${o.steps.map(v=>`<button class="cbtn" data-act="add" data-v="${v}">${lab(v)}</button>`).join('')}<button class="cbtn undo" data-act="undo" aria-label="Undo">↺</button></div>`}
+  if(o.type==='timed'){const C=2*Math.PI*48;return `<div class="octl"><div class="clock" id="clk${o.i}">
+    <svg viewBox="0 0 112 112"><circle cx="56" cy="56" r="48" fill="none" stroke="rgba(125,139,168,.2)" stroke-width="5"/>
+    <circle class="ring-p" cx="56" cy="56" r="48" fill="none" stroke="var(--acc)" stroke-width="5" stroke-dasharray="${C}" stroke-dashoffset="${C}" transform="rotate(-90 56 56)"/>
+    ${Array.from({length:12},(_,k)=>{const a=k/12*Math.PI*2;return`<line x1="${56+Math.sin(a)*40}" y1="${56-Math.cos(a)*40}" x2="${56+Math.sin(a)*36}" y2="${56-Math.cos(a)*36}" stroke="rgba(169,220,255,.45)" stroke-width="1"/>`}).join('')}
+    <text class="ct" x="56" y="62" text-anchor="middle" font-family="JetBrains Mono" font-weight="700" font-size="20" fill="#fff">00:00</text>
+    <text x="56" y="78" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#7D8BA8" letter-spacing="1">REMAINING</text></svg>
+    <div class="ccol"><button class="cbtn big" data-act="timer">START</button><div class="hint">Pausing keeps your progress.</div></div></div></div>`}
+  if(o.type==='block')return `<div class="octl"><div class="blk" id="blk${o.i}">
+    <div class="live"><span class="t num">00:00</span><span class="lk">${R.sys==='focus'?'APPS LOCKED':''}</span></div>
+    <div class="startB"><button class="cbtn warn" data-act="bstart" style="flex:1">START BLOCK</button></div>
+    <div class="endB"><button class="cbtn holdb" data-act="bend" style="flex:1;border-color:var(--warn);color:var(--warn)"><i class="fill"></i><span>HOLD TO END BLOCK</span></button></div></div></div>`;
+  if(o.type==='cap')return `<div class="cnote"><span>MEASURED · LOWER IS BETTER</span><b class="cs">HOLDING</b></div>`;
+  return '';
+}
+function rowHTML(o){
+  const hs=o.type==='check'?`<button class="hsq" data-act="hold" aria-label="Hold to confirm"></button>`:'';
+  const bar=o.type==='check'?'':`<div class="obar"><i></i>${o.type==='cap'?'<span class="lim"></span>':''}</div>`;
+  return `<div class="obj${o.type==='cap'?' cap':''}" id="o${o.i}" data-i="${o.i}">
+    <div class="oh"><span class="ix num">${String(o.i+1).padStart(2,'0')}</span>${CHK}<span class="on">${o.n}</span><span class="op num">${progTxt(o)}</span>${hs}</div>
+    ${bar}${ctlHTML(o)}</div>`}
+function render(){
+  const st=STATES[R.state],ph=$('#phone');
+  ph.classList.toggle('dungeon',!!R.floor);
+  $('#wTitle').textContent=R.floor?`[ DUNGEON · FLOOR ${R.floor} ]`:'[ DAILY QUEST ]';
+  $('#wSubL').innerHTML=R.floor?`RANK D · ${R.sys.toUpperCase()}<span class="mult">${R.floor===2?'+50%':'+25%'}</span>`:`RANK D · ${R.sys.toUpperCase()}`;
+  $('#dDay').textContent=R.floor?`DUNGEON DAY ${R.floor} / 3 · ${R.sys.toUpperCase()}`:`DAY 12 / 30 · ${R.sys.toUpperCase()}`;
+  $('#cdLbl').textContent=R.deadline<86400?'Floor closes 18:00 in':'Time remaining';
+  $('#wl').textContent=R.floor?'Fail this floor and the Dungeon Penalty follows.':'Failure to complete will result in a penalty.';
+  $('#gate').classList.toggle('on',!!st.gate&&!R.floor);
+  $('#list').innerHTML=R.objs.map(rowHTML).join('');
+  R.objs.forEach(o=>update(o,true));
+  $('#reward').classList.remove('on');
+  status();xpDraw();tickUI();
+}
+function update(o,silent){
+  const el=$('#o'+o.i);if(!el)return;const op=el.querySelector('.op');op.innerHTML=progTxt(o);
+  if(!silent){op.classList.remove('pop');void op.offsetWidth;op.classList.add('pop')}
+  const bar=el.querySelector('.obar i');
+  if(bar)bar.style.width=Math.min(100,o.type==='cap'?o.val/o.t*100:o.val/o.t*100)+'%';
+  if(o.type==='timed'){const c=el.querySelector('.clock');if(c){const C=2*Math.PI*48;c.querySelector('.ring-p').setAttribute('stroke-dashoffset',C*(1-o.val/o.t));
+    c.querySelector('.ct').textContent=ms(o.t-o.val);c.classList.toggle('run',o.run);c.querySelector('[data-act="timer"]').textContent=o.run?'PAUSE':o.val>0?'RESUME':'START'}}
+  if(o.type==='block'){const b=el.querySelector('.blk');if(b){b.classList.toggle('run',o.run);b.querySelector('.t').textContent=hms(o.val).slice(o.val>=3600?0:3)}}
+  if(o.type==='cap'){const over=o.val>o.t;el.classList.toggle('over',over);const cs=el.querySelector('.cs');if(cs)cs.textContent=over?'EXCEEDED':`${o.t-o.val} MIN LEFT`}
+  el.classList.toggle('done',o.done);
+}
+function complete(o){
+  o.done=true;o.run=false;update(o);const el=$('#o'+o.i);el.classList.remove('shim');void el.offsetWidth;el.classList.add('shim');
+  chime();buzz(30);status();
+}
+function status(){
+  const goal=R.objs.filter(o=>o.type!=='cap'),n=goal.filter(o=>o.done).length,cap=R.objs.find(o=>o.type==='cap');
+  const all=n===goal.length&&(!cap||cap.val<=cap.t);
+  $('#wSubR').innerHTML=all?`<span class="ok">${n} / ${goal.length} CLEARED</span>`:`${n} / ${goal.length} CLEARED`;
+  $('#allDone').textContent=cap?'All objectives complete. Cap holds until 23:59.':'All objectives complete.';
+  $('#allDone').classList.toggle('on',all);
+  $('#ftr').classList.toggle('safe',all);
+  $('#wl').textContent=all?(R.floor?'Floor cleared. The next floor opens tomorrow.':'Penalty avoided. The next quest issues at 00:00.'):(R.floor?'Fail this floor and the Dungeon Penalty follows.':'Failure to complete will result in a penalty.');
+  if(all&&!R.rewardShown){R.rewardShown=true;setTimeout(showReward,700)}
+}
+function xpDraw(){const cur=R.xp/R.xpMax*100,p=R.claimed?0:R.reward/R.xpMax*100;
+  $('#xpCur').style.width=cur+'%';$('#xpPend').style.left=cur+'%';$('#xpPend').style.width=p+'%';
+  $('#xpV').innerHTML=`${R.xp} / ${R.xpMax}${R.claimed?'':` <b>+${R.reward}</b>`}`}
+function showReward(){
+  flash(true);blip(660,.1);setTimeout(()=>blip(990,.14),100);setTimeout(()=>blip(1320,.25),200);
+  $('#rwT').textContent=R.floor?`[ FLOOR ${R.floor} CLEARED ]`:'[ QUEST CLEARED ]';$('#rwXp').textContent=`+${R.reward} XP`;
+  $('#rwRows').innerHTML=R.floor?`<span>Dungeon progress</span><span>Floor ${R.floor} / 3</span><span>Next</span><span>${R.floor===2?'Rank Trial · tomorrow':'Floor 2 · tomorrow'}</span><span>Dungeon Penalty</span><span style="color:var(--rank-d)">Avoided</span>`
+    :`<span>Days cleared</span><span>13 / 21 for the Gate</span><span>Streak</span><span>6 days</span><span>Penalty Zone</span><span style="color:var(--rank-d)">Avoided</span>`;
+  $('#reward').classList.add('on');
+}
+$('#rwOk').addEventListener('click',()=>{$('#reward').classList.remove('on');if(!R.claimed){R.claimed=true;
+  const from=R.xp,to=R.xp+R.reward,t0=performance.now();R.xp=to;xpDraw();
+  (function cnt(n){const k=Math.min(1,(n-t0)/600);$('#xpV').textContent=`${Math.round(from+(to-from)*k)} / ${R.xpMax}`;if(k<1)requestAnimationFrame(cnt)})(t0);blip(1046,.2)}});
+
+/* ---------- interactions (event delegation) ---------- */
+function bindHold(el,dur,onDone){let t0,raf,on=false,done=false;
+  const tick=()=>{const p=Math.min(1,(performance.now()-t0)/dur);el.style.setProperty('--p',p);if(p>=1){done=true;on=false;el.classList.remove('charging');onDone();return}raf=requestAnimationFrame(tick)};
+  el.addEventListener('pointerdown',e=>{if(done)return;e.preventDefault();el.setPointerCapture?.(e.pointerId);on=true;t0=performance.now();el.classList.add('charging');el.style.transition='none';raf=requestAnimationFrame(tick);blip(220,.05,'triangle',.03)});
+  const stop=()=>{if(!on)return;on=false;cancelAnimationFrame(raf);el.classList.remove('charging');el.style.setProperty('--p',0)};
+  ['pointerup','pointercancel','pointerleave'].forEach(v=>el.addEventListener(v,stop));
+  el.addEventListener('contextmenu',e=>e.preventDefault());
+  el.resetHold=()=>{done=false;el.style.setProperty('--p',0)}}
+$('#list').addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');if(!b)return;const o=R.objs[+b.closest('.obj').dataset.i];if(o.done)return;const a=b.dataset.act;
+  if(a==='add'){o.val=Math.min(o.t,o.val+ +b.dataset.v);blip(520+o.val/o.t*400,.05);buzz(8);update(o);if(o.val>=o.t)complete(o)}
+  if(a==='undo'){const s=o.type==='distance'?100:1;o.val=Math.max(0,o.val-s);blip(300,.05);update(o)}
+  if(a==='timer'){o.run=!o.run;blip(o.run?660:440,.08);update(o)}
+  if(a==='bstart'){o.run=true;flash();blip(180,.25,'sawtooth',.04);toast(R.sys==='focus'?'Block started. Lock targets are closed.':'Block started.');update(o)}
+});
+const obs=new MutationObserver(()=>{$$('.hsq:not([data-b]),.holdb[data-act="bend"]:not([data-b])').forEach(el=>{el.dataset.b=1;
+  const o=R.objs[+el.closest('.obj').dataset.i];
+  if(el.classList.contains('hsq'))bindHold(el,800,()=>{o.val=1;update(o);complete(o)});
+  else bindHold(el,1000,()=>{o.run=false;el.resetHold();toast(o.val>=o.t?'Block complete.':`Block ended at ${Math.floor(o.val/60)} min. Target not met.`);update(o)})})});
+obs.observe($('#list'),{childList:true,subtree:true});
+bindHold($('#gateHold'),1500,()=>{flash(true);blip(110,.6,'sawtooth',.05);toast('Entering the Gate.');
+  setTimeout(()=>{STATES.dungeon1={label:'Dungeon F1',now:'08:31:00',prog:'zero',dungeon:1,deadline:86400,mult:1.25};setState('dungeon1')},700)});
+$('#snd').addEventListener('click',()=>{R.snd=!R.snd;const b=$('#snd');b.classList.toggle('off',!R.snd);
+  b.querySelector('.w1').style.display=b.querySelector('.w2').style.display=R.snd?'':'none';b.querySelector('.x').style.display=R.snd?'none':'';
+  b.setAttribute('aria-label',R.snd?'Sound on':'Sound off');toast(R.snd?'Sound on':'Sound off')});
+$$('.nav button').forEach(b=>b.addEventListener('click',()=>{if(b.dataset.tab!=='QUEST')toast(`${b.dataset.tab} is the next screen to design.`)}));
+
+/* ---------- clock (simulated) ---------- */
+function tickUI(){
+  const left=R.deadline-R.now,cd=$('#cd');cd.textContent=hms(left);cd.classList.toggle('urgent',left<3600&&!$('#allDone').classList.contains('on'));
+  $('#gateCd').textContent=hms(R.gateLeft);$('#penDot').classList.toggle('on',left<3600);
+  const d=new Date(2026,9,31);$('#dDate').textContent=d.toLocaleDateString('en-GB',{weekday:'short'}).toUpperCase()+' · '+d.getDate()+' '+d.toLocaleDateString('en-GB',{month:'short'}).toUpperCase();
+}
+setInterval(()=>{const k=R.speed;R.now=Math.min(R.deadline,R.now+k);R.gateLeft=Math.max(0,R.gateLeft-k);
+  R.objs.forEach(o=>{if(!o.run||o.done)return;o.val=Math.min(o.t,o.val+k);
+    if(o.val>=o.t){if(o.type==='block')toast('Block complete. Apps unlocked.');complete(o)}else update(o,true)});
+  tickUI()},1000);
+
+/* ---------- reviewer controls ---------- */
+function setState(s){R.state=s;$$('#optState button').forEach(b=>b.classList.toggle('on',b.dataset.v===s||(s==='dungeon1'&&b.dataset.v==='gate')));build()}
+$('#optState').innerHTML=Object.entries(STATES).map(([k,v])=>`<button data-v="${k}">${v.label}</button>`).join('');
+$('#optSys').innerHTML=['fitness','personality','focus'].map(k=>`<button data-v="${k}">${k[0].toUpperCase()+k.slice(1)}</button>`).join('');
+$('#optSpeed').innerHTML=[1,30].map(k=>`<button data-v="${k}">×${k}</button>`).join('');
+$$('#optState button').forEach(b=>b.addEventListener('click',()=>setState(b.dataset.v)));
+$$('#optSys button').forEach(b=>b.addEventListener('click',()=>{R.sys=b.dataset.v;$$('#optSys button').forEach(x=>x.classList.toggle('on',x===b));build()}));
+$$('#optSpeed button').forEach(b=>b.addEventListener('click',()=>{R.speed=+b.dataset.v;$$('#optSpeed button').forEach(x=>x.classList.toggle('on',x===b))}));
+$('#optSys button').classList.add('on');$('#optSpeed button').classList.add('on');
+setState('fresh');
+</script>
+</body>
+</html>

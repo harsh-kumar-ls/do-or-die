@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Do or Die — System notices (prototype)</title>
+<!-- Fonts load from Google Fonts here; bundle them as assets in the Flutter build. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* =========================================================
+   BRAND TOKENS
+   ========================================================= */
+:root{
+  --void:#05070D; --void-glow:#0B1730; --panel:rgba(10,18,34,0.72);
+  --sys:#4FB3FF; --hi:#A9DCFF; --text:#DBE7FF; --dim:#7D8BA8;
+  --gold:#F5C96A; --warn:#FF8A93;
+  --pz-red:#FF3B4A; --pz-bg:#090204;
+  --dp-crimson:#D7263D; --dp-gold:#F5C96A; --dp-bg:#060102;
+  --rank-e:#9AA4B8; --rank-d:#5BD69A; --rank-c:#4FB3FF; --rank-b:#B07CFF; --rank-a:#FF9F45; --rank-s:#F5C96A;
+  --f-title:"Chakra Petch",system-ui,sans-serif;
+  --f-body:"JetBrains Mono",ui-monospace,monospace;
+  --safe-top:44px; --safe-bottom:34px; --pad:22px; --touch:48px;
+  --ease:cubic-bezier(.2,.8,.2,1);
+}
+/* notice themes: accent, title colour, window fill, scrim */
+.th-blue{--a:var(--sys);--a2:var(--hi);--aline:rgba(79,179,255,.55);--adim:rgba(79,179,255,.2);--w1:#0d182e;--w2:#080e1b;--glow:0 0 10px rgba(79,179,255,.6);--scrim:rgba(3,5,10,.8)}
+.th-gold{--a:var(--gold);--a2:var(--gold);--aline:rgba(245,201,106,.6);--adim:rgba(245,201,106,.22);--w1:#17140c;--w2:#0b0a07;--glow:0 0 12px rgba(245,201,106,.55);--scrim:rgba(5,4,2,.8)}
+.th-red{--a:var(--pz-red);--a2:#ff6a75;--aline:rgba(255,59,74,.6);--adim:rgba(255,59,74,.22);--w1:#1e0508;--w2:#0c0204;--glow:0 0 12px rgba(255,59,74,.7);--scrim:rgba(9,2,4,.84)}
+.th-crimson{--a:var(--dp-crimson);--a2:var(--dp-gold);--aline:rgba(215,38,61,.65);--adim:rgba(215,38,61,.24);--w1:#1a0307;--w2:#080102;--glow:0 0 12px rgba(245,201,106,.45);--scrim:rgba(6,1,2,.92)}
+
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{min-height:100%;background:#020308;color:var(--text);font-family:var(--f-body)}
+body{display:flex;gap:28px;justify-content:center;align-items:flex-start;padding:24px}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+
+/* reviewer panel */
+.rev{width:300px;font-size:12px;line-height:1.6;color:var(--dim)}
+.rev h2{font-family:var(--f-title);letter-spacing:.18em;font-size:13px;color:var(--hi);margin:16px 0 8px}
+.rev .opts{display:flex;flex-wrap:wrap;gap:6px}
+.rev .opts button{font-size:11px;letter-spacing:.08em;color:var(--dim);border:1px solid rgba(79,179,255,.18);padding:8px 10px;min-height:36px}
+.rev .opts button.on{color:var(--hi);border-color:var(--sys)}
+.rev p{margin-bottom:8px}.rev b{color:var(--text);font-weight:500}.rev .gap{color:var(--warn)}
+
+/* =========================================================
+   PHONE + dimmed backdrop (a static Daily Quest screen)
+   ========================================================= */
+.phone{width:390px;height:844px;position:relative;overflow:hidden;border-radius:38px;flex:none;user-select:none;-webkit-user-select:none;
+  background:radial-gradient(120% 55% at 50% -10%,var(--void-glow) 0%,var(--void) 62%);box-shadow:0 0 0 1px #111a2c,0 30px 80px rgba(0,0,0,.6)}
+.phone::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:60;background:repeating-linear-gradient(0deg,rgba(0,0,0,.18) 0 1px,transparent 1px 3px)}
+.bg{position:absolute;inset:0;padding:var(--safe-top) 16px 0;display:flex;flex-direction:column;gap:10px}
+.bg .mt{display:flex;justify-content:space-between;align-items:center;height:56px}
+.bg .mt b{font-family:var(--f-title);letter-spacing:.2em;font-size:14px}
+.bg .mt span{display:block;font-size:10px;letter-spacing:.16em;color:var(--dim)}
+.bg .mt i{width:44px;height:48px;border:1.5px solid var(--rank-e);clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%)}
+.bg .mw{flex:1;border:1px solid rgba(79,179,255,.35);padding:14px 12px;display:flex;flex-direction:column;gap:10px;margin-bottom:8px}
+.bg .mw .t{font-family:var(--f-title);letter-spacing:.26em;font-size:14px;color:var(--hi);text-align:center;margin-bottom:6px}
+.bg .mw .r{height:92px;border:1px solid rgba(79,179,255,.18);background:rgba(79,179,255,.05)}
+.bg .mn{height:calc(64px + var(--safe-bottom));border-top:1px solid rgba(79,179,255,.18);margin:0 -16px;display:flex;justify-content:space-around;padding-top:22px;font-family:var(--f-title);font-size:11px;letter-spacing:.2em;color:var(--dim)}
+
+.scrim{position:absolute;inset:0;z-index:10;opacity:0;pointer-events:none;background:var(--scrim,rgba(3,5,10,.8));backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);transition:opacity .25s}
+.scrim.on{opacity:1;pointer-events:auto}
+.fx{position:absolute;inset:0;z-index:15;pointer-events:none}
+.stage{position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;justify-content:center;align-items:stretch;gap:18px;padding:var(--safe-top) var(--pad) var(--safe-bottom);pointer-events:none}
+.stage.low{justify-content:flex-end;padding-bottom:calc(var(--safe-bottom) + 40px)}
+.stage>*{pointer-events:auto}
+.flash{position:absolute;inset:0;z-index:50;opacity:0;pointer-events:none}
+/* ANIM flash: colour layer 0 -> peak -> 0 in 320 ms. */
+.flash.go{animation:flash .32s ease-out}
+@keyframes flash{15%{opacity:var(--fo,.5)}100%{opacity:0}}
+.phone.shake{animation:shake .22s linear}
+.phone.shakeH{animation:shakeH .34s linear}
+@keyframes shake{25%{transform:translate(-3px,2px)}50%{transform:translate(3px,-2px)}75%{transform:translate(-2px,-1px)}}
+@keyframes shakeH{15%{transform:translate(0,7px)}30%{transform:translate(-5px,-3px)}45%{transform:translate(4px,3px)}60%{transform:translate(-3px,-1px)}80%{transform:translate(2px,1px)}}
+
+.kicker{font-size:10px;letter-spacing:.22em;color:var(--dim);text-transform:uppercase}
+.num{font-family:var(--f-body);font-weight:700;font-variant-numeric:tabular-nums}
+
+/* =========================================================
+   NOTICE WINDOW
+   ========================================================= */
+.ntc{position:relative;opacity:0}
+.ntc>.b{position:absolute;width:14px;height:14px;border-color:var(--a2);border-style:solid;z-index:2;pointer-events:none}
+.ntc>.b.tl{top:-5px;left:-5px;border-width:2px 0 0 2px}.ntc>.b.tr{top:-5px;right:-5px;border-width:2px 2px 0 0}
+.ntc>.b.bl{bottom:-5px;left:-5px;border-width:0 0 2px 2px}.ntc>.b.br{bottom:-5px;right:-5px;border-width:0 2px 2px 0}
+.ntc .w{padding:1px;background:linear-gradient(160deg,var(--a),var(--adim) 45%,var(--aline));filter:drop-shadow(0 0 14px var(--adim));
+  clip-path:polygon(12px 0,calc(100% - 12px) 0,100% 12px,100% calc(100% - 12px),calc(100% - 12px) 100%,12px 100%,0 calc(100% - 12px),0 12px)}
+.ntc .wi{position:relative;overflow:hidden;padding:16px 18px 18px;background:linear-gradient(180deg,var(--w1),var(--w2));
+  clip-path:polygon(11.5px 0,calc(100% - 11.5px) 0,100% 11.5px,100% calc(100% - 11.5px),calc(100% - 11.5px) 100%,11.5px 100%,0 calc(100% - 11.5px),0 11.5px)}
+.nk{display:flex;justify-content:space-between;font-size:9px;letter-spacing:.22em;color:var(--dim);margin-bottom:8px;min-height:12px}
+.nk .q{color:var(--a2)}
+.tt{font-family:var(--f-title);font-weight:700;font-size:17px;letter-spacing:.26em;color:var(--a2);text-align:center;text-shadow:var(--glow);padding-bottom:12px;margin-bottom:14px;border-bottom:1px solid var(--adim)}
+.lead{font-size:14px;line-height:1.55;text-align:center}
+.lead+.lead{margin-top:2px}
+.lead.gold{color:var(--gold)}
+.note{font-size:11px;line-height:1.5;color:var(--dim);text-align:center;margin-top:12px}
+.rows{display:grid;grid-template-columns:1fr auto;gap:8px 12px;font-size:12px;margin-top:14px;padding-top:12px;border-top:1px dashed var(--adim)}
+.rows span:nth-child(odd){color:var(--dim)}
+.rows .ok{color:var(--rank-d)}.rows .bad{color:var(--pz-red)}.rows .gd{color:var(--gold)}
+.ack{margin-top:18px;width:100%;min-height:52px;border:1px solid var(--a);color:var(--a2);background:var(--adim);font-family:var(--f-title);font-weight:700;letter-spacing:.3em;font-size:14px;
+  clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);text-shadow:var(--glow);transition:opacity .2s,transform .12s}
+/* ACKNOWLEDGE stays disabled until the entrance finishes (0.9–1.9 s), so a reflex tap cannot dismiss an unseen notice. */
+.ack:disabled{opacity:.25;cursor:default}
+.ack:active:not(:disabled){transform:scale(.97)}
+
+/* ---------- entrances (each notice has its own) ---------- */
+/* ANIM power (QUEST CLEARED): scaleY 0.04 -> 1, 400 ms easeOutExpo + gold flash. */
+/* ANIM line (LEVEL UP): a 2 px line grows across (scaleX 0 -> 1, first half), then opens vertically (second half), 500 ms total. */
+/* ANIM glitch (WARNING): 300 ms of clip-path slices + x jitter (±8 px), then a 220 ms screen shake and red flash. */
+/* ANIM rise (GATE / RANK UP / SYSTEM COMPLETE): translateY 18 -> 0 + fade, 350 ms easeOutCubic, after the illustration plays. */
+/* ANIM slam (DUNGEON FAILED): scale 1.18 -> 1, 280 ms easeInQuint (falls, does not ease out) + 340 ms heavy shake + crimson flash on impact. */
+/* ANIM exit (all): scaleY -> 0.04 + fade, 220 ms easeIn; scrim fades 250 ms if the queue is empty. */
+.ntc.play{animation-fill-mode:both;animation-delay:var(--wd,0ms)}
+.ntc.e-power{animation-name:ePower;animation-duration:.4s;animation-timing-function:cubic-bezier(.16,1,.3,1)}
+.ntc.e-line{animation-name:eLine;animation-duration:.5s;animation-timing-function:cubic-bezier(.65,0,.35,1)}
+.ntc.e-glitch{animation-name:eGlitch;animation-duration:.3s;animation-timing-function:steps(1)}
+.ntc.e-rise{animation-name:eRise;animation-duration:.35s;animation-timing-function:var(--ease)}
+.ntc.e-slam{animation-name:eSlam;animation-duration:.28s;animation-timing-function:cubic-bezier(.7,0,.84,0)}
+.ntc.x{animation:eOut .22s ease-in forwards!important}
+@keyframes ePower{from{opacity:0;transform:scaleY(.04)}30%{opacity:1}to{opacity:1;transform:none}}
+@keyframes eLine{0%{opacity:0;transform:scale(0,.012)}8%{opacity:1}50%{opacity:1;transform:scale(1,.012)}100%{opacity:1;transform:none}}
+@keyframes eGlitch{0%{opacity:0}10%{opacity:1;transform:translateX(-8px);clip-path:inset(40% 0 45% 0)}25%{opacity:1;transform:translateX(6px);clip-path:inset(8% 0 62% 0)}45%{opacity:1;transform:translateX(-4px);clip-path:inset(55% 0 4% 0)}65%{opacity:1;transform:translateX(3px);clip-path:inset(0 0 30% 0)}85%{opacity:1;transform:translateX(-1px);clip-path:inset(-10px)}100%{opacity:1;transform:none;clip-path:none}}
+@keyframes eRise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+@keyframes eSlam{from{opacity:0;transform:scale(1.18)}to{opacity:1;transform:none}}
+@keyframes eOut{from{opacity:1}to{opacity:0;transform:scaleY(.04)}}
+.xo{transition:opacity .22s;opacity:0!important}
+
+/* staggered content */
+.sg{opacity:0}
+.ntc.play .sg,.art.sg{animation:sg .3s var(--ease) var(--d,0ms) both}
+@keyframes sg{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.pop{opacity:0}
+.ntc.play .pop{animation:popIn .26s cubic-bezier(.3,1.6,.5,1) var(--d,0ms) both}
+@keyframes popIn{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:none}}
+.art{display:flex;justify-content:center}
+
+/* ---------- QUEST CLEARED ---------- */
+.hero{display:flex;align-items:center;justify-content:center;gap:14px}
+.hero svg{width:56px;height:56px;filter:drop-shadow(0 0 8px rgba(245,201,106,.6))}
+.hero .ck{stroke-dasharray:1;stroke-dashoffset:1}
+.ntc.play .hero .ck{animation:draw .3s ease-out .3s forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.big{font-size:40px;color:var(--gold);text-shadow:0 0 14px rgba(245,201,106,.6)}
+.xpw{margin-top:14px}
+.xpb{height:6px;background:rgba(125,139,168,.2);position:relative;overflow:hidden}
+.xpb i{position:absolute;top:0;bottom:0}
+.xpb .c{left:0;width:68%;background:var(--sys);box-shadow:0 0 6px var(--sys)}
+.xpb .p{left:68%;width:20%;background:repeating-linear-gradient(135deg,rgba(245,201,106,.9) 0 4px,rgba(245,201,106,.35) 4px 8px)}
+.xpl{display:flex;justify-content:space-between;font-size:10px;letter-spacing:.14em;color:var(--dim);margin-top:6px}
+
+/* ---------- LEVEL UP ---------- */
+.lv{display:flex;align-items:center;justify-content:center;gap:10px}
+.lv .lt{font-family:var(--f-title);font-weight:700;font-size:22px;letter-spacing:.2em;color:var(--dim);margin-top:12px}
+/* ANIM level roll: a strip 1..N translates up, 600 ms easeOutCubic, so the number visibly counts up. */
+.roll{height:64px;overflow:hidden;font-size:58px;line-height:64px;color:#fff;text-shadow:0 0 16px rgba(79,179,255,.8);min-width:80px;text-align:left}
+.roll .strip{display:block}
+.roll .strip span{display:block;height:64px}
+.pts{text-align:center;margin-top:12px;font-family:var(--f-title);font-weight:700;letter-spacing:.2em;font-size:14px;color:var(--gold)}
+.chips{display:flex;justify-content:center;gap:8px;margin-top:10px}
+.chip{border:1px solid var(--aline);padding:6px 12px;font-family:var(--f-title);font-weight:700;letter-spacing:.2em;font-size:12px;color:var(--a2);background:var(--adim)}
+.pips{display:flex;justify-content:center;gap:6px;margin-top:8px}
+.pips i{width:10px;height:10px;transform:rotate(45deg);border:1px solid var(--gold);background:var(--gold);box-shadow:0 0 6px rgba(245,201,106,.7)}
+
+/* ---------- WARNING ---------- */
+.wicon{display:flex;justify-content:center;margin-bottom:10px}
+.wicon svg{width:52px;height:52px;filter:drop-shadow(0 0 10px rgba(255,59,74,.8));animation:wpulse 1.6s ease-in-out infinite}
+@keyframes wpulse{50%{filter:drop-shadow(0 0 2px rgba(255,59,74,.4));opacity:.7}}
+.glitch{position:relative;display:inline-block}
+.glitch::before,.glitch::after{content:attr(data-t);position:absolute;inset:0;opacity:0}
+.glitch::before{color:#ff9aa2;animation:gA 2.6s infinite steps(1)}
+.glitch::after{color:#5a0b12;animation:gB 2.6s infinite steps(1)}
+@keyframes gA{0%,88%,100%{opacity:0;transform:none;clip-path:none}89%{opacity:1;transform:translate(-3px,0);clip-path:inset(10% 0 55% 0)}92%{opacity:1;transform:translate(3px,0);clip-path:inset(60% 0 8% 0)}95%{opacity:1;transform:translate(-2px,0);clip-path:inset(30% 0 40% 0)}}
+@keyframes gB{0%,88%,100%{opacity:0;transform:none}90%{opacity:.9;transform:translate(3px,1px);clip-path:inset(45% 0 25% 0)}94%{opacity:.9;transform:translate(-3px,-1px);clip-path:inset(5% 0 70% 0)}}
+
+/* ---------- GATE rift ---------- */
+.rift{position:absolute;left:50%;top:40px;width:300px;height:420px;margin-left:-150px;overflow:visible}
+/* ANIM rift: a jagged crack grows vertically (scaleY 0 -> 1, 200 ms), then the portal tears open sideways
+   (scaleX 0.04 -> 1, 450 ms easeOutExpo), the outline dashes flow 3 s per loop, the core pulses 2.4 s, and particles stream inward 2.2 s. */
+.rift .crk{transform-box:fill-box;transform-origin:center;animation:crk .2s ease-out both,fadeOut .25s ease-in .45s forwards}
+.rift .open{transform-origin:150px 210px;animation:open .45s cubic-bezier(.16,1,.3,1) .2s both}
+.rift .r1{animation:dash 3s linear infinite}
+.rift .r2{animation:dash 2.2s linear infinite reverse}
+.rift .core{transform-box:fill-box;transform-origin:center;animation:corep 2.4s ease-in-out infinite}
+.rift .pt{opacity:0;animation:pin 2.2s ease-in var(--dl) infinite}
+@keyframes crk{from{transform:scaleY(0)}to{transform:none}}
+@keyframes fadeOut{to{opacity:0}}
+@keyframes open{from{transform:scaleX(.04);opacity:.3}to{transform:none;opacity:1}}
+@keyframes dash{to{stroke-dashoffset:-64}}
+@keyframes corep{50%{transform:scale(1.25);opacity:.7}}
+@keyframes pin{0%{transform:translate(var(--x),var(--y));opacity:0}20%{opacity:1}100%{transform:translate(0,0);opacity:0}}
+.gcd{display:flex;justify-content:center;align-items:baseline;gap:10px;margin-top:12px}
+.gcd .num{font-size:22px;color:#fff;text-shadow:var(--glow)}
+
+/* ---------- RANK UP ---------- */
+.rbart{width:150px;height:160px;overflow:visible}
+.rk{display:flex;align-items:center;justify-content:center;gap:14px;font-family:var(--f-title);font-weight:700;font-size:28px;letter-spacing:.2em}
+.rk svg{width:28px;height:14px}
+.ttl{text-align:center;margin-top:12px;padding:10px;border:1px solid rgba(245,201,106,.4);background:rgba(245,201,106,.06)}
+.ttl b{display:block;font-family:var(--f-title);font-weight:700;letter-spacing:.14em;font-size:15px;color:var(--gold);margin-top:4px;text-shadow:0 0 10px rgba(245,201,106,.5)}
+
+/* ---------- DUNGEON FAILED ---------- */
+.seal{display:block;margin:0 auto 10px;width:52px;height:52px}
+.seal .rot{transform-box:fill-box;transform-origin:center;animation:spin 40s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* ANIM impact band: one crimson band sweeps top -> bottom through the window, 500 ms, at the moment of impact. */
+.th-crimson .ntc.play .wi::before{content:"";position:absolute;left:0;right:0;height:60px;top:-60px;z-index:0;pointer-events:none;
+  background:linear-gradient(180deg,transparent,rgba(215,38,61,.35),transparent);animation:band .5s ease-out .43s forwards}
+@keyframes band{to{top:110%}}
+
+/* ---------- SYSTEM COMPLETE ---------- */
+.sbadge{width:150px;height:160px;overflow:visible}
+/* ANIM S badge: blooms scale 0.7 -> 1 in 600 ms; then a long glow ramps 0 -> 28 px over 1.6 s and settles into a 4 s breathing loop.
+   The rays behind rotate once per 60 s. */
+.ntc~.x{}
+.art .sbadge{animation:bloom .6s var(--ease) .2s both,longGlow 1.6s ease-out .8s forwards,breathe 4s ease-in-out 2.4s infinite}
+@keyframes bloom{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:none}}
+@keyframes longGlow{from{filter:drop-shadow(0 0 0 rgba(245,201,106,0))}to{filter:drop-shadow(0 0 28px rgba(245,201,106,.95))}}
+@keyframes breathe{0%,100%{filter:drop-shadow(0 0 28px rgba(245,201,106,.95))}50%{filter:drop-shadow(0 0 14px rgba(245,201,106,.6))}}
+.anch{position:absolute;transform:translate(-50%,-50%)}
+.raysIn{animation:raysIn .6s var(--ease) both}
+.raysIn svg{display:block;animation:spin 60s linear infinite}
+@keyframes raysIn{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}
+
+@media (prefers-reduced-motion:reduce){.glitch::before,.glitch::after,.rift .pt,.raysIn svg,.seal .rot{animation:none!important}}
+</style>
+</head>
+<body>
+
+<div class="phone" id="phone">
+  <div class="bg">
+    <div class="mt"><div><b>SAT · 31 OCT</b><span>DAY 12 / 30 · FITNESS</span></div><i></i></div>
+    <div class="mw"><div class="t">[ DAILY QUEST ]</div><div class="r"></div><div class="r"></div><div class="r"></div><div class="r"></div></div>
+    <div class="mn"><span>QUEST</span><span>STATUS</span><span>PENALTY</span></div>
+  </div>
+  <div class="scrim" id="scrim"></div>
+  <div class="fx" id="fx"></div>
+  <div class="stage" id="stage"></div>
+  <div class="flash" id="flash"></div>
+</div>
+
+<aside class="rev">
+  <h2>NOTICE</h2><div class="opts" id="oN"></div>
+  <h2>QUEUE</h2><div class="opts" id="oQ"></div>
+  <h2>RANK (GATE · RANK UP · FAILED)</h2><div class="opts" id="oR"></div>
+  <h2>SOUND</h2><div class="opts" id="oS"></div>
+  <h2>NOTES</h2>
+  <p><b>Queue.</b> Notices never stack. They play one at a time with "NOTICE 1 / 3". Order: failures first, then QUEST CLEARED → LEVEL UP → RANK UP → GATE or SYSTEM COMPLETE.</p>
+  <p><b>ACKNOWLEDGE</b> becomes active only when the entrance ends: 0.9 s for small notices, 1.3 s for failures, 1.9 s for RANK UP.</p>
+  <p class="gap"><b>Stat points do nothing yet.</b> LEVEL UP and RANK UP both award them, but there's nowhere to spend them until STATUS exists. If they never affect quests, cut them.</p>
+  <p class="gap"><b>Unexpired Gate.</b> Nothing defines what happens if the 48 h pass without entering. Decide: re-open later, or reset the 21-day count.</p>
+  <p><b>SYSTEM COMPLETE</b> figures are sample data. Its last line, "You may now bind a new System", is where the no-switching rule finally ends.</p>
+  <p><b>Reduce motion</b> skips shakes, the shatter (crossfade instead), particles and ray rotation.</p>
+</aside>
+
+<script>
+const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)];
+const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const phone=$('#phone'),stage=$('#stage'),fx=$('#fx'),scrim=$('#scrim');
+const RC={E:'#9AA4B8',D:'#5BD69A',C:'#4FB3FF',B:'#B07CFF',A:'#FF9F45',S:'#F5C96A'};
+const NEXT={E:'D',D:'C',C:'B',B:'A',A:'S'};
+const S={rank:'E',snd:true,queue:[],qi:0,timers:[],tick:null,cur:null};
+const at=(ms,fn)=>S.timers.push(setTimeout(fn,ms));
+const clearT=()=>{S.timers.forEach(clearTimeout);S.timers=[];clearInterval(S.tick)};
+const hms=s=>[s/3600|0,(s%3600)/60|0,s%60].map(x=>String(x).padStart(2,'0')).join(':');
+function flash(c,o=.5){const f=$('#flash');f.style.background=c;f.style.setProperty('--fo',o);f.classList.remove('go');void f.offsetWidth;f.classList.add('go')}
+function shake(h){if(RM)return;phone.classList.remove('shake','shakeH');void phone.offsetWidth;phone.classList.add(h?'shakeH':'shake')}
+const buzz=ms=>{try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){}};
+let AC;function blip(f,d=.1,type='sine',v=.05,delay=0){if(!S.snd)return;try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();AC.resume();
+  const t=AC.currentTime+delay,o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.setValueAtTime(f,t);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.0001,t+d);
+  o.connect(g).connect(AC.destination);o.start(t);o.stop(t+d+.02)}catch(e){}}
+function count(el,a,b,dur,fmt){const t0=performance.now();(function f(n){const k=Math.min(1,(n-t0)/dur),e=1-Math.pow(1-k,3);el.textContent=fmt(Math.round(a+(b-a)*e));if(k<1)requestAnimationFrame(f)})(t0)}
+const ARROW='<svg viewBox="0 0 28 14" fill="none" stroke="#7D8BA8" stroke-width="1.5"><path d="M0 7 H26 M20 1 L26 7 L20 13"/></svg>';
+
+/* =========================================================
+   ILLUSTRATIONS (all original geometry)
+   ========================================================= */
+const HEX='M58 6 L108 34 V90 L58 118 L8 90 V34 Z',HEX2='M58 18 L97 40 V84 L58 106 L19 84 V40 Z';
+const V=[[58,6],[108,34],[108,90],[58,118],[8,90],[8,34]];
+const badgeG=r=>`<path d="${HEX}" fill="rgba(10,18,34,.92)" stroke="${RC[r]}" stroke-width="2.5"/><path d="${HEX2}" fill="none" stroke="${RC[r]}" stroke-width="1" opacity=".5"/>
+  <text x="58" y="80" text-anchor="middle" font-family="Chakra Petch, sans-serif" font-weight="700" font-size="52" fill="${RC[r]}">${r}</text>`;
+
+/* EXPORT: rank-badge.svg — old badge cut into 12 shards (clip paths), new badge drawn over it */
+function rankArt(from,to){
+  const C=[58,62],sh=[];V.forEach((v,i)=>{const w=V[(i+1)%6],m=[(v[0]+w[0])/2,(v[1]+w[1])/2];sh.push([C,v,m],[C,m,w])});
+  return `<svg class="rbart" viewBox="0 0 116 124" xmlns="http://www.w3.org/2000/svg">
+  <defs>${sh.map((t,i)=>`<clipPath id="sh${i}"><polygon points="${t.map(p=>p.join(',')).join(' ')}"/></clipPath>`).join('')}<g id="oldB">${badgeG(from)}</g></defs>
+  <g id="old">${sh.map((t,i)=>`<g class="shard" clip-path="url(#sh${i})" data-cx="${((t[0][0]+t[1][0]+t[2][0])/3).toFixed(1)}" data-cy="${((t[0][1]+t[1][1]+t[2][1])/3).toFixed(1)}"><use href="#oldB"/></g>`).join('')}
+   <g class="crack">${sh.map(t=>`<line x1="58" y1="62" x2="${t[1][0]}" y2="${t[1][1]}" stroke="#fff" stroke-width="1.2" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/>`).join('')}</g></g>
+  <g id="nw" style="opacity:0">
+   <path class="ring" d="${HEX}" fill="none" stroke="${RC[to]}" stroke-width="2" opacity="0"/>
+   <path class="nf" d="${HEX}" fill="rgba(10,18,34,.92)" opacity="0"/>
+   <path class="ns" d="${HEX}" fill="none" stroke="${RC[to]}" stroke-width="2.5" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/>
+   <path class="ns" d="${HEX2}" fill="none" stroke="${RC[to]}" stroke-width="1" stroke-opacity=".5" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/>
+   <text class="nl" x="58" y="80" text-anchor="middle" font-family="Chakra Petch, sans-serif" font-weight="700" font-size="52" fill="${RC[to]}" opacity="0">${to}</text>
+  </g></svg>`}
+
+/* EXPORT: gate-rift.svg — colour = Dungeon rank */
+function riftSVG(c){
+  const pts=[];for(let i=0;i<72;i++){const a=i/72*Math.PI*2,j=1+.045*Math.sin(i*1.7)+.03*Math.cos(i*4.1)+.025*Math.sin(i*9.3);pts.push(`${(150+Math.sin(a)*112*j).toFixed(1)},${(210-Math.cos(a)*192*j).toFixed(1)}`)}
+  const P=Array.from({length:16},(_,i)=>{const a=i/16*Math.PI*2,r=150+(i*37%60);return`<circle class="pt" cx="150" cy="210" r="${1.5+(i%3)*.6}" fill="${c}" style="--x:${(Math.sin(a)*r).toFixed(0)}px;--y:${(-Math.cos(a)*r*1.3).toFixed(0)}px;--dl:${(.65+(i*.137)%2.2).toFixed(2)}s"/>`}).join('');
+  return `<svg class="rift" viewBox="0 0 300 420" xmlns="http://www.w3.org/2000/svg">
+  <defs><radialGradient id="rg"><stop offset="0" stop-color="#ffffff" stop-opacity=".9"/><stop offset=".22" stop-color="${c}" stop-opacity=".8"/><stop offset=".7" stop-color="${c}" stop-opacity=".16"/><stop offset="1" stop-color="${c}" stop-opacity="0"/></radialGradient></defs>
+  <path class="crk" d="M150 16 L143 78 L157 132 L145 204 L156 262 L146 332 L150 404" stroke="${c}" stroke-width="2.5" fill="none" style="filter:drop-shadow(0 0 6px ${c})"/>
+  <g class="open">
+   <ellipse cx="150" cy="210" rx="150" ry="215" fill="url(#rg)" opacity=".5"/>
+   <polygon points="${pts.join(' ')}" fill="rgba(5,7,13,.55)" stroke="${c}" stroke-width="2" style="filter:drop-shadow(0 0 8px ${c})"/>
+   <ellipse class="r1" cx="150" cy="210" rx="90" ry="160" fill="none" stroke="${c}" stroke-width="1.5" stroke-dasharray="6 10" opacity=".8"/>
+   <ellipse class="r2" cx="150" cy="210" rx="58" ry="112" fill="none" stroke="${c}" stroke-width="1.2" stroke-dasharray="40 24" opacity=".7"/>
+   <ellipse class="core" cx="150" cy="210" rx="26" ry="72" fill="url(#rg)"/>
+  </g>${P}</svg>`}
+
+/* EXPORT: s-badge.svg + complete-rays.svg */
+const sBadge=()=>`<svg class="sbadge" viewBox="0 0 116 124" xmlns="http://www.w3.org/2000/svg">${badgeG('S')}
+  <path d="M58 0 V4 M58 120 V124 M2 32 L5 34 M114 32 L111 34 M2 92 L5 90 M114 92 L111 90" stroke="#F5C96A" stroke-width="1.5"/></svg>`;
+const rays=()=>`<div class="raysIn"><svg width="520" height="520" viewBox="-260 -260 520 520" xmlns="http://www.w3.org/2000/svg">
+  <defs><radialGradient id="sg0"><stop offset="0" stop-color="#F5C96A" stop-opacity=".45"/><stop offset="1" stop-color="#F5C96A" stop-opacity="0"/></radialGradient></defs>
+  <circle r="200" fill="url(#sg0)"/>${Array.from({length:28},(_,i)=>`<path d="M-3 -70 L0 -${230+(i%3)*25} L3 -70 Z" fill="#F5C96A" opacity="${i%2?.18:.32}" transform="rotate(${i*360/28})"/>`).join('')}
+  <circle r="96" fill="none" stroke="#F5C96A" stroke-width="1" stroke-dasharray="2 6" opacity=".6"/></svg></div>`;
+
+/* =========================================================
+   NOTICES
+   ========================================================= */
+const N={
+cleared:()=>({theme:'gold',enter:'power',arm:900,kick:'DAILY QUEST',title:'[ QUEST CLEARED ]',
+  body:`<div class="hero sg" style="--d:120ms"><svg viewBox="0 0 64 64" fill="none"><path d="M32 3 L61 32 L32 61 L3 32 Z" stroke="#F5C96A" stroke-width="1.5"/>
+    <path class="ck" d="M19 33 L28 42 L45 22" stroke="#F5C96A" stroke-width="4" pathLength="1"/></svg><div class="big num" id="xpN">+0 XP</div></div>
+   <div class="xpw sg" style="--d:250ms"><div class="xpb"><i class="c" id="xpC"></i><i class="p" id="xpP"></i></div>
+    <div class="xpl"><span>LV 11</span><span class="num" id="xpT">340 / 500</span></div></div>
+   <div class="rows sg" style="--d:380ms"><span>Objectives</span><span>4 / 4</span><span>Days cleared</span><span>13 / 21 for the Gate</span><span>Penalty Zone</span><span class="ok">Avoided</span></div>`,
+  after(){flash('#ffe7b0',.45);blip(660,.12);blip(990,.14,'sine',.05,.09);blip(1320,.3,'sine',.05,.18);buzz(30);
+    at(400,()=>{count($('#xpN'),0,100,600,v=>`+${v} XP`);count($('#xpT'),340,440,600,v=>`${v} / 500`);
+      $('#xpC').animate([{width:'68%'},{width:'88%'}],{duration:600,easing:'cubic-bezier(.2,.8,.2,1)',fill:'forwards'});
+      $('#xpP').animate([{left:'68%',width:'20%'},{left:'88%',width:'0%'}],{duration:600,easing:'cubic-bezier(.2,.8,.2,1)',fill:'forwards'})})}}),
+
+levelup:()=>({theme:'blue',enter:'line',arm:1300,kick:'PLAYER',title:'[ LEVEL UP ]',
+  body:`<div class="lv sg" style="--d:350ms"><span class="lt">LV</span><span class="roll num"><span class="strip" id="strip">${Array.from({length:12},(_,i)=>`<span>${i+1}</span>`).join('')}</span></span></div>
+   <div class="pts sg" style="--d:950ms">+3 STAT POINTS</div>
+   <div class="chips"><span class="chip pop" style="--d:1050ms">STR</span><span class="chip pop" style="--d:1130ms">VIT</span></div>
+   <p class="note sg" style="--d:1150ms">Allocate them in STATUS.</p>
+   <div class="rows sg" style="--d:1200ms"><span>Next level</span><span class="num">0 / 600 XP</span></div>`,
+  after(){blip(330,.3,'triangle',.04);
+    at(450,()=>{$('#strip').animate([{transform:'translateY(0)'},{transform:`translateY(-${11*64}px)`}],{duration:600,easing:'cubic-bezier(.2,.8,.2,1)',fill:'forwards'});
+      for(let i=0;i<8;i++)blip(500+i*60,.04,'square',.02,i*.06)});
+    at(1050,()=>{flash('#cfeaff',.35);blip(880,.15);blip(1320,.3,'sine',.05,.1);buzz(30)})}}),
+
+warning:()=>({theme:'red',enter:'glitch',arm:1300,kick:'DAILY QUEST',title:'<span class="glitch" data-t="[ WARNING ]">[ WARNING ]</span>',
+  body:`<div class="wicon sg" style="--d:250ms"><svg viewBox="0 0 52 52" fill="none" stroke="#FF3B4A" stroke-width="2.5"><path d="M26 4 L49 46 H3 Z"/><path d="M26 19 V32 M26 37 V40"/></svg></div>
+   <p class="lead sg" style="--d:320ms">The daily quest was not completed.</p>
+   <p class="lead sg" style="--d:380ms;color:#ff6a75">The Penalty Zone is now active.</p>
+   <div class="rows sg" style="--d:450ms"><span>Objectives</span><span>2 / 4</span><span>App lock</span><span class="bad">4 h · time withheld</span><span>Penalty debt</span><span>50 push-ups</span></div>
+   <p class="note sg" style="--d:520ms">Clear the debt in PENALTY.</p>`,
+  after(){at(300,()=>{flash('#FF3B4A',.35);shake();buzz([40,40,40]);blip(140,.25,'sawtooth',.06);blip(110,.35,'sawtooth',.06,.12)})}}),
+
+gate:()=>{const r=S.rank,c=RC[r];return{theme:'blue',enter:'rise',wd:550,arm:1000,low:true,kick:'GATE DETECTED',title:'[ GATE ]',fx:riftSVG(c),
+  body:`<p class="lead sg" style="--d:620ms">A Gate has opened.</p>
+   <p class="lead sg" style="--d:700ms;color:${c};font-weight:700">Rank ${r} Dungeon.</p>
+   <p class="lead sg" style="--d:780ms">Enter within 48 hours.</p>
+   <div class="gcd sg" style="--d:860ms"><span class="kicker">CLOSES IN</span><span class="num" id="gcd">48:00:00</span></div>
+   <div class="rows sg" style="--d:940ms"><span>Dungeon</span><span>3 days · 3 floors</span><span>Floor 3</span><span>Rank Trial ${r} → <b style="color:${RC[NEXT[r]]}">${NEXT[r]}</b></span></div>`,
+  after(){blip(55,.9,'sawtooth',.05);at(200,()=>{flash(c,.3);blip(80,.6,'triangle',.06);buzz(60)});
+    let s=48*3600;S.tick=setInterval(()=>{s--;const g=$('#gcd');if(g)g.textContent=hms(s)},1000)}}},
+
+rankup:()=>{const f=S.rank,t=NEXT[f];return{theme:'blue',enter:'rise',wd:1300,arm:1900,kick:'RANK TRIAL CLEARED',title:'[ RANK UP ]',art:rankArt(f,t),
+  body:`<div class="rk sg" style="--d:1380ms"><span style="color:${RC[f]}">${f}</span>${ARROW}<span style="color:${RC[t]};text-shadow:0 0 12px ${RC[t]}">${t}</span></div>
+   <div class="ttl sg" style="--d:1460ms"><span class="kicker">Title earned</span><b>Gatebreaker · Fitness ${t}</b></div>
+   <div class="pts sg" style="--d:1540ms">+5 STAT POINTS</div>
+   <div class="pips">${Array.from({length:5},(_,i)=>`<i class="pop" style="--d:${1600+i*60}ms"></i>`).join('')}</div>
+   <p class="note sg" style="--d:1700ms">Rank ${t} quests begin tomorrow.</p>`,
+  after(){shatter(t)}}},
+
+dfail:()=>({theme:'crimson',enter:'slam',wd:150,arm:1300,kick:'DUNGEON',title:'[ DUNGEON FAILED ]',
+  body:`<svg class="seal sg" style="--d:450ms" viewBox="0 0 52 52" fill="none"><circle class="rot" cx="26" cy="26" r="24" stroke="#F5C96A" stroke-width="1" stroke-dasharray="3 3"/>
+    <path d="M26 6 L44 26 L26 46 L8 26 Z" stroke="#D7263D" stroke-width="2"/><path d="M18 18 L34 34 M34 18 L18 34" stroke="#F5C96A" stroke-width="2"/></svg>
+   <p class="lead sg" style="--d:520ms">Floor 1 was not cleared.</p>
+   <p class="lead sg" style="--d:600ms">Dungeon Penalty today: double lock and double penalty.</p>
+   <p class="lead gold sg" style="--d:700ms">Your rank is kept.</p>
+   <div class="rows sg" style="--d:780ms"><span>App lock</span><span class="bad">×2 · 8 h</span><span>Penalty debt</span><span class="bad">×2 · 100 push-ups</span><span>Rank</span><span style="color:${RC[S.rank]}">${S.rank} · kept</span></div>`,
+  after(){at(430,()=>{flash('#D7263D',.55);shake(true);buzz(120);blip(48,.7,'sine',.2);blip(70,.5,'sawtooth',.05)})}}),
+
+complete:()=>({theme:'gold',enter:'rise',wd:650,arm:1300,kick:'SYSTEM',title:'[ SYSTEM COMPLETE ]',art:sBadge(),fx:rays(),anchor:true,
+  body:`<p class="lead sg" style="--d:720ms">The Fitness System is complete.</p>
+   <p class="lead gold sg" style="--d:800ms">Rank S reached.</p>
+   <div class="rows sg" style="--d:880ms"><span>Days in System</span><span class="num">214</span><span>Quests cleared</span><span class="num">187</span><span>Dungeons cleared</span><span class="num">5</span></div>
+   <p class="note sg" style="--d:960ms">You may now bind a new System.</p>`,
+  after(){[523,659,784,1046].forEach((f,i)=>blip(f,1.6-i*.2,'sine',.04,.2+i*.12));at(800,()=>flash('#ffe7b0',.3))}})
+};
+
+/* rank-up timeline: crack 300 → shatter 450 → new outline 650 → stamp 1100 → window 1300 */
+function shatter(to){const svg=$('.rbart');if(!svg)return;const c=RC[to],E='cubic-bezier(.2,.8,.2,1)';
+  at(300,()=>{svg.querySelectorAll('.crack line').forEach(l=>l.animate([{strokeDashoffset:1},{strokeDashoffset:0}],{duration:150,fill:'forwards'}));blip(1800,.05,'square',.03);shake()});
+  at(450,()=>{flash('#ffffff',.3);blip(90,.3,'sawtooth',.06);buzz(40);
+    svg.querySelector('.crack').animate([{opacity:1},{opacity:0}],{duration:120,fill:'forwards'});
+    if(RM){svg.querySelector('#old').animate([{opacity:1},{opacity:0}],{duration:200,fill:'forwards'});return}
+    /* ANIM shatter: 12 shards fly outward along their centroid direction (×2–3), rotate ±60°, fade, 520 ms easeOutCubic. */
+    svg.querySelectorAll('.shard').forEach((s,i)=>{const cx=+s.dataset.cx,cy=+s.dataset.cy,k=2+(i*37%10)/10,rot=(i*53%120)-60;
+      s.style.transformBox='view-box';s.style.transformOrigin=`${cx}px ${cy}px`;
+      s.animate([{transform:'translate(0,0) rotate(0deg)',opacity:1},{transform:`translate(${((cx-58)*k).toFixed(1)}px,${((cy-62)*k).toFixed(1)}px) rotate(${rot}deg)`,opacity:0}],{duration:520,easing:E,fill:'forwards'})})});
+  /* ANIM form: new outline strokes draw in, 450 ms; then fill + letter stamp scale 1.6 -> 1 in 250 ms; shock ring scale 1 -> 1.7, 450 ms. */
+  at(650,()=>{svg.querySelector('#nw').style.opacity=1;svg.querySelectorAll('.ns').forEach(p=>p.animate([{strokeDashoffset:1},{strokeDashoffset:0}],{duration:450,easing:E,fill:'forwards'}));blip(520,.45,'sine',.04)});
+  at(1100,()=>{svg.querySelector('.nf').animate([{opacity:0},{opacity:1}],{duration:200,fill:'forwards'});
+    const L=svg.querySelector('.nl');L.style.transformBox='fill-box';L.style.transformOrigin='center';
+    L.animate([{opacity:0,transform:'scale(1.6)'},{opacity:1,transform:'scale(1)'}],{duration:250,easing:'cubic-bezier(.55,0,1,.45)',fill:'forwards'});
+    const g=svg.querySelector('.ring');g.style.transformBox='fill-box';g.style.transformOrigin='center';
+    g.animate([{opacity:.9,transform:'scale(1)'},{opacity:0,transform:'scale(1.7)'}],{duration:450,delay:250,easing:'ease-out',fill:'forwards'})});
+  at(1350,()=>{flash(c,.4);shake();buzz(50);svg.style.filter=`drop-shadow(0 0 12px ${c})`;blip(660,.2);blip(990,.4,'sine',.05,.08)})}
+
+/* =========================================================
+   SHOW / DISMISS / QUEUE
+   ========================================================= */
+function show(key){clearT();const d=N[key]();S.cur=key;
+  phone.className='phone th-'+d.theme;scrim.classList.add('on');
+  fx.innerHTML=d.fx?(d.anchor?`<div class="anch" id="anch">${d.fx}</div>`:d.fx):'';
+  stage.className='stage'+(d.low?' low':'');
+  const q=S.queue.length>1?`NOTICE ${S.qi+1} / ${S.queue.length}`:'';
+  stage.innerHTML=(d.art?`<div class="art sg">${d.art}</div>`:'')+`<div class="ntc" id="ntc" style="--wd:${d.wd||0}ms" role="alertdialog" aria-label="${d.title.replace(/<[^>]+>/g,'')}">
+    <span class="b tl"></span><span class="b tr"></span><span class="b bl"></span><span class="b br"></span>
+    <div class="w"><div class="wi"><div class="nk"><span class="q">${q}</span><span>${d.kick}</span></div>
+    <div class="tt">${d.title}</div>${d.body}<button class="ack" id="ack" disabled>ACKNOWLEDGE</button></div></div></div>`;
+  const n=$('#ntc');void n.offsetWidth;n.classList.add('play','e-'+d.enter);
+  if(d.anchor){const a=$('.art').getBoundingClientRect(),p=phone.getBoundingClientRect(),h=$('#anch');h.style.left=(a.left-p.left+a.width/2)+'px';h.style.top=(a.top-p.top+a.height/2)+'px'}
+  d.after&&d.after();
+  at(d.arm,()=>{const b=$('#ack');if(b)b.disabled=false});
+  $('#ack').addEventListener('click',dismiss);
+  $$('#oN button').forEach(b=>b.classList.toggle('on',b.dataset.v===key&&S.queue.length<2));
+}
+function dismiss(){const n=$('#ntc');if(!n)return;$('#ack').disabled=true;clearT();n.classList.add('x');
+  $$('.art,#fx>*').forEach(e=>e.classList.add('xo'));blip(440,.06,'sine',.03);
+  setTimeout(()=>{if(S.qi<S.queue.length-1){S.qi++;show(S.queue[S.qi])}
+    else{scrim.classList.remove('on');stage.innerHTML='';fx.innerHTML='';S.queue=[];setTimeout(()=>{if(!stage.innerHTML)phone.className='phone'},250)}},240)}
+function play(list){clearT();S.queue=list;S.qi=0;show(list[0])}
+
+/* reviewer controls */
+const NAMES=[['cleared','Quest cleared'],['levelup','Level up'],['warning','Warning'],['gate','Gate'],['rankup','Rank up'],['dfail','Dungeon failed'],['complete','System complete']];
+$('#oN').innerHTML=NAMES.map(([k,l])=>`<button data-v="${k}">${l}</button>`).join('');
+$$('#oN button').forEach(b=>b.addEventListener('click',()=>play([b.dataset.v])));
+$('#oQ').innerHTML='<button data-q="cleared,levelup,rankup">Floor 3 cleared (3)</button><button data-q="warning,gate">Failed day, Gate opens (2)</button>';
+$$('#oQ button').forEach(b=>b.addEventListener('click',()=>play(b.dataset.q.split(','))));
+$('#oR').innerHTML=['E','D','C','B','A'].map(r=>`<button data-v="${r}" style="color:${RC[r]}">${r}</button>`).join('');
+$$('#oR button').forEach(b=>b.addEventListener('click',()=>{S.rank=b.dataset.v;$$('#oR button').forEach(x=>x.classList.toggle('on',x===b));
+  if(['gate','rankup','dfail'].includes(S.cur)&&S.queue.length<2)play([S.cur])}));
+$('#oR button').classList.add('on');
+$('#oS').innerHTML='<button data-v="1" class="on">On</button><button data-v="0">Off</button>';
+$$('#oS button').forEach(b=>b.addEventListener('click',()=>{S.snd=b.dataset.v==='1';$$('#oS button').forEach(x=>x.classList.toggle('on',x===b))}));
+setTimeout(()=>play(['cleared']),300);
+</script>
+</body>
+</html>

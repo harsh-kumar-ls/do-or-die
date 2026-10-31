@@ -21,19 +21,27 @@
     },
     {
       "type": "action",
-      "description": "On the 'CHOOSE YOUR SYSTEM' screen, click the PERSONALITY card"
-    },
-    {
-      "type": "assertion",
-      "description": "The PERSONALITY card expands and shows 'RANK E STARTS WITH' followed by 'Read (pages) 10', and a 'FAIL A DAY' line that mentions '20 pages and a written reflection' and no push-ups; the button reads 'BIND PERSONALITY'"
+      "description": "On the 'CHOOSE YOUR SYSTEM' screen, click the small diamond button named 'Show the Personality System' under the card, then wait 1 second"
     },
     {
       "type": "action",
-      "description": "Click the FOCUS card"
+      "description": "Click the front card (the button named 'Personality System') once to flip it, then wait 1 second"
     },
     {
       "type": "assertion",
-      "description": "The FOCUS card is now expanded, its 'FAIL A DAY' line mentions 'a 60-minute phone-free block', and the button reads 'BIND FOCUS'"
+      "description": "The card now shows '[ PERSONALITY \u00b7 BRIEF ]', a 'WHERE YOU START' list containing 'Read (pages)' with '10', and an 'IF YOU FAIL A DAY' section mentioning '20 pages and a written reflection' and no push-ups; the button at the bottom reads 'CHOOSE PERSONALITY SYSTEM'"
+    },
+    {
+      "type": "action",
+      "description": "On the 'CHOOSE YOUR SYSTEM' screen, click the small diamond button named 'Show the Focus System' under the card, then wait 1 second"
+    },
+    {
+      "type": "action",
+      "description": "If the front card shows 'TAP TO INSPECT', click it once (the button named 'Focus System') and wait 1 second"
+    },
+    {
+      "type": "assertion",
+      "description": "The card shows '[ FOCUS \u00b7 BRIEF ]' and its 'IF YOU FAIL A DAY' section mentions 'a 60-minute phone-free block'; the button reads 'CHOOSE FOCUS SYSTEM'"
     }
   ]
 }

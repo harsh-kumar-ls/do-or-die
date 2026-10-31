@@ -15,10 +15,15 @@ class SystemCheckScreen extends StatefulWidget {
     super.key,
     required this.model,
     required this.blocker,
+    this.onRestartTrial,
   });
 
   final GameModel model;
   final AppBlocker blocker;
+
+  /// Archives this game and returns to the Awakening; refused while a
+  /// penalty or a Dungeon is in effect.
+  final Future<void> Function()? onRestartTrial;
 
   @override
   State<SystemCheckScreen> createState() => _SystemCheckScreenState();
@@ -194,6 +199,28 @@ class _SystemCheckScreenState extends State<SystemCheckScreen>
         ),
         const SizedBox(height: 14),
         HudButton('DONE', onPressed: () => Navigator.of(context).pop()),
+        if (widget.onRestartTrial != null) ...[
+          const SizedBox(height: 28),
+          SystemWindow(
+            title: 'RESTART TRIAL',
+            subtitle: 'Archives this game with its full log and starts a new Awakening.',
+            child: m.restartBlockedReason != null
+                ? Text(
+                    m.restartBlockedReason!,
+                    textAlign: TextAlign.center,
+                    style: Hud.mono(11, Hud.warn),
+                  )
+                : HoldButton(
+                    label: 'HOLD 3S · RESTART TRIAL',
+                    doneLabel: 'RESTARTING',
+                    holdFor: const Duration(seconds: 3),
+                    onConfirmed: () async {
+                      Navigator.of(context).pop();
+                      await widget.onRestartTrial!();
+                    },
+                  ),
+          ),
+        ],
       ],
     );
   }

@@ -471,3 +471,172 @@ class _RingPainter extends CustomPainter {
   bool shouldRepaint(_RingPainter old) =>
       old.s != s || old.e != e || old.r != r || old.bad != bad;
 }
+
+/// The three System emblems from the Claude Design carousel (200 x 200):
+/// an outer dashed ring turning every 24 s, an inner ring 14 s the other
+/// way, a pulsing core, and System-specific line art. [t] is seconds.
+class SystemEmblemPainter extends CustomPainter {
+  const SystemEmblemPainter(this.kind, this.t);
+
+  final SystemKind kind;
+  final double t;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.scale(size.width / 200);
+    const c = Offset(100, 100);
+    Paint line(Color col, double w, [double a = 1]) => Paint()
+      ..color = col.withValues(alpha: a)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = w
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.solid, 2.5);
+    void dashedCircle(double r, double dash, double gap, double turn, Paint p) {
+      canvas.save();
+      canvas.translate(c.dx, c.dy);
+      canvas.rotate(turn * 2 * pi);
+      for (var a = 0.0; a < 2 * pi; a += (dash + gap) / r) {
+        canvas.drawArc(
+          Rect.fromCircle(center: Offset.zero, radius: r),
+          a,
+          dash / r,
+          false,
+          p,
+        );
+      }
+      canvas.restore();
+    }
+
+    final pulse = .5 + .5 * sin(t / 2.4 * 2 * pi);
+    dashedCircle(88, 2, 7, t / 24, line(_sys, 1.5, .7));
+    switch (kind) {
+      case SystemKind.fitness:
+        dashedCircle(74, 92, 24.2, -t / 14, line(_hi, 1.2, .6));
+        final p = line(_sys, 3);
+        canvas.drawPath(
+          Path()
+            ..moveTo(66, 108)
+            ..cubicTo(58, 74, 72, 54, 100, 54)
+            ..cubicTo(128, 54, 142, 74, 134, 108),
+          p,
+        );
+        canvas.drawPath(
+          Path()
+            ..moveTo(80, 102)
+            ..cubicTo(76, 80, 84, 68, 100, 68)
+            ..cubicTo(116, 68, 124, 80, 120, 102),
+          line(_sys, 1.2, .6),
+        );
+        final torso = Path()
+          ..moveTo(74, 158)
+          ..cubicTo(54, 146, 56, 108, 80, 100)
+          ..lineTo(120, 100)
+          ..cubicTo(144, 108, 146, 146, 126, 158)
+          ..close();
+        canvas.drawPath(torso, Paint()..color = _sys.withValues(alpha: .08));
+        canvas.drawPath(torso, line(_sys, 2.5));
+        canvas.drawPath(
+          Path()
+            ..moveTo(64, 130)
+            ..lineTo(82, 130)
+            ..lineTo(89, 116)
+            ..lineTo(98, 144)
+            ..lineTo(105, 122)
+            ..lineTo(110, 130)
+            ..lineTo(136, 130),
+          line(_hi, 2),
+        );
+        canvas.drawCircle(
+          const Offset(98, 144),
+          3.5 * (1 + .35 * pulse),
+          Paint()..color = _hi.withValues(alpha: 1 - .55 * pulse),
+        );
+        final side = line(_sys, 1.5, .55);
+        canvas
+          ..drawLine(const Offset(20, 118), const Offset(42, 118), side)
+          ..drawLine(const Offset(26, 128), const Offset(42, 128), side)
+          ..drawLine(const Offset(158, 118), const Offset(180, 118), side)
+          ..drawLine(const Offset(158, 128), const Offset(174, 128), side);
+      case SystemKind.personality:
+        final left = Path()
+          ..moveTo(100, 152)
+          ..cubicTo(84, 142, 62, 140, 38, 144)
+          ..lineTo(38, 100)
+          ..cubicTo(62, 96, 84, 98, 100, 110)
+          ..close();
+        final right = Path()
+          ..moveTo(100, 152)
+          ..cubicTo(116, 142, 138, 140, 162, 144)
+          ..lineTo(162, 100)
+          ..cubicTo(138, 96, 116, 98, 100, 110)
+          ..close();
+        for (final pg in [left, right]) {
+          canvas.drawPath(pg, Paint()..color = _sys.withValues(alpha: .08));
+          canvas.drawPath(pg, line(_sys, 2));
+        }
+        final rule = line(_sys, 1, .55);
+        for (final y in [112.0, 124.0, 136.0]) {
+          canvas.drawPath(
+            Path()
+              ..moveTo(48, y)
+              ..cubicTo(62, y - 3, 78, y - 2, 90, y + 5),
+            rule,
+          );
+        }
+        for (final y in [117.0, 129.0]) {
+          canvas.drawPath(
+            Path()
+              ..moveTo(110, y)
+              ..cubicTo(122, y - 7, 138, y - 8, 152, y - 5),
+            rule,
+          );
+        }
+        canvas.drawLine(
+          const Offset(100, 108),
+          const Offset(100, 84),
+          line(_hi, 1.5),
+        );
+        const heights = [12, 26, 18, 40, 30, 44, 22, 14, 8];
+        for (var k = 0; k < heights.length; k++) {
+          final s = .35 + .65 * (.5 + .5 * cos((t + k * .12) / 1.4 * 2 * pi));
+          final h = heights[k] * s;
+          final x = 52.0 + k * 12;
+          canvas.drawLine(
+            Offset(x, 62 - h / 2),
+            Offset(x, 62 + h / 2),
+            line(_hi, 3),
+          );
+        }
+        canvas.drawCircle(
+          const Offset(100, 108),
+          4.5 * (1 + .35 * pulse),
+          Paint()..color = _hi.withValues(alpha: 1 - .55 * pulse),
+        );
+      case SystemKind.focus:
+        final eye = Path()
+          ..moveTo(18, 100)
+          ..quadraticBezierTo(100, 30, 182, 100)
+          ..quadraticBezierTo(100, 170, 18, 100)
+          ..close();
+        canvas.drawPath(eye, Paint()..color = _sys.withValues(alpha: .06));
+        canvas.drawPath(eye, line(_sys, 2));
+        dashedCircle(40, 18, 6.2, -t / 14, line(_hi, 1.2));
+        dashedCircle(29, 2, 4, t / 9, line(_sys, 2));
+        canvas.drawCircle(c, 18, line(_sys, 2));
+        canvas.drawCircle(
+          c,
+          7 * (1 + .35 * pulse),
+          Paint()..color = _hi.withValues(alpha: 1 - .55 * pulse),
+        );
+        final tick = line(_sys, 1.5, .7);
+        canvas
+          ..drawLine(const Offset(100, 4), const Offset(100, 22), tick)
+          ..drawLine(const Offset(100, 178), const Offset(100, 196), tick)
+          ..drawLine(const Offset(4, 100), const Offset(14, 100), tick)
+          ..drawLine(const Offset(186, 100), const Offset(196, 100), tick);
+    }
+  }
+
+  @override
+  bool shouldRepaint(SystemEmblemPainter old) => old.t != t || old.kind != kind;
+}

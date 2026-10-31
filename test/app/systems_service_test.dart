@@ -617,12 +617,15 @@ void main() {
         expect(debt.kind, PenaltyKind.reading);
         expect((debt.primaryOwed, debt.secondaryOwed), (20, 1));
         expect(await g.submitReflection('too short'), isFalse);
+        // Five lines of one word each don't count.
+        expect(await g.submitReflection('a\nb\nc\nd\ne'), isFalse);
         await g.recordPenalty(secondary: 1); // can't be ticked off
         expect(g.state.debt!.secondaryDone, 0);
         expect(
           await g.submitReflection(
-            'I skipped reading.\nI was tired.\n'
-            'I left it too late.\nTomorrow I read at lunch.\nPhone away.',
+            'I skipped my reading today.\nI was tired after work.\n'
+            'I left it far too late.\nTomorrow I read at lunch.\n'
+            'The phone stays in another room.',
           ),
           isTrue,
         );

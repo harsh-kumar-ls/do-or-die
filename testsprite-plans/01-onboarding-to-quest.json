@@ -21,11 +21,7 @@
     },
     {
       "type": "action",
-      "description": "On the 'CHOOSE YOUR SYSTEM' screen, click the FITNESS card"
-    },
-    {
-      "type": "action",
-      "description": "Click 'BIND FITNESS'"
+      "description": "Click 'CHOOSE FITNESS SYSTEM'"
     },
     {
       "type": "action",
@@ -33,7 +29,7 @@
     },
     {
       "type": "action",
-      "description": "Wait 3 seconds for the rank badge and the '[ DAILY QUEST ]' cards to appear"
+      "description": "Wait 5 seconds for the rank badge and the '[ DAILY QUEST ]' cards to appear"
     },
     {
       "type": "action",

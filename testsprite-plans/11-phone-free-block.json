@@ -21,11 +21,11 @@
     },
     {
       "type": "action",
-      "description": "On the 'CHOOSE YOUR SYSTEM' screen, click the FOCUS card"
+      "description": "On the 'CHOOSE YOUR SYSTEM' screen, click the small diamond button named 'Show the Focus System' under the card, then wait 1 second"
     },
     {
       "type": "action",
-      "description": "Click 'BIND FOCUS'"
+      "description": "Click 'CHOOSE FOCUS SYSTEM'"
     },
     {
       "type": "action",
@@ -33,7 +33,7 @@
     },
     {
       "type": "action",
-      "description": "Wait 3 seconds for the rank badge and the '[ DAILY QUEST ]' cards to appear"
+      "description": "Wait 5 seconds for the rank badge and the '[ DAILY QUEST ]' cards to appear"
     },
     {
       "type": "action",
@@ -69,11 +69,11 @@
     },
     {
       "type": "assertion",
-      "description": "The button now reads 'END BLOCK' and the text 'Chosen apps are locked until the block ends.' is shown under it"
+      "description": "The objective now shows 'APPS LOCKED' and a 'HOLD TO END BLOCK' button"
     },
     {
       "type": "action",
-      "description": "Click 'END BLOCK'"
+      "description": "Click 'HOLD TO END BLOCK' once (test build: a click confirms)"
     },
     {
       "type": "assertion",

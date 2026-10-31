@@ -21,11 +21,7 @@
     },
     {
       "type": "action",
-      "description": "On the 'CHOOSE YOUR SYSTEM' screen, click the FITNESS card"
-    },
-    {
-      "type": "action",
-      "description": "Click 'BIND FITNESS'"
+      "description": "Click 'CHOOSE FITNESS SYSTEM'"
     },
     {
       "type": "action",
@@ -33,7 +29,7 @@
     },
     {
       "type": "action",
-      "description": "Wait 3 seconds for the rank badge and the '[ DAILY QUEST ]' cards to appear"
+      "description": "Wait 5 seconds for the rank badge and the '[ DAILY QUEST ]' cards to appear"
     },
     {
       "type": "action",
@@ -65,7 +61,7 @@
     },
     {
       "type": "assertion",
-      "description": "The 'QUEST REDUCTION' row on the '[ STATUS ]' window shows 'Full quest'"
+      "description": "The 'QUEST REDUCTION' row on the '[ STATUS ]' screen shows 'Full quest \u00b7 full XP.'"
     },
     {
       "type": "action",
@@ -73,7 +69,7 @@
     },
     {
       "type": "assertion",
-      "description": "The 'QUEST REDUCTION' row now shows 'Tomorrow 20% \u00b7 half XP'"
+      "description": "The 'QUEST REDUCTION' row now shows '\u221220% targets \u00b7 applies tomorrow \u00b7 half XP'"
     },
     {
       "type": "action",

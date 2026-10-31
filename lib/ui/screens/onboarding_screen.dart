@@ -603,7 +603,10 @@ class _BlinkState extends State<_Blink> with SingleTickerProviderStateMixin {
 // ---------------------------------------------------------------------------
 // Step 2: choose your System
 
-class _SystemStep extends StatelessWidget {
+/// Choose your System: a carousel of flip cards (neighbours scaled to 0.92
+/// and dimmed), each with its animated emblem on the front and a brief on
+/// the back. The centred card is the choice.
+class _SystemStep extends StatefulWidget {
   const _SystemStep({
     required this.choices,
     required this.chosen,
@@ -618,73 +621,209 @@ class _SystemStep extends StatelessWidget {
   final ValueChanged<SystemKind> onChoose;
   final VoidCallback onBind;
 
-  static const _examples = {
-    SystemKind.fitness: 'Walks, push-ups, squats, planks, runs.',
-    SystemKind.personality:
-        'Reading, journaling, talking to people, presenting work.',
-    SystemKind.focus:
-        'Phone-free blocks, social media caps, no phone at meals.',
-  };
+  @override
+  State<_SystemStep> createState() => _SystemStepState();
+}
+
+class _SystemStepState extends State<_SystemStep>
+    with SingleTickerProviderStateMixin {
+  late final _page = PageController(
+    viewportFraction: .8,
+    initialPage: max(
+      0,
+      widget.choices.indexOf(widget.chosen ?? widget.choices.first),
+    ),
+  );
+  late final _clock = AnimationController(
+    vsync: this,
+    duration: const Duration(days: 1),
+  )..forward();
+  final _flipped = <SystemKind>{};
+
+  int get _index => _page.hasClients
+      ? (_page.page ?? _page.initialPage.toDouble()).round()
+      : _page.initialPage;
+
+  @override
+  void initState() {
+    super.initState();
+    // The centred card is chosen from the start.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && widget.chosen == null) {
+        widget.onChoose(widget.choices[_page.initialPage]);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _page.dispose();
+    _clock.dispose();
+    super.dispose();
+  }
+
+  void _goTo(int i) => _page.animateToPage(
+    i,
+    duration: const Duration(milliseconds: 250),
+    curve: Curves.easeOutCubic,
+  );
 
   @override
   Widget build(BuildContext context) {
-    final name = chosen == null
-        ? null
-        : systemCatalogue[chosen]!.name.split(' ').first.toUpperCase();
+    final p = HudScope.of(context);
+    final chosen = widget.chosen ?? widget.choices.first;
+    final name = systemCatalogue[chosen]!.name.toUpperCase();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _Head(
           kicker: 'Awakening · System binding',
           title: 'Choose your System',
-          sub: nextSystemOnly
+          sub: widget.nextSystemOnly
               ? 'Your System is complete. Choose the next one.'
-              : 'One System per Player. No switching until it is complete.',
+              : null,
         ),
         Expanded(
-          child: Column(
-            children: [
-              for (final (i, k) in choices.indexed) ...[
-                if (i > 0) const SizedBox(height: 12),
-                Expanded(
-                  flex: chosen == null ? 1 : (chosen == k ? 6 : 2),
-                  child: _SystemCard(
-                    spec: systemCatalogue[k]!,
-                    example: _examples[k]!,
-                    selected: chosen == k,
-                    dimmed: chosen != null && chosen != k,
-                    onTap: () => onChoose(k),
-                  ),
+          child: LayoutBuilder(
+            builder: (context, box) => OverflowBox(
+              // The carousel runs edge to edge, past the step's 20 px padding.
+              minWidth: box.maxWidth + 40,
+              maxWidth: box.maxWidth + 40,
+              child: AnimatedBuilder(
+                animation: Listenable.merge([_page, _clock]),
+                builder: (context, _) => PageView.builder(
+                  controller: _page,
+                  itemCount: widget.choices.length,
+                  onPageChanged: (i) {
+                    HapticFeedback.selectionClick();
+                    widget.onChoose(widget.choices[i]);
+                  },
+                  itemBuilder: (context, i) {
+                    final page =
+                        _page.hasClients && _page.position.haveDimensions
+                        ? (_page.page ?? 0)
+                        : _page.initialPage.toDouble();
+                    final d = (page - i).abs().clamp(0.0, 1.0);
+                    final k = widget.choices[i];
+                    return Transform.scale(
+                      scale: 1 - .08 * d,
+                      child: Opacity(
+                        opacity: 1 - .45 * d,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 8,
+                          ),
+                          child: _FlipCard(
+                            kind: k,
+                            index: i,
+                            count: widget.choices.length,
+                            active: d < .5,
+                            flipped: _flipped.contains(k),
+                            seconds: _clock.lastElapsedDuration == null
+                                ? 0
+                                : _clock.lastElapsedDuration!.inMilliseconds /
+                                      1000,
+                            onTap: () {
+                              if (i != _index) return _goTo(i);
+                              HapticFeedback.selectionClick();
+                              setState(
+                                () => _flipped.contains(k)
+                                    ? _flipped.remove(k)
+                                    : _flipped.add(k),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
-              ],
-            ],
+              ),
+            ),
           ),
         ),
-        const SizedBox(height: 14),
-        CutButton(
-          name == null ? 'BIND SYSTEM' : 'BIND $name',
-          onPressed: chosen == null ? null : onBind,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            for (final (i, k) in widget.choices.indexed)
+              Semantics(
+                button: true,
+                selected: k == chosen,
+                label: 'Show the ${systemCatalogue[k]!.name}',
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => _goTo(i),
+                  child: SizedBox(
+                    width: 48,
+                    height: 36,
+                    child: Center(
+                      child: Transform.rotate(
+                        angle: pi / 4,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: k == chosen ? 11 : 8,
+                          height: k == chosen ? 11 : 8,
+                          decoration: BoxDecoration(
+                            color: k == chosen ? p.sys : Colors.transparent,
+                            border: Border.all(
+                              color: k == chosen ? p.hi : p.dim,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
+        Text.rich(
+          TextSpan(
+            text: 'One System at a time. ',
+            style: Hud.mono(11, p.dim),
+            children: [
+              TextSpan(
+                text: 'No switching until it is complete.',
+                style: Hud.mono(11, Hud.warn),
+              ),
+            ],
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 10),
+        CutButton('CHOOSE $name', onPressed: widget.onBind),
       ],
     );
   }
 }
 
-class _SystemCard extends StatelessWidget {
-  const _SystemCard({
-    required this.spec,
-    required this.example,
-    required this.selected,
-    required this.dimmed,
+class _FlipCard extends StatelessWidget {
+  const _FlipCard({
+    required this.kind,
+    required this.index,
+    required this.count,
+    required this.active,
+    required this.flipped,
+    required this.seconds,
     required this.onTap,
   });
 
-  final SystemSpec spec;
-  final String example;
-  final bool selected;
-  final bool dimmed;
+  final SystemKind kind;
+  final int index;
+  final int count;
+  final bool active;
+  final bool flipped;
+  final double seconds;
   final VoidCallback onTap;
 
+  static const _statFull = {
+    Stat.strength: 'STRENGTH',
+    Stat.intellect: 'INTELLECT',
+    Stat.discipline: 'DISCIPLINE',
+    Stat.vitality: 'VITALITY',
+    Stat.charisma: 'CHARISMA',
+  };
   static const _stat = {
     Stat.strength: 'STR',
     Stat.intellect: 'INT',
@@ -692,172 +831,337 @@ class _SystemCard extends StatelessWidget {
     Stat.vitality: 'VIT',
     Stat.charisma: 'CHA',
   };
+  static const _end = {
+    SystemKind.fitness: 'A full-intensity personal programme, logged daily.',
+    SystemKind.personality:
+        'Create something every day: write, build or present.',
+    SystemKind.focus: 'Locked apps stay locked all day, by choice.',
+  };
 
   @override
   Widget build(BuildContext context) {
-    final p = HudScope.of(context);
-    final short = spec.name.split(' ').first.toUpperCase();
-    final start = spec.at(Rank.e).daily.map(questTask).toList();
+    final spec = systemCatalogue[kind]!;
     return Semantics(
       button: true,
-      selected: selected,
       label: spec.name,
+      hint: flipped ? 'Tap to return' : 'Tap to inspect',
       child: GestureDetector(
         onTap: onTap,
-        child: AnimatedOpacity(
-          opacity: dimmed ? .45 : 1,
-          duration: const Duration(milliseconds: 250),
-          child: ClipPath(
-            clipper: const ChamferClipper(
-              12,
-              corners: [true, false, true, false],
-            ),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              decoration: BoxDecoration(
-                color: selected ? p.sys.withValues(alpha: .10) : p.panel,
-                border: Border.all(
-                  color: selected ? p.sys : p.sys.withValues(alpha: .18),
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(end: flipped ? 1 : 0),
+          duration: const Duration(milliseconds: 450),
+          curve: Curves.easeInOut,
+          builder: (context, f, _) {
+            final back = f > .5;
+            final angle = f * pi;
+            return Transform(
+              alignment: Alignment.center,
+              transform: Matrix4.identity()
+                ..setEntry(3, 2, .0012)
+                ..rotateY(angle),
+              child: back
+                  ? Transform(
+                      alignment: Alignment.center,
+                      transform: Matrix4.rotationY(pi),
+                      child: _face(context, spec, back: true),
+                    )
+                  : _face(context, spec, back: false),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _face(BuildContext context, SystemSpec spec, {required bool back}) {
+    final p = HudScope.of(context);
+    final short = spec.name.split(' ').first.toUpperCase();
+    final content = back
+        ? _back(context, spec, short)
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      'SYSTEM 0${index + 1} / 0$count',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Hud.mono(10, p.dim, spacing: .2),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      'START · RANK E',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.right,
+                      style: Hud.mono(10, Hud.rankColor(Rank.e), spacing: .2),
+                    ),
+                  ),
+                ],
+              ),
+              Expanded(
+                child: Center(
+                  child: AspectRatio(
+                    aspectRatio: 1,
+                    child: CustomPaint(
+                      painter: SystemEmblemPainter(kind, active ? seconds : 0),
+                    ),
+                  ),
                 ),
               ),
-              child: ExcludeSemantics(
-                child: Stack(
-                  children: [
-                    Row(
+              Text(
+                short,
+                textAlign: TextAlign.center,
+                style: Hud.head(
+                  26,
+                  p.hi,
+                  spacing: .26,
+                ).copyWith(shadows: p.textGlow(1)),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                spec.tagline,
+                textAlign: TextAlign.center,
+                style: Hud.mono(13, p.text).copyWith(height: 1.55),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  for (final s in spec.stats)
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      constraints: const BoxConstraints(minWidth: 96),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: p.sys.withValues(alpha: .06),
+                        border: Border.all(color: p.sys.withValues(alpha: .55)),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            _stat[s]!,
+                            style: Hud.head(15, p.hi, spacing: .22),
+                          ),
+                          Text(
+                            _statFull[s]!,
+                            style: Hud.mono(9, p.dim, spacing: .16),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.flip, size: 16, color: active ? p.sys : p.dim),
+                  const SizedBox(width: 8),
+                  Text(
+                    'TAP TO INSPECT',
+                    style: Hud.mono(10, active ? p.sys : p.dim, spacing: .22),
+                  ),
+                ],
+              ),
+            ],
+          );
+    return HudFrame(
+      chamfer: 16,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      expand: true,
+      child: content,
+    );
+  }
+
+  Widget _back(BuildContext context, SystemSpec spec, String short) {
+    final p = HudScope.of(context);
+    Widget sh(String a, String b, Color c) => Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Flexible(
+            child: Text(
+              a,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Hud.mono(9, p.dim, spacing: .2),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              b,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
+              style: Hud.mono(9, c, spacing: .2),
+            ),
+          ),
+        ],
+      ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          '[ $short · BRIEF ]',
+          textAlign: TextAlign.center,
+          style: Hud.head(
+            12,
+            p.hi,
+            spacing: .24,
+          ).copyWith(shadows: p.textGlow(.8)),
+        ),
+        Container(
+          height: 1,
+          margin: const EdgeInsets.only(top: 10, bottom: 12),
+          color: p.sys.withValues(alpha: .18),
+        ),
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                sh('WHERE YOU START', 'RANK E · TODAY', Hud.rankColor(Rank.e)),
+                for (final t in spec.at(Rank.e).daily.map(questTask))
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: p.sys.withValues(alpha: .05),
+                      border: Border.all(color: p.sys.withValues(alpha: .18)),
+                    ),
+                    child: Row(
                       children: [
-                        CustomPaint(
-                          size: const Size(60, 60),
-                          painter: SystemGlyphPainter(spec.kind, lit: selected),
-                        ),
-                        const SizedBox(width: 14),
                         Expanded(
-                          child: Center(
-                            child: SingleChildScrollView(
-                              primary: false,
-                              physics: const ClampingScrollPhysics(),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    short,
-                                    style:
-                                        Hud.head(
-                                          17,
-                                          selected ? p.hi : p.text,
-                                          spacing: .24,
-                                        ).copyWith(
-                                          shadows: selected
-                                              ? p.textGlow(.8)
-                                              : null,
-                                        ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Row(
-                                    children: [
-                                      for (final s in spec.stats)
-                                        Container(
-                                          margin: const EdgeInsets.only(
-                                            right: 6,
-                                          ),
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 7,
-                                            vertical: 3,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            border: Border.all(
-                                              color: p.sys.withValues(
-                                                alpha: .18,
-                                              ),
-                                            ),
-                                          ),
-                                          child: Text(
-                                            _stat[s]!,
-                                            style: Hud.mono(
-                                              10,
-                                              p.hi,
-                                              spacing: .14,
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                  if (!dimmed) const SizedBox(height: 6),
-                                  if (!dimmed)
-                                    Text(
-                                      selected ? spec.tagline : example,
-                                      style: Hud.mono(
-                                        11,
-                                        p.dim,
-                                      ).copyWith(height: 1.45),
-                                    ),
-                                  if (selected) ...[
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'RANK E STARTS WITH',
-                                      style: Hud.mono(9, p.sys, spacing: .16),
-                                    ),
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      start
-                                          .map(
-                                            (t) => t.type == TaskType.checkbox
-                                                ? t.name
-                                                : '${t.name} ${questTarget(t)}',
-                                          )
-                                          .join(' · '),
-                                      style: Hud.mono(
-                                        11,
-                                        p.text,
-                                      ).copyWith(height: 1.45),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      'FAIL A DAY: apps lock, plus ${penaltyShort(penaltyKindFor(spec.kind))}.',
-                                      style: Hud.mono(
-                                        10,
-                                        Hud.warn,
-                                      ).copyWith(height: 1.45),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
+                          child: Text(t.name, style: Hud.mono(12, p.text)),
+                        ),
+                        Text(
+                          questTarget(t),
+                          style: Hud.mono(
+                            12,
+                            Colors.white,
+                            weight: FontWeight.w700,
                           ),
                         ),
                       ],
                     ),
-                    Positioned(
-                      right: 2,
-                      top: 2,
-                      child: Transform.rotate(
-                        angle: pi / 4,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          width: 13,
-                          height: 13,
-                          decoration: BoxDecoration(
-                            color: selected ? p.sys : Colors.transparent,
-                            border: Border.all(
-                              color: selected
-                                  ? p.hi
-                                  : p.sys.withValues(alpha: .18),
-                            ),
-                            boxShadow: selected
-                                ? [BoxShadow(color: p.glowColor, blurRadius: 8)]
-                                : null,
-                          ),
-                        ),
+                  ),
+                const SizedBox(height: 10),
+                sh('WHERE IT ENDS', 'RANK S', Hud.rankColor(Rank.s)),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Hud.gold.withValues(alpha: .05),
+                    border: Border.all(color: Hud.gold.withValues(alpha: .35)),
+                  ),
+                  child: Text(
+                    _end[kind]!,
+                    style: Hud.mono(12, Hud.gold).copyWith(height: 1.5),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                sh('IF YOU FAIL A DAY', '', p.dim),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.lock, size: 16, color: Hud.warn),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Your chosen apps lock for 4 hours at a time you are not told.',
+                        style: Hud.mono(
+                          12,
+                          const Color(0xFFFFC4CA),
+                        ).copyWith(height: 1.45),
                       ),
                     ),
                   ],
                 ),
-              ),
+                const SizedBox(height: 6),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.warning_amber, size: 16, color: Hud.warn),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        '${penaltyShort(penaltyKindFor(kind))[0].toUpperCase()}${penaltyShort(penaltyKindFor(kind)).substring(1)}, growing with your level.',
+                        style: Hud.mono(12, p.text).copyWith(height: 1.45),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ),
-      ),
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            for (final r in Rank.values)
+              Transform.rotate(
+                angle: pi / 4,
+                child: Container(
+                  width: 24,
+                  height: 24,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: r == Rank.e
+                        ? Hud.rankColor(r)
+                        : const Color(0xFF070D1A),
+                    border: Border.all(color: Hud.rankColor(r), width: 1.5),
+                    boxShadow: r == Rank.e || r == Rank.s
+                        ? [
+                            BoxShadow(
+                              color: Hud.rankColor(r).withValues(alpha: .6),
+                              blurRadius: 10,
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Transform.rotate(
+                    angle: -pi / 4,
+                    child: Text(
+                      r.name.toUpperCase(),
+                      style: Hud.head(
+                        11,
+                        r == Rank.e
+                            ? const Color(0xFF05070D)
+                            : Hud.rankColor(r),
+                        spacing: 0,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.flip, size: 16, color: p.sys),
+            const SizedBox(width: 8),
+            Text('TAP TO RETURN', style: Hud.mono(10, p.sys, spacing: .22)),
+          ],
+        ),
+      ],
     );
   }
 }

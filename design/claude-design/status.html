@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Do or Die — Status + 30-day report (prototype)</title>
+<!-- Fonts load from Google Fonts here; bundle them as assets in the Flutter build. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* =========================================================
+   BRAND TOKENS
+   ========================================================= */
+:root{
+  --void:#05070D; --void-glow:#0B1730; --panel:rgba(10,18,34,0.72);
+  --sys:#4FB3FF; --hi:#A9DCFF; --text:#DBE7FF; --dim:#7D8BA8;
+  --gold:#F5C96A; --warn:#FF8A93;
+  --pz-red:#FF3B4A; --pz-bg:#090204;
+  --dp-crimson:#D7263D; --dp-gold:#F5C96A; --dp-bg:#060102;
+  --rank-e:#9AA4B8; --rank-d:#5BD69A; --rank-c:#4FB3FF; --rank-b:#B07CFF; --rank-a:#FF9F45; --rank-s:#F5C96A;
+  --f-title:"Chakra Petch",system-ui,sans-serif;
+  --f-body:"JetBrains Mono",ui-monospace,monospace;
+  --safe-top:44px; --safe-bottom:34px; --pad:16px; --touch:48px;
+  --line:rgba(79,179,255,.55); --line-dim:rgba(79,179,255,.18); --fill:rgba(79,179,255,.06);
+  --glow:0 0 8px rgba(79,179,255,.55); --ease:cubic-bezier(.2,.8,.2,1);
+  --rc:var(--rank-d);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{min-height:100%;background:#020308;color:var(--text);font-family:var(--f-body)}
+body{display:flex;gap:28px;justify-content:center;align-items:flex-start;padding:24px}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+a{color:var(--hi)}
+
+.rev{width:300px;font-size:12px;line-height:1.6;color:var(--dim)}
+.rev h2{font-family:var(--f-title);letter-spacing:.18em;font-size:13px;color:var(--hi);margin:16px 0 8px}
+.rev .opts{display:flex;flex-wrap:wrap;gap:6px}
+.rev .opts button,.rev .opts a{font-size:11px;letter-spacing:.08em;color:var(--dim);border:1px solid var(--line-dim);padding:8px 10px;min-height:36px;text-decoration:none;display:inline-flex;align-items:center}
+.rev .opts button.on{color:var(--hi);border-color:var(--sys)}
+.rev p{margin-bottom:8px}.rev b{color:var(--text);font-weight:500}.rev .gap{color:var(--warn)}
+
+/* =========================================================
+   PHONE
+   ========================================================= */
+.phone{width:390px;height:844px;position:relative;overflow:hidden;border-radius:38px;flex:none;user-select:none;-webkit-user-select:none;
+  background:radial-gradient(120% 55% at 50% -10%,var(--void-glow) 0%,var(--void) 62%);box-shadow:0 0 0 1px #111a2c,0 30px 80px rgba(0,0,0,.6)}
+.phone::before{content:"";position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(79,179,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(79,179,255,.04) 1px,transparent 1px);background-size:26px 26px;
+  mask-image:radial-gradient(90% 70% at 50% 40%,#000 30%,transparent 100%)}
+.phone::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:80;background:repeating-linear-gradient(0deg,rgba(0,0,0,.18) 0 1px,transparent 1px 3px)}
+.scr{position:absolute;inset:0;display:none;flex-direction:column;padding:var(--safe-top) var(--pad) 0;z-index:1}
+.scr.on{display:flex}
+/* ANIM screen swap: incoming screen fades + slides 12 px from the side it comes from, 280 ms. */
+.scr.in-r{animation:inR .28s var(--ease)}.scr.in-l{animation:inL .28s var(--ease)}
+@keyframes inR{from{opacity:0;transform:translateX(12px)}}@keyframes inL{from{opacity:0;transform:translateX(-12px)}}
+
+.kicker{font-size:10px;letter-spacing:.22em;color:var(--dim);text-transform:uppercase}
+.num{font-family:var(--f-body);font-weight:700;font-variant-numeric:tabular-nums}
+.gold{color:var(--gold)}
+
+/* framed panel */
+.pnl{position:relative;flex:none}
+.pnl>.b{position:absolute;width:12px;height:12px;border-color:var(--hi);border-style:solid;z-index:2;pointer-events:none}
+.pnl>.b.tl{top:-4px;left:-4px;border-width:2px 0 0 2px}.pnl>.b.tr{top:-4px;right:-4px;border-width:2px 2px 0 0}
+.pnl>.b.bl{bottom:-4px;left:-4px;border-width:0 0 2px 2px}.pnl>.b.br{bottom:-4px;right:-4px;border-width:0 2px 2px 0}
+.pnl .w{padding:1px;background:linear-gradient(160deg,var(--sys),var(--line-dim) 45%,var(--line));
+  clip-path:polygon(10px 0,calc(100% - 10px) 0,100% 10px,100% calc(100% - 10px),calc(100% - 10px) 100%,10px 100%,0 calc(100% - 10px),0 10px)}
+.pnl .wi{padding:12px 14px;background:linear-gradient(180deg,rgba(13,24,46,.96),rgba(8,14,27,.96));
+  clip-path:polygon(9.5px 0,calc(100% - 9.5px) 0,100% 9.5px,100% calc(100% - 9.5px),calc(100% - 9.5px) 100%,9.5px 100%,0 calc(100% - 9.5px),0 9.5px)}
+.ph{display:flex;justify-content:space-between;align-items:center;min-height:20px;margin-bottom:8px}
+.ph .t{font-family:var(--f-title);font-weight:700;letter-spacing:.24em;font-size:11px;color:var(--hi)}
+
+.btn{min-height:var(--touch);border:1px solid var(--sys);color:var(--hi);background:var(--fill);font-family:var(--f-title);font-weight:700;letter-spacing:.22em;font-size:13px;
+  clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);text-shadow:var(--glow);transition:transform .12s,background .15s}
+.btn:active:not(:disabled){transform:scale(.97);background:rgba(79,179,255,.16)}
+.btn:disabled{opacity:.3}
+.btn.gold{border-color:var(--gold);color:var(--gold);background:rgba(245,201,106,.07);text-shadow:0 0 8px rgba(245,201,106,.5)}
+
+.nav{flex:none;display:flex;height:calc(64px + var(--safe-bottom));padding-bottom:var(--safe-bottom);margin:0 calc(var(--pad) * -1);border-top:1px solid var(--line-dim);background:rgba(5,7,13,.85)}
+.nav button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-family:var(--f-title);font-size:11px;letter-spacing:.2em;color:var(--dim);position:relative}
+.nav button svg{width:20px;height:20px}
+.nav button.on{color:var(--hi);text-shadow:var(--glow)}
+.nav button.on::before{content:"";position:absolute;top:-1px;left:28%;right:28%;height:2px;background:var(--sys);box-shadow:var(--glow)}
+
+/* =========================================================
+   STATUS (fits 844 px with no scrolling)
+   ========================================================= */
+#status{gap:8px}
+.stT{font-family:var(--f-title);font-weight:700;letter-spacing:.3em;font-size:12px;color:var(--hi);text-align:center;text-shadow:var(--glow);height:20px;line-height:20px;flex:none;margin-top:2px}
+.hero{flex:none;display:flex;align-items:center;gap:14px;height:112px}
+.rkbox{position:relative;width:100px;height:112px;flex:none;display:flex;align-items:center;justify-content:center}
+.rkbox svg{position:absolute;inset:0;width:100%;height:100%}
+/* ANIM rank letter: glow breathes 8 px -> 22 px over 3.2 s, forever; on screen entry the letter scales 1.2 -> 1 in 300 ms. */
+.rkL{position:relative;font-family:var(--f-title);font-weight:700;font-size:90px;line-height:1;color:var(--rc);
+  text-shadow:0 0 8px var(--rc),0 0 22px color-mix(in srgb,var(--rc) 50%,transparent);animation:rkIn .3s var(--ease),breathe 3.2s ease-in-out infinite}
+@keyframes rkIn{from{transform:scale(1.2);opacity:0}}
+@keyframes breathe{50%{text-shadow:0 0 14px var(--rc),0 0 40px color-mix(in srgb,var(--rc) 60%,transparent)}}
+.hmeta{flex:1;min-width:0}
+.hmeta .sy{font-family:var(--f-title);font-weight:700;letter-spacing:.22em;font-size:18px;color:var(--text);margin:4px 0 8px}
+.hmeta .tl{font-size:9px;letter-spacing:.2em;color:var(--dim)}
+.hmeta .ti{font-family:var(--f-title);font-weight:700;letter-spacing:.08em;font-size:15px;color:var(--gold);text-shadow:0 0 10px rgba(245,201,106,.45);margin-top:2px}
+
+.core{display:flex;gap:12px;align-items:center}
+.rows{flex:1;display:flex;flex-direction:column;gap:9px;min-width:0}
+.row .k{font-size:9px;letter-spacing:.2em;color:var(--dim)}
+.row .v{font-size:15px;color:#fff;margin-top:1px}
+.row .v small{font-size:11px;color:var(--dim);font-weight:400}
+.xpbar{height:4px;background:rgba(125,139,168,.2);margin-top:4px;position:relative;overflow:hidden}
+.xpbar i{position:absolute;inset:0 auto 0 0;width:0;background:var(--sys);box-shadow:var(--glow);transition:width .6s var(--ease)}
+.ring{width:124px;flex:none;text-align:center}
+.ring svg{width:124px;height:124px;display:block}
+/* ANIM gate ring: the 14 cleared segments light in order, 25 ms apart, 150 ms each, on screen entry. */
+.ring .sgm{transition:fill .15s}
+.ring .lbl{font-size:9px;letter-spacing:.2em;color:var(--dim);margin-top:2px}
+
+.red .seg{display:flex;gap:6px;margin-top:2px}
+.red .seg button{flex:1;min-height:var(--touch);border:1px solid var(--line-dim);font-family:var(--f-title);font-weight:700;letter-spacing:.12em;font-size:15px;color:var(--dim);background:rgba(0,0,0,.2);
+  clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);transition:all .2s}
+/* ANIM reduction select: border + text to blue (0%) or warn (10/20%), 200 ms; caption crossfades 150 ms. */
+.red .seg button.on{border-color:var(--sys);color:var(--hi);background:var(--fill);text-shadow:var(--glow)}
+.red .seg button.on.cut{border-color:var(--warn);color:var(--warn);background:rgba(255,138,147,.07);text-shadow:none}
+.red .cap{font-size:10px;letter-spacing:.1em;color:var(--dim);margin-top:6px;min-height:14px}
+.red .cap b{color:var(--warn);font-weight:500}
+.acts{flex:none;display:flex;gap:8px}
+.acts .btn{flex:1}
+
+.attr .grid{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.st{display:flex;flex-direction:column;align-items:center;gap:4px}
+.st .n{font-family:var(--f-title);font-weight:700;letter-spacing:.14em;font-size:12px;color:var(--hi)}
+.st .val{font-size:15px;color:#fff;height:18px;line-height:18px}
+.st .val em{font-style:normal;color:var(--gold);font-size:11px;margin-left:2px}
+.st .bar{width:10px;height:50px;background:rgba(125,139,168,.18);position:relative;overflow:hidden}
+.st .bar i{position:absolute;left:0;right:0;bottom:0;background:var(--sys);box-shadow:var(--glow);transition:height .3s var(--ease)}
+.st .bar u{position:absolute;left:0;right:0;background:var(--gold);transition:all .25s var(--ease)}
+.st .pl{width:48px;height:48px;border:1px solid var(--line);color:var(--hi);font-family:var(--f-title);font-size:24px;line-height:1;background:var(--fill);
+  clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);transition:transform .1s}
+.st .pl:active:not(:disabled){transform:scale(.92)}
+.st .pl:disabled{opacity:.25}
+/* unbound stats (not trained by the current System) are dimmed */
+.st.off .n{color:var(--dim)}.st.off .bar i{background:#4a5670;box-shadow:none}
+.st .val.pop{animation:pop .2s ease-out}
+@keyframes pop{from{transform:scale(1.25)}}
+.pts{font-size:10px;letter-spacing:.16em;color:var(--gold)}
+.pts.none{color:var(--dim)}
+.pact{display:none;gap:6px}
+.pact.on{display:flex}
+.pact button{min-height:32px;padding:0 10px;font-family:var(--f-title);font-weight:700;letter-spacing:.16em;font-size:10px;border:1px solid var(--line-dim);color:var(--dim)}
+.pact button.cf{border-color:var(--gold);color:var(--gold)}
+/* NOTE: the 32 px CONFIRM / RESET sit inside a 48 px tall header row; the hit area is padded to 48 px. */
+.pact button{position:relative}
+.pact button::after{content:"";position:absolute;inset:-8px -2px}
+
+/* =========================================================
+   REPORT
+   ========================================================= */
+.rhd{flex:none;display:flex;align-items:center;gap:8px;height:56px}
+.back{width:48px;height:48px;border:1px solid var(--line-dim);display:flex;align-items:center;justify-content:center;color:var(--hi)}
+.back svg{width:18px;height:18px}
+.rhd .t{flex:1;text-align:center;padding-right:48px}
+.rhd .t b{display:block;font-family:var(--f-title);font-weight:700;letter-spacing:.26em;font-size:14px;color:var(--hi);text-shadow:var(--glow)}
+.rhd .t span{font-size:10px;letter-spacing:.14em;color:var(--dim)}
+.rbody{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:14px;padding:6px 0 14px;scrollbar-width:none}
+.rbody::-webkit-scrollbar{display:none}
+.rfoot{flex:none;padding:10px 0 calc(var(--safe-bottom) + 6px);border-top:1px solid var(--line-dim);margin:0 calc(var(--pad) * -1);padding-left:var(--pad);padding-right:var(--pad);background:rgba(5,7,13,.9)}
+.rfoot .btn{width:100%}
+
+.dialrow{display:flex;gap:14px;align-items:center}
+.dial{width:140px;height:140px;flex:none;position:relative}
+.dial svg{width:100%;height:100%}
+.dial .c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.dial .c b{font-size:34px;color:#fff;text-shadow:0 0 10px rgba(245,201,106,.5)}
+.dial .c span{font-size:9px;letter-spacing:.2em;color:var(--dim)}
+/* ANIM clear-rate dial: arc sweeps 0 -> 78 % and the number counts with it, 600 ms easeOutCubic, on entry. */
+.drows{flex:1;display:grid;grid-template-columns:1fr auto;gap:8px 8px;font-size:12px}
+.drows span:nth-child(odd){color:var(--dim)}
+.drows i{display:inline-block;width:9px;height:9px;margin-right:6px;vertical-align:0}
+
+.journey{display:flex;align-items:center;gap:6px}
+.journey .bd{width:72px;flex:none;text-align:center}
+.journey .bd svg{width:64px;height:68px}
+.journey .bd span{display:block;font-size:9px;letter-spacing:.14em;color:var(--dim);margin-top:2px}
+.journey .path{flex:1;position:relative;height:68px;display:flex;align-items:center}
+.journey .path::before{content:"";position:absolute;left:0;right:0;top:50%;border-top:1px dashed var(--line)}
+.journey .path .ms{position:relative;flex:1;display:flex;justify-content:space-around}
+.journey .path .ms i{width:12px;height:12px;transform:rotate(45deg);border:1px solid var(--gold);background:var(--void)}
+.journey .path .ms i.ok{background:var(--gold);box-shadow:0 0 6px rgba(245,201,106,.6)}
+.journey .path .cap{position:absolute;left:0;right:0;bottom:2px;text-align:center;font-size:9px;letter-spacing:.12em;color:var(--dim)}
+
+.tn{display:grid;grid-template-columns:1fr auto 18px auto auto;gap:8px 8px;align-items:center;font-size:12px}
+.tn .h{font-size:9px;letter-spacing:.18em;color:var(--dim)}
+.tn .old{color:var(--dim);text-align:right}
+.tn .new{color:#fff;text-align:right;font-weight:700}
+.tn .ch{color:var(--rank-d);text-align:right;font-size:11px}
+.tn svg{width:14px;height:8px}
+
+.cal{display:grid;grid-template-columns:repeat(10,1fr);gap:5px}
+.cal button{aspect-ratio:1;position:relative;border:1px solid transparent;transition:transform .1s}
+.cal button.c{background:rgba(245,201,106,.85);box-shadow:0 0 6px rgba(245,201,106,.35)}
+.cal button.f{background:rgba(255,59,74,.8)}
+.cal button.d{background:rgba(79,179,255,.45)}
+.cal button.r::after{content:"";position:absolute;right:2px;top:2px;width:5px;height:5px;background:#05070D;transform:rotate(45deg)}
+.cal button.sel{border-color:#fff;transform:scale(1.12);z-index:1}
+/* ANIM calendar: squares fill in day order, 18 ms stagger, scale 0.4 -> 1, 200 ms, on entry. */
+.cal button.in{animation:cIn .2s var(--ease) both}
+@keyframes cIn{from{transform:scale(.4);opacity:0}}
+.lg{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;font-size:9px;letter-spacing:.12em;color:var(--dim)}
+.lg i{display:inline-block;width:9px;height:9px;margin-right:5px;vertical-align:-1px}
+.cdet{margin-top:8px;font-size:11px;color:var(--text);min-height:16px;letter-spacing:.04em}
+
+.hon{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.ht{border:1px solid var(--line-dim);padding:9px 10px;background:rgba(0,0,0,.2)}
+.ht b{display:block;font-size:20px;color:#fff}
+.ht span{display:block;font-size:9px;letter-spacing:.14em;color:var(--dim);margin-top:2px}
+.ht small{display:block;font-size:10px;color:var(--dim);margin-top:4px;line-height:1.35}
+.ht.w{border-color:rgba(255,138,147,.4)}.ht.w b{color:var(--warn)}
+.verdict{border:1px solid var(--line);padding:14px;background:rgba(0,0,0,.35);font-family:var(--f-title);font-weight:600;font-size:15px;line-height:1.45;letter-spacing:.04em;color:var(--text);text-align:center}
+.verdict .k{display:block;font-family:var(--f-body);font-size:9px;letter-spacing:.24em;color:var(--dim);margin-bottom:6px;font-weight:400}
+
+/* =========================================================
+   OVERLAYS: system check, share sheet
+   ========================================================= */
+.scrim{position:absolute;inset:0;z-index:30;background:rgba(3,5,10,.8);backdrop-filter:blur(3px);display:none}
+.scrim.on{display:block;animation:fade .25s}
+@keyframes fade{from{opacity:0}}
+.mod{position:absolute;left:20px;right:20px;top:50%;transform:translateY(-50%);z-index:31;display:none}
+.mod.on{display:block}
+/* ANIM system check window: power-on scaleY 0.04 -> 1, 400 ms; each check row scans for 220 ms (moving bar), then resolves. */
+.mod.on .pnl{animation:pw .4s cubic-bezier(.16,1,.3,1)}
+@keyframes pw{from{transform:scaleY(.04);opacity:0}}
+.chk{display:flex;flex-direction:column;gap:2px;margin:4px 0 12px}
+.ck{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line-dim);font-size:12px;position:relative;overflow:hidden}
+.ck .l{flex:1}
+.ck .s{font-size:10px;letter-spacing:.14em;color:var(--dim)}
+.ck .s.ok{color:var(--rank-d)}.ck .s.bad{color:var(--warn)}
+.ck.scan::after{content:"";position:absolute;top:0;bottom:0;width:40%;background:linear-gradient(90deg,transparent,rgba(79,179,255,.25),transparent);animation:scan .22s linear}
+@keyframes scan{from{left:-40%}to{left:100%}}
+.ck .fix{min-height:36px;padding:0 10px;border:1px solid var(--warn);color:var(--warn);font-family:var(--f-title);letter-spacing:.16em;font-size:10px;display:none}
+.ck.bad .fix{display:block}
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:31;display:none;padding:14px var(--pad) calc(var(--safe-bottom) + 10px);background:linear-gradient(180deg,#0d182e,#070c18);border-top:1px solid var(--line)}
+.sheet.on{display:block;animation:up .3s var(--ease)}
+/* ANIM share sheet: slides up 100% -> 0, 300 ms easeOutCubic. */
+@keyframes up{from{transform:translateY(100%)}}
+.sheet .grab{width:40px;height:3px;background:var(--line-dim);margin:0 auto 12px}
+.sheet .pv{width:324px;height:405px;margin:0 auto;overflow:hidden;box-shadow:0 0 0 1px var(--line-dim),0 10px 30px rgba(0,0,0,.6)}
+.sheet .pv .card{transform:scale(.3);transform-origin:0 0}
+.tog{display:flex;align-items:center;justify-content:space-between;min-height:var(--touch);font-size:12px;margin:8px 2px 6px}
+.sw{width:52px;height:30px;border:1px solid var(--line);position:relative;background:rgba(0,0,0,.3)}
+.sw i{position:absolute;top:3px;left:3px;width:22px;height:22px;background:var(--dim);transition:all .2s var(--ease)}
+.sw.on i{left:25px;background:var(--sys);box-shadow:var(--glow)}
+.sheet .acts{margin-top:4px}
+.toast{position:absolute;left:24px;right:24px;bottom:calc(var(--safe-bottom) + 84px);z-index:45;padding:10px 12px;font-size:11px;text-align:center;
+  border:1px solid var(--line);background:rgba(5,7,13,.95);opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:none}
+.toast.on{opacity:1;transform:none}
+
+/* =========================================================
+   SHARE CARD 1080 x 1350
+   Flutter: render this layout off-screen in a RepaintBoundary and call toImage(pixelRatio: 1).
+   ========================================================= */
+.card{width:1080px;height:1350px;position:relative;overflow:hidden;color:var(--text);font-family:var(--f-body);
+  background:radial-gradient(110% 50% at 50% 0%,#0f2142 0%,#05070D 60%)}
+.card::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(79,179,255,.05) 2px,transparent 2px),linear-gradient(90deg,rgba(79,179,255,.05) 2px,transparent 2px);background-size:60px 60px}
+.card::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(0,0,0,.16) 0 2px,transparent 2px 6px);pointer-events:none}
+.card .fr{position:absolute;inset:44px;border:2px solid rgba(79,179,255,.45);
+  clip-path:polygon(30px 0,calc(100% - 30px) 0,100% 30px,100% calc(100% - 30px),calc(100% - 30px) 100%,30px 100%,0 calc(100% - 30px),0 30px)}
+.card .cb{position:absolute;width:44px;height:44px;border-color:#A9DCFF;border-style:solid}
+.card .cb.a{top:32px;left:32px;border-width:4px 0 0 4px}.card .cb.b{top:32px;right:32px;border-width:4px 4px 0 0}
+.card .cb.c{bottom:32px;left:32px;border-width:0 0 4px 4px}.card .cb.d{bottom:32px;right:32px;border-width:0 4px 4px 0}
+.card .in{position:absolute;inset:96px 96px 88px;display:flex;flex-direction:column;justify-content:space-between;z-index:1}
+.card .top{display:flex;justify-content:space-between;align-items:center}
+.card .wm{font-family:var(--f-title);font-weight:700;font-size:30px;letter-spacing:.42em;color:var(--hi)}
+.card .cy{font-size:22px;letter-spacing:.14em;color:var(--dim)}
+.card .tt{font-family:var(--f-title);font-weight:700;font-size:58px;letter-spacing:.2em;color:var(--hi);text-shadow:0 0 22px rgba(79,179,255,.6);margin-top:18px}
+.card .sy{font-size:24px;letter-spacing:.24em;color:var(--dim);margin-top:6px}
+.card .jr{display:flex;align-items:center;justify-content:center;gap:36px}
+.card .jr svg.b1{width:150px;height:160px}
+.card .jr svg.b2{width:200px;height:214px;filter:drop-shadow(0 0 24px rgba(91,214,154,.6))}
+.card .jr .ar{display:flex;gap:22px}
+.card .jr .ar i{width:24px;height:24px;transform:rotate(45deg);background:var(--gold);box-shadow:0 0 12px rgba(245,201,106,.7)}
+.card .mid{display:flex;gap:48px;align-items:center}
+.card .dl{width:270px;height:270px;position:relative;flex:none}
+.card .dl svg{width:100%;height:100%}
+.card .dl .c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.card .dl .c b{font-size:78px;color:#fff;text-shadow:0 0 18px rgba(245,201,106,.5)}
+.card .dl .c span{font-size:18px;letter-spacing:.24em;color:var(--dim)}
+.card .tnc{flex:1;display:flex;flex-direction:column;gap:18px}
+.card .tnc .h{font-size:18px;letter-spacing:.24em;color:var(--dim)}
+.card .tnc .r{display:flex;justify-content:space-between;align-items:baseline;font-size:28px;border-bottom:2px solid rgba(79,179,255,.15);padding-bottom:12px}
+.card .tnc .r b{color:#fff}.card .tnc .r em{font-style:normal;color:var(--dim);font-size:22px;margin-right:12px}
+.card .cl{display:grid;grid-template-columns:repeat(15,1fr);gap:9px}
+.card .cl i{aspect-ratio:1}
+.card .cl i.c{background:rgba(245,201,106,.9);box-shadow:0 0 10px rgba(245,201,106,.3)}
+.card .cl i.f{background:rgba(255,59,74,.85)}.card .cl i.d{background:rgba(79,179,255,.5)}
+.card .lgc{display:flex;gap:30px;margin-top:14px;font-size:18px;letter-spacing:.16em;color:var(--dim)}
+.card .lgc i{display:inline-block;width:16px;height:16px;margin-right:10px;vertical-align:-2px}
+.card .hn{display:grid;grid-template-columns:repeat(4,1fr);border:2px solid rgba(255,138,147,.35)}
+.card .hn div{padding:18px 14px;text-align:center;border-right:2px solid rgba(255,138,147,.2)}
+.card .hn div:last-child{border-right:0}
+.card .hn b{display:block;font-size:44px;color:#fff}
+.card .hn span{font-size:15px;letter-spacing:.16em;color:var(--dim)}
+.card .vd{font-family:var(--f-title);font-weight:600;font-size:34px;line-height:1.35;text-align:center;letter-spacing:.03em;padding:22px 30px;border-top:2px solid rgba(79,179,255,.35);border-bottom:2px solid rgba(79,179,255,.35)}
+.card .ft{display:flex;justify-content:space-between;font-size:18px;letter-spacing:.2em;color:var(--dim)}
+.card.nohon .hn{display:none}
+
+body.cardonly{padding:0;display:block;background:#05070D}
+</style>
+</head>
+<body>
+
+<div class="phone" id="phone">
+  <!-- ================= STATUS ================= -->
+  <section class="scr on" id="status">
+    <div class="stT">[ STATUS ]</div>
+    <div class="hero">
+      <div class="rkbox">
+        <!-- EXPORT: rank-frame.svg -->
+        <svg viewBox="0 0 118 132" fill="none"><path d="M59 3 L114 34 V98 L59 129 L4 98 V34 Z" stroke="currentColor" style="color:var(--rc)" stroke-width="1.5" opacity=".55"/>
+          <path d="M59 14 L104 40 V92 L59 118 L14 92 V40 Z" stroke="currentColor" style="color:var(--rc)" stroke-width=".8" opacity=".3" stroke-dasharray="3 4"/></svg>
+        <span class="rkL" id="rkL">D</span>
+      </div>
+      <div class="hmeta">
+        <div class="kicker">Rank D · Player</div>
+        <div class="sy">FITNESS SYSTEM</div>
+        <div class="tl">LATEST TITLE</div>
+        <div class="ti">Gatebreaker · Fitness D</div>
+      </div>
+    </div>
+
+    <div class="pnl"><span class="b tl"></span><span class="b tr"></span><span class="b bl"></span><span class="b br"></span><div class="w"><div class="wi core">
+      <div class="rows">
+        <div class="row"><div class="k">LEVEL</div><div class="v num">12</div></div>
+        <div class="row"><div class="k">EXPERIENCE</div><div class="v num">340 <small>/ 600</small></div><div class="xpbar"><i id="xpI"></i></div></div>
+        <div class="row"><div class="k">CURRENT STREAK</div><div class="v num">6 <small>days · best 11</small></div></div>
+        <div class="row"><div class="k">TRIAL DAY</div><div class="v num" style="color:var(--rank-d)">DONE <small>3 / 3 dry runs</small></div></div>
+      </div>
+      <div class="ring"><svg id="gring" viewBox="0 0 124 124"></svg><div class="lbl">NEXT GATE · DAY 19 / 30</div></div>
+    </div></div></div>
+
+    <div class="red">
+      <div class="kicker">Quest reduction</div>
+      <div class="seg" id="redSeg"><button data-v="0" class="on">0%</button><button data-v="10">10%</button><button data-v="20">20%</button></div>
+      <div class="cap" id="redCap">Full quest · full XP.</div>
+    </div>
+
+    <div class="acts"><button class="btn" id="toReport">REPORT</button><button class="btn" id="toCheck">SYSTEM CHECK</button></div>
+
+    <div class="pnl attr"><span class="b tl"></span><span class="b tr"></span><span class="b bl"></span><span class="b br"></span><div class="w"><div class="wi">
+      <div class="ph" style="min-height:32px"><span class="t">ATTRIBUTES</span><span class="pts" id="pts">3 POINTS</span>
+        <span class="pact" id="pact"><button id="pReset">RESET</button><button class="cf" id="pConf">CONFIRM</button></span></div>
+      <div class="grid" id="agrid"></div>
+    </div></div></div>
+
+    <nav class="nav" style="margin-top:auto">
+      <button><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 2 L18 10 L10 18 L2 10 Z"/><path d="M7 10 H13"/></svg>QUEST</button>
+      <button class="on"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 16 V10 M10 16 V4 M16 16 V8"/></svg>STATUS</button>
+      <button><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 2 L19 17 H1 Z"/><path d="M10 8 V12 M10 14 V15"/></svg>PENALTY</button>
+    </nav>
+  </section>
+
+  <!-- ================= 30-DAY REPORT ================= -->
+  <section class="scr" id="report">
+    <div class="rhd"><button class="back" id="back" aria-label="Back"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 3 L5 9 L11 15"/></svg></button>
+      <div class="t"><b>[ 30-DAY REPORT ]</b><span>FITNESS · 13 SEP – 12 OCT</span></div></div>
+    <div class="rbody">
+      <div class="pnl"><span class="b tl"></span><span class="b tr"></span><span class="b bl"></span><span class="b br"></span><div class="w"><div class="wi dialrow">
+        <div class="dial"><svg viewBox="0 0 140 140"><circle cx="70" cy="70" r="58" fill="none" stroke="rgba(125,139,168,.18)" stroke-width="10"/>
+          <circle id="dialArc" cx="70" cy="70" r="58" fill="none" stroke="#F5C96A" stroke-width="10" stroke-dasharray="364.4" stroke-dashoffset="364.4" transform="rotate(-90 70 70)" style="filter:drop-shadow(0 0 6px rgba(245,201,106,.6))"/>
+          <circle cx="70" cy="70" r="46" fill="none" stroke="rgba(79,179,255,.25)" stroke-dasharray="2 4"/></svg>
+          <div class="c"><b class="num" id="dialN">0%</b><span>CLEAR RATE</span></div></div>
+        <div class="drows"><span><i style="background:var(--gold)"></i>Cleared</span><span class="num">21</span><span><i style="background:var(--pz-red)"></i>Failed</span><span class="num">6</span>
+          <span><i style="background:rgba(79,179,255,.6)"></i>Dry run</span><span class="num">3</span><span>Counted days</span><span class="num">27</span></div>
+      </div></div></div>
+
+      <div><div class="kicker" style="margin-bottom:8px">Rank journey</div>
+        <div class="journey">
+          <div class="bd"><svg id="jb1" viewBox="0 0 116 124"></svg><span>13 SEP</span></div>
+          <div class="path"><div class="ms"><i class="ok"></i><i class="ok"></i><i class="ok"></i></div><div class="cap">GATE · 3 FLOORS CLEARED</div></div>
+          <div class="bd"><svg id="jb2" viewBox="0 0 116 124" style="filter:drop-shadow(0 0 8px rgba(91,214,154,.6))"></svg><span>12 OCT</span></div>
+        </div></div>
+
+      <div><div class="kicker" style="margin-bottom:8px">Then and now</div>
+        <div class="tn" id="tn"></div></div>
+
+      <div><div class="kicker" style="margin-bottom:8px">Consistency</div>
+        <div class="cal" id="cal"></div>
+        <div class="lg"><span><i style="background:var(--gold)"></i>CLEARED</span><span><i style="background:var(--pz-red)"></i>FAILED</span><span><i style="background:rgba(79,179,255,.5)"></i>DRY RUN</span><span><i style="background:var(--gold);clip-path:polygon(0 0,100% 0,100% 100%,60% 100%,60% 40%,0 40%)"></i>REDUCED</span></div>
+        <div class="cdet" id="cdet">Tap a day.</div></div>
+
+      <div><div class="kicker" style="margin-bottom:8px">Honesty</div>
+        <div class="hon" id="hon"></div></div>
+
+      <div class="verdict" id="verdict"><span class="k">VERDICT</span><span id="vTxt"></span></div>
+    </div>
+    <div class="rfoot"><button class="btn" id="toShare">SHARE AS IMAGE</button></div>
+  </section>
+
+  <!-- overlays -->
+  <div class="scrim" id="scrim"></div>
+  <div class="mod" id="check"><div class="pnl"><span class="b tl"></span><span class="b tr"></span><span class="b bl"></span><span class="b br"></span><div class="w"><div class="wi" style="padding:16px">
+    <div style="font-family:var(--f-title);font-weight:700;letter-spacing:.26em;font-size:14px;color:var(--hi);text-align:center;padding-bottom:10px;border-bottom:1px solid var(--line-dim);text-shadow:var(--glow)">[ SYSTEM CHECK ]</div>
+    <div class="chk" id="chk"></div>
+    <p style="font-size:11px;color:var(--dim);line-height:1.5;margin-bottom:12px" id="chkSum">Checking the lock…</p>
+    <button class="btn" id="chkOk" style="width:100%" disabled>ACKNOWLEDGE</button>
+  </div></div></div></div>
+  <div class="sheet" id="sheet"><div class="grab"></div>
+    <div class="pv" id="pv"></div>
+    <div class="tog"><span>Include honesty figures</span><button class="sw on" id="sw" aria-label="Include honesty figures"><i></i></button></div>
+    <div class="acts"><button class="btn" id="shSave">SAVE IMAGE</button><button class="btn gold" id="shShare">SHARE</button></div>
+  </div>
+  <div class="toast" id="toast"></div>
+</div>
+
+<aside class="rev" id="rev">
+  <h2>SCREEN</h2><div class="opts" id="oScr"></div>
+  <h2>SHARE CARD</h2><div class="opts"><a href="?card=1" target="_blank">Open 1080×1350</a><a href="?card=1&nohon=1" target="_blank">Without honesty</a></div>
+  <h2>NOTES</h2>
+  <p class="gap"><b>Attributes.</b> Three of five never move from quests for any one System. Spending is held as pending until CONFIRM, but points still change nothing in play.</p>
+  <p class="gap"><b>Quest reduction</b> is a third escape valve, after releases and self-report. It's counted in HONESTY and should be blocked in Dungeons (not shown on the control, to keep it on one line). Consider capping it at a few days per cycle.</p>
+  <p><b>TRIAL DAY</b> is read as the dry-run days at the start (no penalties). These are the blue squares. [Guessing] Correct me if you meant the Rank Trial floor.</p>
+  <p><b>Verdict rules</b> (first match wins): under 50 % cleared · releases &gt; penalty zones · blocker outage · over 60 % honour-confirmed · otherwise the clear rate alone.</p>
+  <p><b>STATUS</b> fits 844 px with no scrolling. The REPORT scrolls, with SHARE pinned at the bottom.</p>
+</aside>
+
+<script>
+const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)];
+const RC={E:'#9AA4B8',D:'#5BD69A',C:'#4FB3FF',B:'#B07CFF',A:'#FF9F45',S:'#F5C96A'};
+const HEX='M58 6 L108 34 V90 L58 118 L8 90 V34 Z',HEX2='M58 18 L97 40 V84 L58 106 L19 84 V40 Z';
+const badge=r=>`<path d="${HEX}" fill="rgba(10,18,34,.92)" stroke="${RC[r]}" stroke-width="3"/><path d="${HEX2}" fill="none" stroke="${RC[r]}" stroke-width="1" opacity=".5"/><text x="58" y="81" text-anchor="middle" font-family="Chakra Petch, sans-serif" font-weight="700" font-size="54" fill="${RC[r]}">${r}</text>`;
+let tt;const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),1800)};
+const buzz=ms=>{try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){}};
+
+/* ---------- report data (sample cycle) ---------- */
+const PAT='dddccfccccfcccccfccfcccfcccfcc'.split('');   // 3 dry runs, 21 cleared, 6 failed
+const REDUCED=new Set([6,13,20,27]);                      // day indexes on a reduced quest
+const START=new Date(2026,8,13);
+const H={zones:6,dpen:0,rel:9,outH:3,outN:1,honour:41,honTot:96,reduced:4};
+const counted=PAT.filter(x=>x!=='d').length, cleared=PAT.filter(x=>x==='c').length, rate=Math.round(cleared/counted*100);
+function verdict(){ /* first match wins */
+  if(rate<50)return 'Fewer than half the days were cleared. The System expected more.';
+  if(H.rel>H.zones)return `You cleared ${rate}% of days and escaped more locks than you served.`;
+  if(H.outN>0)return `Cleared ${rate}%. The lock was down for ${H.outH} hours. That was not an accident.`;
+  if(H.honour/H.honTot>.6)return `Cleared ${rate}%, mostly on your word.`;
+  return `Cleared ${rate}%. Nothing to add.`}
+const TN=[['Walk','12 min','20 min','+67%'],['Push-ups','10 · knees','20','+100%'],['Squats','15','25','+67%'],['Plank','—','45 s','new']];
+
+/* =========================================================
+   SHARE CARD
+   ========================================================= */
+function cardHTML(noHon){
+  const C=2*Math.PI*118;
+  return `<div class="card${noHon?' nohon':''}"><div class="fr"></div><span class="cb a"></span><span class="cb b"></span><span class="cb c"></span><span class="cb d"></span>
+  <div class="in">
+   <div><div class="top"><span class="wm">DO OR DIE</span><span class="cy">CYCLE 1 · 13 SEP – 12 OCT</span></div>
+    <div class="tt">[ 30-DAY REPORT ]</div><div class="sy">FITNESS SYSTEM</div></div>
+   <div class="jr"><svg class="b1" viewBox="0 0 116 124">${badge('E')}</svg><div class="ar"><i></i><i></i><i></i></div><svg class="b2" viewBox="0 0 116 124">${badge('D')}</svg></div>
+   <div class="mid"><div class="dl"><svg viewBox="0 0 270 270"><circle cx="135" cy="135" r="118" fill="none" stroke="rgba(125,139,168,.2)" stroke-width="20"/>
+     <circle cx="135" cy="135" r="118" fill="none" stroke="#F5C96A" stroke-width="20" stroke-dasharray="${C}" stroke-dashoffset="${C*(1-rate/100)}" transform="rotate(-90 135 135)"/></svg>
+     <div class="c"><b class="num">${rate}%</b><span>CLEAR RATE</span></div></div>
+    <div class="tnc"><div class="h">THEN → NOW</div>${TN.slice(0,3).map(r=>`<div class="r"><span>${r[0]}</span><span><em>${r[1]}</em><b>${r[2]}</b></span></div>`).join('')}</div></div>
+   <div><div class="cl">${PAT.map(x=>`<i class="${x}"></i>`).join('')}</div>
+    <div class="lgc"><span><i style="background:#F5C96A"></i>CLEARED ${cleared}</span><span><i style="background:#FF3B4A"></i>FAILED ${counted-cleared}</span><span><i style="background:rgba(79,179,255,.6)"></i>DRY RUN 3</span></div></div>
+   <div class="hn"><div><b class="num">${H.zones}</b><span>PENALTY ZONES</span></div><div><b class="num">${H.rel}</b><span>RELEASES</span></div><div><b class="num">${H.reduced}</b><span>REDUCED DAYS</span></div><div><b class="num">${Math.round(H.honour/H.honTot*100)}%</b><span>ON MY WORD</span></div></div>
+   <div class="vd">${verdict()}</div>
+   <div class="ft"><span>ISSUED BY THE SYSTEM</span><span>RANK E → D</span></div>
+  </div></div>`}
+
+if(new URLSearchParams(location.search).get('card')){
+  document.body.className='cardonly';document.body.innerHTML=cardHTML(new URLSearchParams(location.search).get('nohon'));
+}else{
+
+/* =========================================================
+   STATUS
+   ========================================================= */
+function arc(cx,cy,r,a0,a1){const p=a=>[cx+Math.sin(a*Math.PI/180)*r,cy-Math.cos(a*Math.PI/180)*r];const[x0,y0]=p(a0),[x1,y1]=p(a1);return`M${x0.toFixed(2)} ${y0.toFixed(2)} A${r} ${r} 0 ${a1-a0>180?1:0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`}
+function gateRing(n=14,of=21){const step=360/of;
+  $('#gring').innerHTML=Array.from({length:of},(_,i)=>`<path class="sgm" d="${arc(62,62,52,i*step+2,(i+1)*step-2)}" fill="none" stroke="rgba(125,139,168,.22)" stroke-width="9" data-i="${i}"/>`).join('')+
+    `<circle cx="62" cy="62" r="40" fill="none" stroke="rgba(79,179,255,.22)" stroke-dasharray="2 4"/>
+     <text x="62" y="62" text-anchor="middle" font-family="JetBrains Mono" font-weight="700" font-size="22" fill="#fff">${n}<tspan font-size="13" fill="#7D8BA8"> / ${of}</tspan></text>
+     <text x="62" y="78" text-anchor="middle" font-family="JetBrains Mono" font-size="8" letter-spacing="1.5" fill="#7D8BA8">CLEARED</text>`;
+  $$('#gring .sgm').forEach((s,i)=>{if(i<n)setTimeout(()=>{s.setAttribute('stroke','#F5C96A');s.style.filter='drop-shadow(0 0 3px rgba(245,201,106,.7))'},120+i*25)})}
+
+const ST=[{k:'STR',v:14,on:1},{k:'VIT',v:11,on:1},{k:'INT',v:3},{k:'CHA',v:2},{k:'DIS',v:6}];
+const A={pts:3,pend:{}};const MAX=30;
+function pendTotal(){return Object.values(A.pend).reduce((a,b)=>a+b,0)}
+function renderAttr(pop){
+  const left=A.pts-pendTotal();
+  $('#agrid').innerHTML=ST.map(s=>{const p=A.pend[s.k]||0;return`<div class="st${s.on?'':' off'}">
+    <span class="n">${s.k}</span><span class="val num${pop===s.k?' pop':''}">${s.v}${p?`<em>+${p}</em>`:''}</span>
+    <span class="bar"><i style="height:${s.v/MAX*100}%"></i><u style="bottom:${s.v/MAX*100}%;height:${p/MAX*100}%"></u></span>
+    <button class="pl" data-k="${s.k}" ${left<=0?'disabled':''} aria-label="Add a point to ${s.k}">+</button></div>`}).join('');
+  const has=pendTotal()>0;$('#pact').classList.toggle('on',has);$('#pts').style.display=has?'none':'';
+  $('#pts').textContent=A.pts?`${A.pts} POINT${A.pts>1?'S':''}`:'NO POINTS';$('#pts').classList.toggle('none',!A.pts);
+  $$('.pl').forEach(b=>b.addEventListener('click',()=>{A.pend[b.dataset.k]=(A.pend[b.dataset.k]||0)+1;buzz(8);renderAttr(b.dataset.k)}));
+}
+$('#pReset').addEventListener('click',()=>{A.pend={};renderAttr()});
+$('#pConf').addEventListener('click',()=>{const t=pendTotal();ST.forEach(s=>s.v+=A.pend[s.k]||0);A.pts-=t;A.pend={};renderAttr();toast(`${t} point${t>1?'s':''} allocated.`);buzz(20)});
+
+const CAP={0:'Full quest · full XP.',10:'<b>−10% targets</b> · applies tomorrow · half XP',20:'<b>−20% targets</b> · applies tomorrow · half XP'};
+$$('#redSeg button').forEach(b=>b.addEventListener('click',()=>{$$('#redSeg button').forEach(x=>x.classList.toggle('on',x===b));b.classList.toggle('cut',b.dataset.v!=='0');
+  $('#redCap').innerHTML=CAP[b.dataset.v];buzz(10)}));
+
+function enterStatus(){gateRing();setTimeout(()=>$('#xpI').style.width=340/600*100+'%',80);renderAttr()}
+
+/* =========================================================
+   REPORT
+   ========================================================= */
+function enterReport(){
+  $('#jb1').innerHTML=badge('E');$('#jb2').innerHTML=badge('D');
+  const C=364.4,t0=performance.now();
+  (function f(n){const k=Math.min(1,(n-t0)/600),e=1-Math.pow(1-k,3);$('#dialArc').setAttribute('stroke-dashoffset',C*(1-rate/100*e));$('#dialN').textContent=Math.round(rate*e)+'%';if(k<1)requestAnimationFrame(f)})(t0);
+  $('#tn').innerHTML='<span class="h">TARGET</span><span class="h" style="text-align:right">THEN</span><span></span><span class="h" style="text-align:right">NOW</span><span class="h" style="text-align:right">CHANGE</span>'+
+    TN.map(r=>`<span>${r[0]}</span><span class="old">${r[1]}</span><svg viewBox="0 0 14 8" fill="none" stroke="#7D8BA8"><path d="M0 4 H12 M9 1 L12 4 L9 7"/></svg><span class="new num">${r[2]}</span><span class="ch">${r[3]}</span>`).join('');
+  $('#cal').innerHTML=PAT.map((x,i)=>`<button class="${x}${REDUCED.has(i)?' r':''} in" style="animation-delay:${i*18}ms" data-i="${i}" aria-label="Day ${i+1}"></button>`).join('');
+  $$('#cal button').forEach(b=>b.addEventListener('click',()=>{$$('#cal button').forEach(x=>x.classList.toggle('sel',x===b));const i=+b.dataset.i,d=new Date(START);d.setDate(d.getDate()+i);
+    const st={c:'CLEARED',f:'FAILED · PENALTY ZONE',d:'DRY RUN · NO PENALTY'}[PAT[i]];
+    $('#cdet').textContent=`DAY ${i+1} · ${['SUN','MON','TUE','WED','THU','FRI','SAT'][d.getDay()]+' '+d.getDate()+' '+['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'][d.getMonth()]} · ${st}${REDUCED.has(i)?' · REDUCED 10%':''}`;buzz(6)}));
+  const hp=Math.round(H.honour/H.honTot*100);
+  $('#hon').innerHTML=[
+    ['Penalty zones',H.zones,'of 27 counted days',0],['Dungeon penalties',H.dpen,'Rank Trial cleared first try',0],
+    ['Releases taken',H.rel,`${(H.rel/H.zones).toFixed(1)} per penalty zone`,1],['Blocker outages',`${H.outN} · ${H.outH} h`,'Usage access was revoked',1],
+    ['Honour confirmations',`${hp}%`,`${H.honour} of ${H.honTot} objectives on your word`,hp>40],['Reduced days',H.reduced,'3 at 10%, 1 at 20%',0]
+  ].map(([l,v,s,w])=>`<div class="ht${w?' w':''}"><b class="num">${v}</b><span>${l.toUpperCase()}</span><small>${s}</small></div>`).join('');
+  $('#vTxt').textContent=verdict();
+}
+
+/* =========================================================
+   OVERLAYS + NAV
+   ========================================================= */
+function go(id,dir){$$('.scr').forEach(s=>s.classList.remove('on','in-r','in-l'));const s=$('#'+id);s.classList.add('on',dir==='l'?'in-l':'in-r');
+  closeOv();if(id==='status')enterStatus();else enterReport();syncOpts(id)}
+function closeOv(){$('#scrim').classList.remove('on');$('#check').classList.remove('on');$('#sheet').classList.remove('on')}
+$('#toReport').addEventListener('click',()=>go('report'));
+$('#back').addEventListener('click',()=>go('status','l'));
+$('#scrim').addEventListener('click',()=>{if($('#sheet').classList.contains('on'))closeOv()});
+
+const CHECKS=[['Usage access','GRANTED',1],['Display over other apps','GRANTED',1],['Battery optimisation','RESTRICTED',0],['Lock test','PASSED · 14:02',1],['Blocker uptime · 7 days','99.1%',1]];
+function openCheck(){$('#scrim').classList.add('on');$('#check').classList.add('on');$('#chkOk').disabled=true;$('#chkSum').textContent='Checking the lock…';
+  $('#chk').innerHTML=CHECKS.map(([l])=>`<div class="ck"><span class="l">${l}</span><span class="s">—</span><button class="fix">FIX</button></div>`).join('');
+  CHECKS.forEach(([l,v,ok],i)=>setTimeout(()=>{const r=$$('.ck')[i];r.classList.add('scan');setTimeout(()=>{const s=r.querySelector('.s');s.textContent=v;s.className='s '+(ok?'ok':'bad');if(!ok)r.classList.add('bad');buzz(ok?5:30)},220)},450+i*260));
+  setTimeout(()=>{$('#chkSum').innerHTML='<span style="color:var(--warn)">1 issue.</span> Android may stop the blocker in the background. Locks can fail without warning.';$('#chkOk').disabled=false},450+CHECKS.length*260+250)}
+$('#toCheck').addEventListener('click',openCheck);
+$('#chkOk').addEventListener('click',closeOv);
+$('#chk').addEventListener('click',e=>{if(e.target.closest('.fix'))toast('Opens Android battery settings for Do or Die.')});
+
+function openSheet(){$('#scrim').classList.add('on');$('#sheet').classList.add('on');$('#pv').innerHTML=cardHTML(!$('#sw').classList.contains('on'))}
+$('#toShare').addEventListener('click',openSheet);
+$('#sw').addEventListener('click',()=>{$('#sw').classList.toggle('on');$('#pv').innerHTML=cardHTML(!$('#sw').classList.contains('on'))});
+$('#shSave').addEventListener('click',()=>toast('Saved to Photos · 1080 × 1350.'));
+$('#shShare').addEventListener('click',()=>toast('Opens the Android share sheet.'));
+
+const SCR=[['status','Status'],['report','30-day report'],['share','Share sheet'],['check','System check']];
+$('#oScr').innerHTML=SCR.map(([k,l])=>`<button data-v="${k}">${l}</button>`).join('');
+$$('#oScr button').forEach(b=>b.addEventListener('click',()=>{const v=b.dataset.v;
+  if(v==='status'||v==='report')go(v);else if(v==='share'){go('report');openSheet()}else{go('status');openCheck()}syncOpts(v)}));
+function syncOpts(v){$$('#oScr button').forEach(b=>b.classList.toggle('on',b.dataset.v===v))}
+go('status');
+}
+</script>
+</body>
+</html>

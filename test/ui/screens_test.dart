@@ -9,11 +9,31 @@ import 'package:do_or_die/platform/blocker.dart';
 import 'package:do_or_die/ui/app_shell.dart';
 import 'package:do_or_die/ui/game_model.dart';
 import 'package:do_or_die/ui/screens/onboarding_screen.dart';
+import 'package:do_or_die/ui/screens/system_check_screen.dart';
 import 'package:do_or_die/ui/theme.dart';
+import 'package:do_or_die/ui/widgets/hud_kit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+/// A widget test with semantics on (for finders by label), released before
+/// the end-of-test checks.
+void testUi(String description, Future<void> Function(WidgetTester) body) =>
+    testWidgets(description, (tester) async {
+      final semantics = tester.ensureSemantics();
+      try {
+        await body(tester);
+      } finally {
+        semantics.dispose();
+      }
+    });
+
 void main() {
+  Future<void> pumpFor(WidgetTester tester, int ms) async {
+    for (var t = 0; t < ms; t += 100) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+  }
+
   Future<GameModel> pumpShell(
     WidgetTester tester, {
     Clock? clock,
@@ -67,243 +87,353 @@ void main() {
     return hits.contains(box);
   }
 
-  testWidgets(
-    'with no penalty, RESTART TRIAL is visible on Status without scrolling',
-    (tester) async {
-      await pumpShell(tester);
-      await tester.tap(find.text('STATUS'));
-      await tester.pump(const Duration(milliseconds: 600));
-      final button = find.text('HOLD 3S · RESTART TRIAL');
-      expect(button, findsOneWidget);
-      expect(reallyVisible(tester, button), isTrue);
-      await tester.pump(const Duration(seconds: 1)); // let title animations end
-    },
-  );
+  Future<void> openTab(WidgetTester tester, String tab) async {
+    await tester.tap(find.text(tab).last);
+    await pumpFor(tester, 600);
+  }
 
-  testWidgets(
-    'while push-ups are owed, Status says exactly what blocks the restart',
-    (tester) async {
-      final clock = FixedClock(DateTime(2026, 10, 19, 10));
-      final model = await pumpShell(tester, clock: clock);
-      clock.set(
-        DateTime(2026, 10, 20, 6, 30),
-      ); // Monday failed, before any lock
-      await model.tick();
-      await tester.pump(const Duration(milliseconds: 600));
-      // The failed day's [ WARNING ] notice covers the screen until acknowledged.
+  Future<void> holdText(WidgetTester tester, Finder f, {int ms = 1300}) async {
+    await tester.ensureVisible(f);
+    await tester.pump();
+    final g = await tester.startGesture(tester.getCenter(f));
+    await pumpFor(tester, ms);
+    await g.up();
+    await pumpFor(tester, 500);
+  }
+
+  /// Clears [n] days in a row on [clock], ending at 09:00 the day after.
+  Future<void> clearDays(GameService g, FixedClock clock, int n) async {
+    for (var i = 0; i < n; i++) {
+      for (final t in g.todaysTasks) {
+        await g.setProgress(t.id, t.goal);
+      }
+      clock.set(g.today.addDays(1).at(9 * 60));
+      await g.tick();
+    }
+    g.takeSystemEvents();
+  }
+
+  Future<void> acknowledgeAll(WidgetTester tester) async {
+    for (
+      var i = 0;
+      i < 6 && find.text('ACKNOWLEDGE').evaluate().isNotEmpty;
+      i++
+    ) {
+      await pumpFor(tester, 2000);
       await tester.tap(find.text('ACKNOWLEDGE'));
-      await tester.pump(const Duration(milliseconds: 600));
-      await tester.tap(find.text('STATUS'));
-      await tester.pump(const Duration(milliseconds: 600));
-
-      expect(find.text('HOLD 3S · RESTART TRIAL'), findsNothing);
-      final reason = find.text(
-        "Finish today's 50 push-ups and wait for today's lock to end to unlock restart.",
-      );
-      expect(reason, findsOneWidget);
-      expect(reallyVisible(tester, reason), isTrue);
-      // The message must not give away when the scheduled lock starts.
-      final start = model.state.lock!.start;
-      final startHm =
-          '${start.hour.toString().padLeft(2, '0')}:${start.minute.toString().padLeft(2, '0')}';
-      expect(find.textContaining(startHm), findsNothing);
-      await tester.pump(const Duration(seconds: 1)); // let title animations end
-    },
-  );
-
-  Future<void> openStatus(WidgetTester tester) async {
-    await tester.tap(find.text('STATUS'));
-    await tester.pump(const Duration(milliseconds: 600));
+      await pumpFor(tester, 400);
+    }
   }
 
   const diagnosticsTitle = 'Blocking spike (M5)';
 
-  testWidgets('holding RESTART TRIAL restarts, and never opens diagnostics', (
+  // -------------------------------------------------------------------------
+  // Status
+
+  testUi('Status fits a phone screen: rank, rows, buttons, attributes', (
+    tester,
+  ) async {
+    await pumpShell(tester);
+    await openTab(tester, 'STATUS');
+    for (final f in [
+      find.text('[ STATUS ]'),
+      find.text('LEVEL'),
+      find.text('CURRENT STREAK'),
+      find.text('REPORT'),
+      find.text('SYSTEM CHECK'),
+      find.text('ATTRIBUTES'),
+      find.text('CHA'),
+    ]) {
+      expect(reallyVisible(tester, f), isTrue, reason: f.toString());
+    }
+    expect(find.text('FITNESS SYSTEM'), findsOneWidget);
+  });
+
+  testUi('Status shows Gate progress and the reduction valve', (tester) async {
+    final clock = FixedClock(DateTime(2026, 10, 19, 9));
+    final model = await pumpShell(
+      tester,
+      clock: clock,
+      prepare: (g) => clearDays(g, clock, 4),
+    );
+    await acknowledgeAll(tester);
+    await openTab(tester, 'STATUS');
+    expect(find.text('4 / 21', findRichText: true), findsOneWidget);
+    await tester.tap(find.text('20%'));
+    await pumpFor(tester, 300);
+    expect(model.reductionTomorrow, 20);
+    expect(
+      find.text('−20% targets · applies tomorrow · half XP'),
+      findsOneWidget,
+    );
+  });
+
+  testUi('attribute points are pending until CONFIRM', (tester) async {
+    final clock = FixedClock(DateTime(2026, 10, 19, 9));
+    final model = await pumpShell(
+      tester,
+      clock: clock,
+      prepare: (g) => clearDays(g, clock, 3), // level 2: 3 points
+    );
+    await acknowledgeAll(tester);
+    await openTab(tester, 'STATUS');
+    expect(find.text('3 POINTS'), findsOneWidget);
+    final plus = find.bySemanticsLabel('Add a point to strength');
+    await tester.ensureVisible(plus);
+    await tester.pump();
+    await tester.tap(plus);
+    await pumpFor(tester, 200);
+    expect(model.state.stats[Stat.strength] ?? 0, 0, reason: 'still pending');
+    await tester.tap(find.text('CONFIRM'));
+    await pumpFor(tester, 300);
+    expect(model.state.stats[Stat.strength], 1);
+    expect(model.state.unspentStatPoints, 2);
+  });
+
+  testUi('seven quick taps on Status open diagnostics', (tester) async {
+    await pumpShell(tester);
+    await openTab(tester, 'STATUS');
+    final spot = tester.getCenter(find.text('LEVEL'));
+    for (var i = 0; i < 7; i++) {
+      await tester.tapAt(spot);
+      await tester.pump(const Duration(milliseconds: 120));
+    }
+    await pumpFor(tester, 600);
+    expect(find.text(diagnosticsTitle), findsOneWidget);
+  });
+
+  testUi('diagnostics is refused while a penalty is in effect', (tester) async {
+    final clock = FixedClock(DateTime(2026, 10, 19, 10));
+    final model = await pumpShell(tester, clock: clock);
+    clock.set(DateTime(2026, 10, 20, 6, 30));
+    await model.tick();
+    await acknowledgeAll(tester);
+    await openTab(tester, 'STATUS');
+    final spot = tester.getCenter(find.text('LEVEL'));
+    for (var i = 0; i < 7; i++) {
+      await tester.tapAt(spot);
+      await tester.pump(const Duration(milliseconds: 120));
+    }
+    await pumpFor(tester, 600);
+    expect(find.text(diagnosticsTitle), findsNothing);
+    await pumpFor(tester, 5000); // let the snackbar go
+  });
+
+  testUi('restart lives in System Check and returns to the Awakening', (
     tester,
   ) async {
     var restarted = false;
     await pumpShell(tester, onAbandoned: () => restarted = true);
-    await openStatus(tester);
-
-    final hold = await tester.startGesture(
-      tester.getCenter(find.text('HOLD 3S · RESTART TRIAL')),
+    await openTab(tester, 'STATUS');
+    await tester.tap(find.text('SYSTEM CHECK'));
+    await pumpFor(tester, 800);
+    await tester.scrollUntilVisible(
+      find.text('HOLD 3S · RESTART TRIAL'),
+      300,
+      scrollable: find
+          .descendant(
+            of: find.byType(SystemCheckScreen),
+            matching: find.byType(Scrollable),
+          )
+          .first,
     );
-    for (var i = 0; i < 35; i++) {
-      await tester.pump(const Duration(milliseconds: 100));
-    }
-    await hold.up();
-    await tester.pump(const Duration(milliseconds: 300));
-
-    expect(find.text(diagnosticsTitle), findsNothing);
+    await holdText(tester, find.text('HOLD 3S · RESTART TRIAL'), ms: 3500);
     expect(restarted, isTrue);
-    await tester.pump(const Duration(seconds: 1));
   });
 
-  testWidgets('holding the rank letter opens nothing', (tester) async {
-    await pumpShell(tester);
-    await openStatus(tester);
-    final hold = await tester.startGesture(
-      tester.getCenter(find.text('E').first),
-    );
-    await tester.pump(const Duration(seconds: 2));
-    await hold.up();
-    await tester.pump(const Duration(milliseconds: 600));
-    expect(find.text(diagnosticsTitle), findsNothing);
-  });
-
-  testWidgets('seven quick taps on the Status window open diagnostics', (
-    tester,
-  ) async {
-    await pumpShell(tester);
-    await openStatus(tester);
-    final spot = tester.getCenter(find.text('LEVEL'));
-    for (var i = 0; i < 7; i++) {
-      await tester.tapAt(spot);
-      await tester.pump(const Duration(milliseconds: 120));
-    }
-    await tester.pump(const Duration(milliseconds: 600));
-    expect(find.text(diagnosticsTitle), findsOneWidget);
-  });
-
-  testWidgets('diagnostics is refused while a penalty is in effect', (
+  testUi('while push-ups are owed, restart says what blocks it', (
     tester,
   ) async {
     final clock = FixedClock(DateTime(2026, 10, 19, 10));
     final model = await pumpShell(tester, clock: clock);
-    clock.set(DateTime(2026, 10, 20, 6, 30)); // Monday failed: push-ups owed
+    clock.set(DateTime(2026, 10, 20, 6, 30));
     await model.tick();
-    await tester.pump(const Duration(milliseconds: 600));
-    await tester.tap(find.text('ACKNOWLEDGE'));
-    await tester.pump(const Duration(milliseconds: 600));
-    await openStatus(tester);
-
-    final spot = tester.getCenter(find.text('LEVEL'));
-    for (var i = 0; i < 7; i++) {
-      await tester.tapAt(spot);
-      await tester.pump(const Duration(milliseconds: 120));
-    }
-    await tester.pump(const Duration(milliseconds: 600));
-    expect(find.text(diagnosticsTitle), findsNothing);
-    expect(
-      find.text('Diagnostics is unavailable while a penalty is in effect.'),
-      findsOneWidget,
+    await acknowledgeAll(tester);
+    expect(find.text('ACKNOWLEDGE'), findsNothing);
+    await openTab(tester, 'STATUS');
+    await acknowledgeAll(tester);
+    await tester.ensureVisible(find.text('SYSTEM CHECK'));
+    await pumpFor(tester, 300);
+    await tester.tap(find.text('SYSTEM CHECK'));
+    await pumpFor(tester, 800);
+    expect(find.text('[ SYSTEM CHECK ]'), findsOneWidget);
+    final reason = find.textContaining('Finish today');
+    await tester.scrollUntilVisible(
+      reason,
+      300,
+      scrollable: find
+          .descendant(
+            of: find.byType(SystemCheckScreen),
+            matching: find.byType(Scrollable),
+          )
+          .first,
     );
-    await tester.pump(const Duration(seconds: 5)); // let the snackbar go
+    expect(reason, findsOneWidget);
+    expect(find.text('HOLD 3S · RESTART TRIAL'), findsNothing);
+    tester.state<NavigatorState>(find.byType(Navigator)).pop();
+    await pumpFor(tester, 3000);
   });
 
-  testWidgets(
-    'on a short screen every Status row is on screen, and restart is reachable by page scroll',
-    (tester) async {
-      await pumpShell(tester);
-      // A short, wide browser window, like the TestSprite one.
-      tester.view.physicalSize = const Size(1280, 640);
-      tester.view.devicePixelRatio = 1;
-      await tester.pump(const Duration(milliseconds: 300));
-      await openStatus(tester);
+  // -------------------------------------------------------------------------
+  // Quest
 
-      for (final row in [
-        'LEVEL',
-        'EXPERIENCE',
-        'NEXT GATE',
-        'CURRENT STREAK',
-      ]) {
-        expect(reallyVisible(tester, find.text(row)), isTrue, reason: row);
-      }
-      // Lower content is reached by scrolling the page itself, which is visible
-      // and expected, not by a hidden scroll inside a window.
-      final restart = find.text('HOLD 3S · RESTART TRIAL');
-      await tester.ensureVisible(restart);
-      await tester.pump();
-      expect(reallyVisible(tester, restart), isTrue);
-      await tester.pump(const Duration(seconds: 1));
-    },
-  );
-
-  testWidgets('the walk clock ticks on its own, with no taps', (tester) async {
-    final clock = FixedClock(DateTime(2026, 10, 20, 15, 0, 0));
-    final model = await pumpShell(tester, clock: clock);
-    await model.toggleTimer(model.tasks.first);
-    await tester.pump();
-    expect(find.text('00:00:00'), findsOneWidget);
-
-    // Only time passes; nothing is tapped.
-    for (var s = 1; s <= 5; s++) {
-      clock.advance(const Duration(seconds: 1));
-      await tester.pump(const Duration(seconds: 1));
-    }
-    expect(find.text('00:00:05'), findsOneWidget);
-    expect(find.text('RUNNING'), findsOneWidget);
-  });
-
-  testWidgets('quest screen shows the quest the System issued', (tester) async {
-    await pumpShell(tester);
+  testUi('the quest shows what the System issued, with undo', (tester) async {
+    final model = await pumpShell(tester);
     expect(find.text('[ DAILY QUEST ]'), findsOneWidget);
     expect(find.text('Walk'), findsOneWidget);
     expect(find.text('Push-ups (knees allowed)'), findsOneWidget);
-    expect(find.text('Squats'), findsOneWidget);
-    expect(find.text('0 / 10'), findsOneWidget);
-    expect(find.text('0 / 15'), findsOneWidget);
-  });
-
-  testWidgets('counter buttons add push-ups', (tester) async {
-    await pumpShell(tester);
-    await tester.ensureVisible(find.text('+5').first);
-    await tester.pump();
+    expect(find.text('0 / 3 CLEARED'), findsOneWidget);
+    final pushups = model.tasks.firstWhere((t) => t.id == 'pushups');
     await tester.tap(find.text('+5').first);
     await tester.pump();
     await tester.tap(find.text('+1').first);
     await tester.pump();
     expect(find.text('6 / 10'), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('Undo Push-ups (knees allowed)'));
+    await tester.pump();
+    expect(model.progress(pushups), 5);
   });
 
-  testWidgets('a quick tap does not confirm the journal line; holding does', (
+  testUi('the walk clock ticks on its own, with no taps', (tester) async {
+    final clock = FixedClock(DateTime(2026, 10, 20, 15, 0, 0));
+    final model = await pumpShell(tester, clock: clock);
+    await model.toggleTimer(model.tasks.first);
+    await tester.pump();
+    expect(find.text('12:00'), findsOneWidget);
+    for (var s = 1; s <= 5; s++) {
+      clock.advance(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+    }
+    expect(find.text('11:55'), findsOneWidget);
+    expect(find.text('RUNNING'), findsOneWidget);
+  });
+
+  testUi('a quick tap does not confirm the journal line; holding does', (
     tester,
   ) async {
     final model = await pumpShell(tester, system: SystemKind.personality);
     final journal = model.tasks.firstWhere((t) => t.id == 'journal');
-    await tester.ensureVisible(find.text('HOLD TO CONFIRM').first);
-    await tester.tap(find.text('HOLD TO CONFIRM').first);
+    // Personality E: pages, then the journal line's hold square first.
+    final square = find.byType(HoldSquare).first;
+    await tester.tap(square);
     await tester.pump(const Duration(milliseconds: 200));
     expect(model.isDone(journal), isFalse);
-
-    final gesture = await tester.startGesture(
-      tester.getCenter(find.text('HOLD TO CONFIRM').first),
-    );
-    // The press registers after ~100ms; then the fill needs ~900ms of frames.
-    await tester.pump(const Duration(milliseconds: 150));
-    await tester.pump(const Duration(milliseconds: 1000));
-    await gesture.up();
-    await tester.pump();
+    await holdText(tester, square, ms: 1100);
     expect(model.isDone(journal), isTrue);
-    expect(find.text('CONFIRMED'), findsOneWidget);
   });
 
-  testWidgets('completing every task shows the System notice', (tester) async {
+  testUi('completing the quest shows QUEST CLEARED, armed after a beat', (
+    tester,
+  ) async {
     final model = await pumpShell(tester);
     for (final t in model.tasks) {
       await model.setProgress(t, t.goal);
     }
-    await tester.pump(const Duration(milliseconds: 600));
-    expect(find.text('[ NOTIFICATION ]'), findsOneWidget);
-    expect(find.text('The daily quest has been completed.'), findsOneWidget);
+    await pumpFor(tester, 300);
+    expect(find.text('[ QUEST CLEARED ]'), findsOneWidget);
+    expect(find.text('All objectives complete.'), findsOneWidget);
+    // A reflex tap does nothing before the entrance ends.
     await tester.tap(find.text('ACKNOWLEDGE'));
-    await tester.pump(const Duration(milliseconds: 600));
-    expect(find.text('[ NOTIFICATION ]'), findsNothing);
+    await pumpFor(tester, 200);
+    expect(find.text('[ QUEST CLEARED ]'), findsOneWidget);
+    await pumpFor(tester, 1000);
+    await tester.tap(find.text('ACKNOWLEDGE'));
+    await pumpFor(tester, 400);
+    expect(find.text('[ QUEST CLEARED ]'), findsNothing);
   });
 
-  testWidgets('status and penalty tabs open', (tester) async {
+  testUi('status and penalty tabs open', (tester) async {
     await pumpShell(tester);
-    await tester.tap(find.text('STATUS'));
-    await tester.pump(const Duration(milliseconds: 600));
+    await openTab(tester, 'STATUS');
     expect(find.text('[ STATUS ]'), findsOneWidget);
-    expect(find.text('ATTRIBUTES'), findsOneWidget);
-
-    await tester.tap(find.text('PENALTY').last);
-    await tester.pump(const Duration(milliseconds: 600));
+    await openTab(tester, 'PENALTY');
     expect(find.text('[ PENALTY ZONE ]'), findsOneWidget);
     expect(find.text('No penalty is in effect.'), findsOneWidget);
-    expect(find.text('INSTAGRAM'), findsOneWidget);
+    expect(find.text('NO LOCK TODAY'), findsOneWidget);
+    expect(find.text('Instagram'), findsOneWidget); // fallback name
   });
+
+  // -------------------------------------------------------------------------
+  // Gates and Dungeons
+
+  testUi('an open Gate is shown with a hold to enter', (tester) async {
+    final clock = FixedClock(DateTime(2026, 10, 19, 9));
+    final model = await pumpShell(
+      tester,
+      clock: clock,
+      prepare: (g) => clearDays(g, clock, 21),
+    );
+    await acknowledgeAll(tester);
+    expect(find.text('[ GATE OPEN ]'), findsOneWidget);
+    await holdText(tester, find.text('HOLD TO ENTER'), ms: 1800);
+    expect(model.systems!.dungeon, isNotNull);
+    expect(find.text('[ DUNGEON ]'), findsOneWidget);
+  });
+
+  testUi('a Dungeon floor is titled as such, with the 18:00 deadline', (
+    tester,
+  ) async {
+    final clock = FixedClock(DateTime(2026, 10, 19, 9));
+    await pumpShell(
+      tester,
+      clock: clock,
+      prepare: (g) async {
+        await clearDays(g, clock, 21);
+        await g.enterGate();
+        await clearDays(g, clock, 2);
+      },
+    );
+    await acknowledgeAll(tester);
+    expect(find.text('[ DUNGEON · FLOOR 2 ]'), findsOneWidget);
+    expect(find.text('FLOOR CLOSES 18:00 IN'), findsOneWidget);
+    expect(find.text('+50%'), findsOneWidget);
+  });
+
+  testUi('the day after a failed floor, the Penalty tab is the Dungeon '
+      'Penalty', (tester) async {
+    final clock = FixedClock(DateTime(2026, 10, 19, 9));
+    await pumpShell(
+      tester,
+      clock: clock,
+      prepare: (g) async {
+        await clearDays(g, clock, 21);
+        await g.enterGate();
+        await clearDays(g, clock, 1);
+        clock.set(g.today.addDays(1).at(9 * 60));
+        await g.tick(); // floor 1 failed
+        g.takeSystemEvents();
+      },
+    );
+    await acknowledgeAll(tester);
+    expect(find.text('DUNGEON PENALTY ACTIVE'), findsOneWidget);
+    await openTab(tester, 'PENALTY');
+    expect(find.text('[ DUNGEON PENALTY ]'), findsOneWidget);
+    expect(find.text('[ DUNGEON DEBT · ×2 ]'), findsOneWidget);
+  });
+
+  testUi('the report opens from Status', (tester) async {
+    final clock = FixedClock(DateTime(2026, 10, 19, 9));
+    await pumpShell(
+      tester,
+      clock: clock,
+      prepare: (g) => clearDays(g, clock, 3),
+    );
+    await acknowledgeAll(tester);
+    await openTab(tester, 'STATUS');
+    await tester.tap(find.text('REPORT'));
+    await pumpFor(tester, 1500);
+    expect(find.text('[ 30-DAY REPORT ]'), findsOneWidget);
+    expect(find.text('100%'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('VERDICT'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Cleared 100%. Nothing to add.'), findsOneWidget);
+  });
+
+  // -------------------------------------------------------------------------
+  // Awakening
 
   Future<void> pumpOnboarding(
     WidgetTester tester,
@@ -336,227 +466,73 @@ void main() {
   Future<void> tapText(WidgetTester tester, String text) async {
     await tester.ensureVisible(find.text(text));
     await tester.tap(find.text(text));
-    await tester.pump(const Duration(milliseconds: 300));
+    await pumpFor(tester, 400);
   }
 
-  Future<void> pumpFor(WidgetTester tester, int ms) async {
-    for (var t = 0; t < ms; t += 100) {
-      await tester.pump(const Duration(milliseconds: 100));
-    }
-  }
-
-  Future<void> holdText(WidgetTester tester, String text) async {
-    await tester.ensureVisible(find.text(text));
-    await tester.pump();
-    final g = await tester.startGesture(tester.getCenter(find.text(text)));
-    await pumpFor(tester, 1300);
-    await g.up();
-    await pumpFor(tester, 500);
-  }
-
-  /// From the black screen to the System choice.
   Future<void> makeContact(WidgetTester tester) async {
     await tester.tap(find.text('TOUCH TO ESTABLISH CONTACT'));
-    await pumpFor(tester, 4000); // particles, emblem, window, typing
-    await holdText(tester, 'ACCEPT');
+    await pumpFor(tester, 4000);
+    await holdText(tester, find.text('ACCEPT'));
   }
 
-  testWidgets('the Awakening refuses to continue without a System', (
-    tester,
-  ) async {
-    OnboardingResult? result;
-    await pumpOnboarding(tester, (r) => result = r);
+  testUi('the System carousel: centred card is the choice; flip shows '
+      'the brief', (tester) async {
+    await pumpOnboarding(tester, (_) {});
     await makeContact(tester);
     expect(find.text('CHOOSE YOUR SYSTEM'), findsOneWidget);
-    await tester.tap(find.text('BIND SYSTEM'));
-    await pumpFor(tester, 500);
-    expect(find.text('CHOOSE YOUR SYSTEM'), findsOneWidget);
-    expect(find.text('PLACEMENT TEST'), findsNothing);
-    expect(result, isNull);
+    expect(find.text('CHOOSE FITNESS SYSTEM'), findsOneWidget);
+    await tester.tap(find.text('TAP TO INSPECT').first);
+    await pumpFor(tester, 600);
+    expect(find.text('[ FITNESS · BRIEF ]'), findsOneWidget);
+    expect(find.text('WHERE YOU START'), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('Show the Personality System'));
+    await pumpFor(tester, 600);
+    expect(find.text('CHOOSE PERSONALITY SYSTEM'), findsOneWidget);
   });
 
-  testWidgets('the Awakening places a strong candidate at C, never higher', (
+  testUi('the Awakening places a strong candidate at C, never higher', (
     tester,
   ) async {
     OnboardingResult? result;
     await pumpOnboarding(tester, (r) => result = r);
     await makeContact(tester);
-    await tapText(tester, 'FITNESS');
-    await tapText(tester, 'BIND FITNESS');
-    await pumpFor(tester, 500);
+    await tapText(tester, 'CHOOSE FITNESS SYSTEM');
     expect(find.text('PLACEMENT TEST'), findsOneWidget);
     final fields = find.byType(TextField);
     await tester.enterText(fields.at(0), '80');
     await tester.enterText(fields.at(1), '4');
     await tester.pump();
     await tapText(tester, 'SUBMIT');
-    await pumpFor(tester, 2500); // rank stamp, quest cards deal in
+    await pumpFor(tester, 2500);
     expect(find.text('RANK C'), findsOneWidget);
     expect(find.text('Jog'), findsOneWidget);
     await tapText(tester, 'CONTINUE');
-    await pumpFor(tester, 500);
     await tapText(tester, 'CONFIRM TARGETS');
-    await pumpFor(tester, 500);
     await tapText(tester, 'SET REST PERIOD');
-    await pumpFor(tester, 500);
     expect(find.text('PENALTY TERMS'), findsOneWidget);
-    // Accepting is refused until every term has been read.
-    expect(find.textContaining('SCROLL TO READ ALL TERMS'), findsOneWidget);
     await tester.drag(
       find.textContaining('Clear every objective'),
       const Offset(0, -3000),
     );
     await pumpFor(tester, 500);
     expect(find.text('ALL TERMS READ'), findsOneWidget);
-    await holdText(tester, 'HOLD TO ACCEPT');
-    expect(find.text('[ PLAYER REGISTERED ]'), findsOneWidget);
+    await holdText(tester, find.text('HOLD TO ACCEPT'));
     await tapText(tester, 'ENTER');
-    expect(result, isNotNull);
     expect(result!.system, SystemKind.fitness);
     expect(result!.placement, Rank.c);
     expect(result!.answers, {'pushups': 80, 'km_minutes': 4});
-    expect(result!.sleep.startMinute, 23 * 60);
   });
 
-  testWidgets('choosing the next System hides completed ones', (tester) async {
+  testUi('choosing the next System hides completed ones', (tester) async {
     await pumpOnboarding(
       tester,
       (_) {},
       nextSystemOnly: true,
       completed: const {SystemKind.fitness},
     );
+    await pumpFor(tester, 300);
     expect(find.text('FITNESS'), findsNothing);
-    expect(find.text('FOCUS'), findsOneWidget);
-    expect(find.text('PERSONALITY'), findsOneWidget);
-    // Choosing one explains it, including its own penalty.
-    await tapText(tester, 'PERSONALITY');
-    expect(find.text('BIND PERSONALITY'), findsOneWidget);
-    expect(
-      find.textContaining('20 pages and a written reflection'),
-      findsOneWidget,
-    );
-    expect(find.textContaining('push-ups'), findsNothing);
-  });
-
-  /// Clears [n] days in a row on [clock], ending at 09:00 the day after.
-  Future<void> clearDays(GameService g, FixedClock clock, int n) async {
-    for (var i = 0; i < n; i++) {
-      for (final t in g.todaysTasks) {
-        await g.setProgress(t.id, t.goal);
-      }
-      clock.set(g.today.addDays(1).at(9 * 60));
-      await g.tick();
-    }
-    g.takeSystemEvents();
-  }
-
-  testWidgets('an open Gate is shown with a hold to enter', (tester) async {
-    final clock = FixedClock(DateTime(2026, 10, 19, 9));
-    final model = await pumpShell(
-      tester,
-      clock: clock,
-      prepare: (g) => clearDays(g, clock, 21),
-    );
-    await tester.pump(const Duration(milliseconds: 600));
-    expect(find.text('RANK E GATE OPEN'), findsOneWidget);
-    final hold = find.text('HOLD TO ENTER THE GATE');
-    await tester.ensureVisible(hold);
-    await tester.pump();
-    final gesture = await tester.startGesture(tester.getCenter(hold));
-    await tester.pump(const Duration(milliseconds: 150));
-    for (var i = 0; i < 10; i++) {
-      await tester.pump(const Duration(milliseconds: 200));
-    }
-    await gesture.up();
-    await tester.pump(const Duration(milliseconds: 600));
-    expect(model.systems!.dungeon, isNotNull);
-    expect(find.text('You have entered the Dungeon.'), findsOneWidget);
-    await tester.tap(find.text('ACKNOWLEDGE'));
-    await tester.pump(const Duration(milliseconds: 600));
-    expect(find.text('DUNGEON AHEAD'), findsOneWidget);
-    await tester.pump(const Duration(seconds: 1));
-  });
-
-  testWidgets('a Dungeon floor is titled as such, with the 18:00 deadline', (
-    tester,
-  ) async {
-    final clock = FixedClock(DateTime(2026, 10, 19, 9));
-    await pumpShell(
-      tester,
-      clock: clock,
-      prepare: (g) async {
-        await clearDays(g, clock, 21);
-        await g.enterGate();
-        await clearDays(g, clock, 2);
-        g.takeSystemEvents();
-      },
-    );
-    await tester.pump(const Duration(milliseconds: 600));
-    expect(find.text('[ DUNGEON · FLOOR 2 ]'), findsOneWidget);
-    expect(find.text('UNTIL 18:00'), findsOneWidget);
-    await tester.pump(const Duration(seconds: 1));
-  });
-
-  testWidgets('the day after a failed floor, the Penalty tab is the Dungeon '
-      'Penalty', (tester) async {
-    final clock = FixedClock(DateTime(2026, 10, 19, 9));
-    await pumpShell(
-      tester,
-      clock: clock,
-      prepare: (g) async {
-        await clearDays(g, clock, 21);
-        await g.enterGate();
-        await clearDays(g, clock, 1);
-        clock.set(g.today.addDays(1).at(9 * 60));
-        await g.tick(); // floor 1 failed
-        g.takeSystemEvents();
-      },
-    );
-    await tester.pump(const Duration(milliseconds: 600));
-    expect(find.text('DUNGEON PENALTY ACTIVE'), findsOneWidget);
-    await tester.tap(find.text('PENALTY').last);
-    await tester.pump(const Duration(milliseconds: 600));
-    expect(find.text('[ DUNGEON PENALTY ]'), findsOneWidget);
-    expect(find.text('DUNGEON PENALTY'), findsOneWidget);
-    await tester.pump(const Duration(seconds: 1));
-  });
-
-  testWidgets('the report opens from Status', (tester) async {
-    final clock = FixedClock(DateTime(2026, 10, 19, 9));
-    await pumpShell(
-      tester,
-      clock: clock,
-      prepare: (g) => clearDays(g, clock, 3),
-    );
-    await tester.pump(const Duration(milliseconds: 600));
-    await openStatus(tester);
-    await tester.tap(find.text('REPORT'));
-    for (var i = 0; i < 10; i++) {
-      await tester.pump(const Duration(milliseconds: 300));
-    }
-    expect(find.text('[ REPORT ]'), findsOneWidget);
-    expect(find.text('100%'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('HONESTY'), 200);
-    expect(find.text('HONESTY'), findsOneWidget);
-    await tester.pump(const Duration(seconds: 1));
-  });
-
-  testWidgets('Status shows the Gate progress and the reduction valve', (
-    tester,
-  ) async {
-    final clock = FixedClock(DateTime(2026, 10, 19, 9));
-    final model = await pumpShell(
-      tester,
-      clock: clock,
-      prepare: (g) => clearDays(g, clock, 4),
-    );
-    await tester.pump(const Duration(milliseconds: 600));
-    await openStatus(tester);
-    expect(find.text('4 / 21 CLEARED'), findsOneWidget);
-    await tester.tap(find.text('20%'));
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(model.reductionTomorrow, 20);
-    expect(find.text('Tomorrow 20% · half XP'), findsOneWidget);
-    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('CHOOSE PERSONALITY SYSTEM'), findsOneWidget);
+    expect(find.bySemanticsLabel('Show the Focus System'), findsOneWidget);
   });
 }

@@ -21,11 +21,7 @@
     },
     {
       "type": "action",
-      "description": "On the 'CHOOSE YOUR SYSTEM' screen, click the FITNESS card"
-    },
-    {
-      "type": "action",
-      "description": "Click 'BIND FITNESS'"
+      "description": "Click 'CHOOSE FITNESS SYSTEM'"
     },
     {
       "type": "action",
@@ -33,7 +29,7 @@
     },
     {
       "type": "action",
-      "description": "Wait 3 seconds for the rank badge and the '[ DAILY QUEST ]' cards to appear"
+      "description": "Wait 5 seconds for the rank badge and the '[ DAILY QUEST ]' cards to appear"
     },
     {
       "type": "action",
@@ -69,7 +65,7 @@
     },
     {
       "type": "assertion",
-      "description": "A '[ REPORT ]' window is shown with 'No day has been judged yet.'"
+      "description": "A '[ 30-DAY REPORT ]' screen is shown with 'NO JUDGED DAYS YET' and a '0%' 'CLEAR RATE' dial"
     },
     {
       "type": "action",
@@ -77,7 +73,7 @@
     },
     {
       "type": "assertion",
-      "description": "Windows titled 'HONESTY' (with a 'RELEASES TAKEN' row) and '[ VERDICT ]' (with 'Insufficient data. Continue.') are shown"
+      "description": "An 'HONESTY' section (with a 'RELEASES TAKEN' tile) and a 'VERDICT' box with 'Insufficient data. Continue.' are shown"
     },
     {
       "type": "action",
@@ -85,7 +81,7 @@
     },
     {
       "type": "assertion",
-      "description": "The '[ STATUS ]' window is shown again"
+      "description": "The '[ STATUS ]' screen is shown again"
     }
   ]
 }

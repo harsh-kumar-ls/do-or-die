@@ -743,8 +743,8 @@ class GameService {
     final kind = _game.state.debt?.kind;
     // Focus minutes come only from a penalty block; reflections only from
     // submitReflection.
-    if (kind == PenaltyKind.focus && primary > 0) return;
-    if (kind == PenaltyKind.reading && secondary > 0) return;
+    if (kind == PenaltyKind.focus && primary != 0) return;
+    if (kind == PenaltyKind.reading && secondary != 0) return;
     final before = _game.state.debt;
     final next = engine.recordPenalty(
       _game.state,

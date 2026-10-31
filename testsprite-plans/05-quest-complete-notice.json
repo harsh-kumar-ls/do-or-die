@@ -21,11 +21,11 @@
     },
     {
       "type": "action",
-      "description": "On the 'CHOOSE YOUR SYSTEM' screen, click the PERSONALITY card"
+      "description": "On the 'CHOOSE YOUR SYSTEM' screen, click the small diamond button named 'Show the Personality System' under the card, then wait 1 second"
     },
     {
       "type": "action",
-      "description": "Click 'BIND PERSONALITY'"
+      "description": "Click 'CHOOSE PERSONALITY SYSTEM'"
     },
     {
       "type": "action",
@@ -33,7 +33,7 @@
     },
     {
       "type": "action",
-      "description": "Wait 3 seconds for the rank badge and the '[ DAILY QUEST ]' cards to appear"
+      "description": "Wait 5 seconds for the rank badge and the '[ DAILY QUEST ]' cards to appear"
     },
     {
       "type": "action",
@@ -65,19 +65,19 @@
     },
     {
       "type": "action",
-      "description": "Click 'HOLD TO CONFIRM' once in the 'Write one journal line' objective"
+      "description": "Click the 'Hold to confirm Write one journal line' button once"
     },
     {
       "type": "action",
-      "description": "Click 'HOLD TO CONFIRM' once in the 'Say hello to someone you rarely talk to' objective"
+      "description": "Click the 'Hold to confirm Say hello to someone you rarely talk to' button once"
     },
     {
       "type": "assertion",
-      "description": "A '[ NOTIFICATION ]' window appears containing 'The daily quest has been completed.' and 'Reward: +100 XP'"
+      "description": "A '[ QUEST CLEARED ]' notice appears with the row 'Objectives' '3 / 3' and the note 'The reward is granted at 00:00.'"
     },
     {
       "type": "action",
-      "description": "Click 'ACKNOWLEDGE'"
+      "description": "Wait 2 seconds, then click 'ACKNOWLEDGE'"
     },
     {
       "type": "assertion",

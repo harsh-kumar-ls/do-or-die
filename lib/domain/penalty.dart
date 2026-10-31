@@ -93,13 +93,15 @@ class PenaltyDebt {
   int get secondaryRemaining => max(0, secondaryOwed - secondaryDone);
   bool get isPaid => primaryRemaining == 0 && secondaryRemaining == 0;
 
+  /// Adds work done; a negative amount corrects a mis-tap. Done never goes
+  /// below zero or above what is owed.
   PenaltyDebt record({int primary = 0, int secondary = 0}) => PenaltyDebt(
     dueDay: dueDay,
     kind: kind,
     primaryOwed: primaryOwed,
     secondaryOwed: secondaryOwed,
-    primaryDone: min(primaryOwed, primaryDone + max(0, primary)),
-    secondaryDone: min(secondaryOwed, secondaryDone + max(0, secondary)),
+    primaryDone: (primaryDone + primary).clamp(0, primaryOwed),
+    secondaryDone: (secondaryDone + secondary).clamp(0, secondaryOwed),
   );
 }
 
@@ -232,9 +234,21 @@ class LockScheduler {
   }
 }
 
-/// A reflection counts when it has at least five non-empty lines, or 200
-/// characters of the user's own words.
-bool reflectionAccepted(String text) {
-  final lines = text.split('\n').where((l) => l.trim().isNotEmpty).length;
-  return lines >= 5 || text.trim().length >= 200;
-}
+/// Lines a reflection needs, each of at least [reflectionWordsPerLine]
+/// words, so five lines of "a" don't pass.
+const reflectionLines = 5;
+const reflectionWordsPerLine = 4;
+
+/// Lines of [text] that count toward a reflection.
+int reflectionLineCount(String text) => text
+    .split('\n')
+    .where(
+      (l) =>
+          l.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length >=
+          reflectionWordsPerLine,
+    )
+    .length;
+
+/// A reflection counts when it has [reflectionLines] real lines.
+bool reflectionAccepted(String text) =>
+    reflectionLineCount(text) >= reflectionLines;

@@ -4,23 +4,34 @@ import com.doordie.do_or_die.TrustedTime
 import android.app.Activity
 import android.content.Intent
 import android.graphics.Color
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.TypedValue
 import android.view.Gravity
-import android.widget.Button
+import android.view.View
+import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.window.OnBackInvokedDispatcher
 
-/** Full-screen Penalty Zone shown in place of a blocked app. */
+/**
+ * Shown in place of a locked app, in one of three looks from the Claude
+ * Design prototype (design/claude-design/penalty.html): Penalty Zone (red),
+ * Dungeon Penalty (crimson and gold) and phone-free block (blue).
+ */
 class BlockActivity : Activity() {
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var countdown: TextView
-
+    private lateinit var caption: TextView
     private lateinit var releaseLine: TextView
+    private var mode = "penalty"
 
     private val tick = object : Runnable {
         override fun run() {
@@ -31,84 +42,150 @@ class BlockActivity : Activity() {
                 return
             }
             val penalty = BlockerState.isPenaltyLocked(ctx)
-            countdown.textSize = if (penalty) 40f else 16f
-            countdown.text = if (penalty)
-                format(BlockerState.lockEndsAt(ctx) - TrustedTime.nowMillis())
-            else "Pause the block in Do or Die to end it."
+            if (penalty) {
+                countdown.text = format(BlockerState.lockEndsAt(ctx) - TrustedTime.nowMillis())
+                countdown.setTextSize(TypedValue.COMPLEX_UNIT_SP, 52f)
+            } else {
+                countdown.text = "BLOCK RUNNING"
+                countdown.setTextSize(TypedValue.COMPLEX_UNIT_SP, 24f)
+            }
             val used = BlockerState.releases(ctx)
-            releaseLine.text = if (used == 0) "" else
-                "Releases used: $used (${used * 15} min)"
+            releaseLine.text = if (used == 0 || !penalty) "" else
+                "RELEASES USED: $used · ${used * 15} MIN"
             handler.postDelayed(this, 1000)
         }
     }
 
+    private fun dp(v: Float) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, resources.displayMetrics)
+
+    private fun font(name: String): Typeface = try {
+        Typeface.createFromAsset(assets, "flutter_assets/assets/fonts/$name")
+    } catch (e: Exception) {
+        Typeface.MONOSPACE
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        mode = BlockerState.mode(this)
+        val pkg = intent.getStringExtra(EXTRA_PACKAGE)
+        val appName = pkg?.let {
+            try {
+                packageManager.getApplicationLabel(packageManager.getApplicationInfo(it, 0)).toString()
+            } catch (e: Exception) { null }
+        } ?: "This app"
 
-        val mode = BlockerState.mode(this)
-        val red = Color.parseColor(
+        val acc = Color.parseColor(when (mode) { "dungeon" -> "#D7263D"; "focus" -> "#4FB3FF"; else -> "#FF3B4A" })
+        val title = Color.parseColor(when (mode) { "dungeon" -> "#F5C96A"; "focus" -> "#A9DCFF"; else -> "#FF5562" })
+        val acc2 = Color.parseColor(when (mode) { "dungeon" -> "#F5C96A"; "focus" -> "#A9DCFF"; else -> "#FF8790" })
+        val bg = Color.parseColor(when (mode) { "dungeon" -> "#060102"; "focus" -> "#05070D"; else -> "#090204" })
+        val glow = Color.parseColor(when (mode) { "dungeon" -> "#1D0308"; "focus" -> "#0B1730"; else -> "#2A050A" })
+        val ink = Color.parseColor("#DBE7FF")
+        val dim = Color.parseColor("#7D8BA8")
+        val head = font("ChakraPetch-Bold.ttf")
+        val mono = font("JetBrainsMono.ttf")
+
+        // App icon, greyed, with a lock badge.
+        val icon = ImageView(this).apply {
+            try { setImageDrawable(packageManager.getApplicationIcon(pkg ?: "")) } catch (e: Exception) {}
+            colorFilter = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(0f) })
+            alpha = .55f
+        }
+        val badge = TextView(this).apply {
+            text = "LOCKED"
+            setTextColor(acc)
+            textSize = 9f
+            typeface = mono
+            letterSpacing = .12f
+            gravity = Gravity.CENTER
+            background = GradientDrawable().apply { setColor(bg); setStroke(dp(1.5f).toInt(), acc) }
+            setPadding(dp(6f).toInt(), dp(3f).toInt(), dp(6f).toInt(), dp(3f).toInt())
+        }
+        val iconBox = FrameLayout(this).apply {
+            addView(icon, FrameLayout.LayoutParams(dp(96f).toInt(), dp(96f).toInt()))
+            addView(badge, FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM or Gravity.END,
+            ))
+        }
+
+        fun tv(s: String, color: Int, size: Float, tf: Typeface, spacing: Float = 0f) = TextView(this).apply {
+            this.text = s
+            setTextColor(color)
+            textSize = size
+            typeface = tf
+            letterSpacing = spacing
+            gravity = Gravity.CENTER
+        }
+
+        val titleView = tv(
+            when (mode) { "dungeon" -> "[ DUNGEON PENALTY ]"; "focus" -> "[ PHONE-FREE BLOCK ]"; else -> "[ ACCESS DENIED ]" },
+            title, 22f, head, .2f,
+        ).apply { setShadowLayer(dp(10f), 0f, 0f, acc) }
+        val reason = tv(
             when (mode) {
-                "dungeon" -> "#E0B44C"
-                "focus" -> "#4FC3F7"
-                else -> "#FF3B4A"
+                "dungeon" -> "$appName is sealed. The Dungeon was not cleared."
+                "focus" -> "$appName is closed while your block runs."
+                else -> "$appName is locked. The daily quest was failed."
             },
-        )
-        val dim = Color.parseColor("#8A93A6")
+            ink, 14f, mono,
+        ).apply { setLineSpacing(0f, 1.4f); setPadding(0, dp(14f).toInt(), 0, 0) }
+        countdown = tv("", Color.WHITE, 52f, mono).apply {
+            setShadowLayer(dp(10f), 0f, 0f, acc)
+            setPadding(0, dp(18f).toInt(), 0, 0)
+        }
+        caption = tv(
+            when (mode) { "dungeon" -> "UNTIL THE SEAL BREAKS"; "focus" -> "END IT IN DO OR DIE"; else -> "UNTIL ACCESS IS RESTORED" },
+            acc2, 12f, head, .2f,
+        ).apply { setPadding(0, dp(6f).toInt(), 0, 0) }
+        val fine = tv(
+            when (mode) {
+                "dungeon" -> "Double lock. Clear your Dungeon debt in Do or Die."
+                "focus" -> "Ending the block early stops your progress toward today's quest."
+                else -> "Emergency release is in Do or Die · Penalty."
+            },
+            dim, 11f, mono,
+        ).apply { setLineSpacing(0f, 1.4f); setPadding(0, dp(14f).toInt(), 0, 0) }
+        releaseLine = tv("", acc2, 11f, mono, .1f).apply { setPadding(0, dp(8f).toInt(), 0, 0) }
 
-        val title = TextView(this).apply {
-            text = when (mode) {
-                "dungeon" -> "[ DUNGEON PENALTY ]"
-                "focus" -> "[ PHONE-FREE BLOCK ]"
-                else -> "[ PENALTY ZONE ]"
+        val leave = tv("LEAVE", acc2, 15f, head, .3f).apply {
+            background = GradientDrawable().apply {
+                setColor(Color.argb(18, Color.red(acc), Color.green(acc), Color.blue(acc)))
+                setStroke(dp(1f).toInt(), acc)
             }
-            setTextColor(red)
-            textSize = 26f
-            typeface = Typeface.MONOSPACE
-            gravity = Gravity.CENTER
-        }
-        val body = TextView(this).apply {
-            text = when (mode) {
-                "dungeon" -> "Access denied.\nThe Dungeon was not cleared."
-                "focus" -> "Access denied.\nA phone-free block is running."
-                else -> "Access denied.\nThe quest was not completed."
-            }
-            setTextColor(dim)
-            textSize = 16f
-            typeface = Typeface.MONOSPACE
-            gravity = Gravity.CENTER
-            setPadding(0, 32, 0, 32)
-        }
-        countdown = TextView(this).apply {
-            setTextColor(Color.WHITE)
-            textSize = 40f
-            typeface = Typeface.MONOSPACE
-            gravity = Gravity.CENTER
-        }
-        releaseLine = TextView(this).apply {
-            setTextColor(red)
-            textSize = 14f
-            typeface = Typeface.MONOSPACE
-            gravity = Gravity.CENTER
-            setPadding(0, 16, 0, 24)
-        }
-        val leave = Button(this).apply {
-            text = "Leave"
+            minHeight = dp(56f).toInt()
             setOnClickListener { goHome() }
         }
 
-        setContentView(
-            LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                gravity = Gravity.CENTER
-                setBackgroundColor(Color.parseColor(if (mode == "dungeon") "#0E0406" else "#07080C"))
-                setPadding(48, 48, 48, 48)
-                addView(title)
-                addView(body)
-                addView(countdown)
-                addView(releaseLine)
-                addView(leave)
-            },
-        )
+        val middle = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            addView(iconBox, LinearLayout.LayoutParams(dp(104f).toInt(), dp(104f).toInt()).apply { bottomMargin = dp(18f).toInt() })
+            addView(titleView)
+            addView(reason)
+            addView(countdown)
+            addView(caption)
+            addView(fine)
+            addView(releaseLine)
+        }
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(glow, bg, bg))
+            setPadding(dp(24f).toInt(), dp(44f).toInt(), dp(24f).toInt(), dp(40f).toInt())
+            addView(middle, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
+            addView(leave, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+        }
+        setContentView(root)
+        window.statusBarColor = bg
+        window.navigationBarColor = bg
+
+        // Enter: the icon drops in, then the rest fades up.
+        iconBox.alpha = 0f
+        iconBox.translationY = -dp(12f)
+        iconBox.animate().alpha(1f).translationY(0f).setDuration(300).start()
+        for ((i, v) in listOf<View>(titleView, reason, countdown, caption, fine).withIndex()) {
+            v.alpha = 0f
+            v.animate().alpha(1f).setStartDelay(200L + i * 60L).setDuration(250).start()
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             onBackInvokedDispatcher.registerOnBackInvokedCallback(
@@ -148,6 +225,8 @@ class BlockActivity : Activity() {
     }
 
     companion object {
+        const val EXTRA_PACKAGE = "package"
+
         /** Read by the service to check the screen actually appeared. */
         @Volatile
         var isShowing = false

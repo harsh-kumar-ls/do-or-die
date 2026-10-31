@@ -1,7 +1,7 @@
 {
   "projectId": "d37f7ffc-2ffc-4da9-88ea-8ee0106eba69",
   "type": "frontend",
-  "name": "Awakening: binding is disabled until a System is chosen",
+  "name": "Awakening: the choose button always names the System on the front card",
   "planSteps": [
     {
       "type": "action",
@@ -21,19 +21,23 @@
     },
     {
       "type": "assertion",
-      "description": "The 'CHOOSE YOUR SYSTEM' screen shows three cards, FITNESS, PERSONALITY and FOCUS"
-    },
-    {
-      "type": "assertion",
-      "description": "The 'BIND SYSTEM' button at the bottom is disabled (dimmed and not clickable) because no card is selected; this is the expected behaviour, and no 'PLACEMENT TEST' screen is shown"
+      "description": "The 'CHOOSE YOUR SYSTEM' screen shows the FITNESS card in front, three diamond buttons under it, and a button reading 'CHOOSE FITNESS SYSTEM'"
     },
     {
       "type": "action",
-      "description": "Click the FITNESS card"
+      "description": "On the 'CHOOSE YOUR SYSTEM' screen, click the small diamond button named 'Show the Focus System' under the card, then wait 1 second"
     },
     {
       "type": "assertion",
-      "description": "The button now reads 'BIND FITNESS' and is enabled"
+      "description": "The FOCUS card is now in front and the button reads 'CHOOSE FOCUS SYSTEM'; no 'PLACEMENT TEST' screen has been shown"
+    },
+    {
+      "type": "action",
+      "description": "On the 'CHOOSE YOUR SYSTEM' screen, click the small diamond button named 'Show the Personality System' under the card, then wait 1 second"
+    },
+    {
+      "type": "assertion",
+      "description": "The button now reads 'CHOOSE PERSONALITY SYSTEM'"
     }
   ]
 }

@@ -21,11 +21,7 @@
     },
     {
       "type": "action",
-      "description": "On the 'CHOOSE YOUR SYSTEM' screen, click the FITNESS card"
-    },
-    {
-      "type": "action",
-      "description": "Click 'BIND FITNESS'"
+      "description": "Click 'CHOOSE FITNESS SYSTEM'"
     },
     {
       "type": "action",
@@ -57,7 +53,7 @@
     },
     {
       "type": "action",
-      "description": "Wait 3 seconds for the rank badge and the '[ DAILY QUEST ]' cards to appear"
+      "description": "Wait 5 seconds for the rank badge and the '[ DAILY QUEST ]' cards to appear"
     },
     {
       "type": "action",
@@ -85,7 +81,7 @@
     },
     {
       "type": "assertion",
-      "description": "The '[ DAILY QUEST ]' window lists 'Jog' showing '0.0 / 2.0 km' and 'Push-ups' showing '0 / 30' (the rank C quest), and the top bar shows 'RANK C'"
+      "description": "The '[ DAILY QUEST ]' window lists 'Jog' showing '0.0 / 2.0 km' and 'Push-ups' showing '0 / 30' (the rank C quest), and the quest window shows 'RANK C \u00b7 FITNESS'"
     }
   ]
 }

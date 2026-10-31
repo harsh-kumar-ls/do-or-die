@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 
@@ -6,12 +7,15 @@ import '../../domain/penalty.dart';
 import '../../platform/blocker.dart';
 import '../game_model.dart';
 import '../theme.dart';
-import '../widgets/fill_column.dart';
 import '../widgets/hud_controls.dart';
-import '../widgets/system_window.dart';
+import '../widgets/hud_kit.dart';
+import '../widgets/system_frame.dart';
+import 'quest_screen.dart' show QuestScreen;
 
-/// Shown in the P3 palette. Exercise owed, the lock state, the locked apps,
-/// and the emergency exit.
+/// The Penalty tab, built from design/claude-design/penalty.html, in the
+/// Penalty Zone (red, glitching) or Dungeon Penalty (crimson and gold,
+/// still and ceremonial) look: lock countdown, locked apps, the 15-minute
+/// release and its tally, and the System-specific debt.
 class PenaltyScreen extends StatelessWidget {
   const PenaltyScreen({
     super.key,
@@ -29,105 +33,73 @@ class PenaltyScreen extends StatelessWidget {
     final p = HudScope.of(context);
     return Ticker1s(
       builder: (context) {
+        final dungeon = model.dungeonPenalty;
         final debt = model.state.debt;
-        final owesToday = debt != null && debt.dueDay == model.service.today;
+        final owes = debt != null && debt.dueDay == model.service.today;
         final lock = model.state.lock;
-        final now = model.now;
-
-        final String lockLine;
-        final String lockValue;
-        if (model.lockActive) {
-          lockLine = 'UNTIL ACCESS IS RESTORED';
-          lockValue = hms(lock!.end.difference(now));
-        } else if (model.lockReleased) {
-          lockLine = 'RELEASED · THE LOCK RETURNS IN';
-          lockValue = hms(model.releaseEndsAt!.difference(now));
-        } else if (model.lockPending) {
-          lockLine = 'THE LOCK WILL BEGIN WITHOUT WARNING';
-          lockValue = '--:--:--';
-        } else {
-          lockLine = 'NO LOCK TODAY';
-          lockValue = '00:00:00';
-        }
-
+        final lockToday = lock != null && lock.day == model.service.today;
+        final any = model.inPenalty;
+        final failedDay = lockToday ? lock.day.addDays(-1) : null;
         return Padding(
-          padding: const EdgeInsets.fromLTRB(18, 4, 18, 16),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (blocker.canBlock) _EnforcementStatus(blocker: blocker),
-              Expanded(
-                child: SystemWindow(
-                  expand: true,
-                  title: model.dungeonPenalty
-                      ? '[ DUNGEON PENALTY ]'
-                      : '[ PENALTY ZONE ]',
-                  subtitle: model.dungeonPenalty
-                      ? 'The Dungeon was not cleared. Double lock, double reps.'
-                      : model.inPenalty
-                      ? "Yesterday's quest was not completed."
-                      : 'No penalty is in effect.',
-                  child: FillColumn(
-                    children: [
-                      Text(
-                        lockValue,
-                        textAlign: TextAlign.center,
-                        style: Hud.head(52, Colors.white, spacing: .08)
-                            .copyWith(
-                              shadows: p.textGlow(1),
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
-                              ],
-                            ),
-                      ),
-                      Text(
-                        lockLine,
-                        textAlign: TextAlign.center,
-                        style: Hud.mono(11, p.dim, spacing: .06),
-                      ),
-                      _LockedApps(model: model, blocker: blocker),
-                      HudButton('EDIT LOCKED APPS', onPressed: onEditApps),
-                      if (model.lockActive)
-                        HoldButton(
-                          key: ValueKey('release-${model.releasesUsed}'),
-                          label: 'HOLD 3S · RELEASE 15 MIN',
-                          doneLabel: 'RELEASED',
-                          holdFor: const Duration(seconds: 3),
-                          onConfirmed: () async {
-                            final released = await model.releaseLock();
-                            if (released && context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Released for 15 minutes. '
-                                    'Release ${model.releasesUsed} today, '
-                                    'and it has been logged.',
-                                  ),
-                                ),
-                              );
-                            }
-                          },
-                        ),
-                      if (model.releasesUsed > 0)
-                        Text(
-                          'RELEASES USED TODAY: ${model.releasesUsed} · '
-                          '${model.releasesUsed * 15} MIN',
-                          textAlign: TextAlign.center,
-                          style: Hud.head(13, Hud.warn, spacing: .14),
-                        ),
-                    ],
-                  ),
-                ),
+              SysTopBar(
+                now: model.now,
+                kicker: dungeon
+                    ? 'DUNGEON FLOOR FAILED · ${model.systemSpec?.name.split(' ').first.toUpperCase() ?? ''}'
+                    : QuestScreen.kicker(model),
+                rank: model.rank,
               ),
-              if (owesToday) ...[
-                const SizedBox(height: 14),
-                ..._owed(model, debt),
-              ],
-              const SizedBox(height: 14),
-              Text(
-                'Releases last 15 minutes · every one is counted',
-                textAlign: TextAlign.center,
-                style: Hud.mono(11, p.dim.withValues(alpha: .7)),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  children: [
+                    if (blocker.canBlock) _EnforcementStatus(blocker: blocker),
+                    const SizedBox(height: 4),
+                    if (dungeon) ...[
+                      const Center(child: _Seal(size: 44)),
+                      const SizedBox(height: 6),
+                    ],
+                    Center(
+                      child: _GlitchTitle(
+                        dungeon ? '[ DUNGEON PENALTY ]' : '[ PENALTY ZONE ]',
+                        glitch: !dungeon && any,
+                        size: dungeon ? 20 : 22,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      !any
+                          ? 'No penalty is in effect.'
+                          : dungeon
+                          ? 'The Dungeon was not cleared. Double lock, double penalty.'
+                          : failedDay == null
+                          ? 'A penalty is in effect today.'
+                          : 'Daily quest failed · ${dayLabel(DateTime(failedDay.year, failedDay.month, failedDay.day))}',
+                      textAlign: TextAlign.center,
+                      style: Hud.mono(
+                        11,
+                        p.hi.withValues(alpha: .85),
+                      ).copyWith(height: 1.5),
+                    ),
+                    const SizedBox(height: 12),
+                    _LockPanel(
+                      model: model,
+                      blocker: blocker,
+                      onEditApps: onEditApps,
+                    ),
+                    if (model.lockActive || model.lockReleased) ...[
+                      const SizedBox(height: 12),
+                      _Release(model: model),
+                    ],
+                    if (owes) ...[
+                      const SizedBox(height: 12),
+                      _DebtPanel(model: model, debt: debt, dungeon: dungeon),
+                    ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -137,67 +109,205 @@ class PenaltyScreen extends StatelessWidget {
   }
 }
 
-/// The windows for what is owed today, by the System's penalty kind.
-List<Widget> _owed(GameModel model, PenaltyDebt debt) {
-  switch (debt.kind) {
-    case PenaltyKind.exercise:
-      return [
-        _CountWindow(
-          title: 'PUSH-UPS OWED',
-          done: debt.primaryDone,
-          owed: debt.primaryOwed,
-          steps: const [1, 10],
-          unit: 'REP',
-          onAdd: (n) => model.recordPenalty(primary: n),
-        ),
-        if (debt.secondaryOwed > 0) ...[
-          const SizedBox(height: 14),
-          _CountWindow(
-            title: 'SQUATS OWED',
-            done: debt.secondaryDone,
-            owed: debt.secondaryOwed,
-            steps: const [1, 10],
-            unit: 'REP',
-            onAdd: (n) => model.recordPenalty(secondary: n),
-          ),
-        ],
-      ];
-    case PenaltyKind.reading:
-      return [
-        _CountWindow(
-          title: 'PAGES OWED',
-          done: debt.primaryDone,
-          owed: debt.primaryOwed,
-          steps: const [1, 5],
-          unit: 'PAGE',
-          onAdd: (n) => model.recordPenalty(primary: n),
-        ),
-        if (debt.secondaryOwed > 0) ...[
-          const SizedBox(height: 14),
-          _ReflectionWindow(
-            done: debt.secondaryDone,
-            owed: debt.secondaryOwed,
-            onSubmit: (text) => model.submitReflection(text),
-          ),
-        ],
-      ];
-    case PenaltyKind.focus:
-      return [_BlockWindow(model: model, debt: debt)];
+// ---------------------------------------------------------------------------
+// Title and seal
+
+/// The Penalty Zone title: a short glitch burst every 2.6 s (offset red and
+/// pale copies, jitter). Still when reduce-motion is on or [glitch] is off.
+class _GlitchTitle extends StatefulWidget {
+  const _GlitchTitle(this.text, {required this.glitch, required this.size});
+  final String text;
+  final bool glitch;
+  final double size;
+
+  @override
+  State<_GlitchTitle> createState() => _GlitchTitleState();
+}
+
+class _GlitchTitleState extends State<_GlitchTitle>
+    with SingleTickerProviderStateMixin {
+  late final _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2600),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    final style = Hud.head(
+      widget.size,
+      p.hi,
+      spacing: .24,
+    ).copyWith(shadows: p.textGlow(1));
+    final text = Text(widget.text, style: style);
+    if (!widget.glitch || MediaQuery.of(context).disableAnimations) return text;
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (context, _) {
+        final t = _c.value;
+        final on = t > .9 && t < .96;
+        if (!on) return text;
+        final dx = t < .92
+            ? -3.0
+            : t < .94
+            ? 3.0
+            : -2.0;
+        return Stack(
+          children: [
+            text,
+            Transform.translate(
+              offset: Offset(dx, 0),
+              child: ClipRect(
+                clipper: _Slice(t < .93 ? .1 : .6, t < .93 ? .45 : .92),
+                child: Text(
+                  widget.text,
+                  style: style.copyWith(color: const Color(0xFFFF9AA2)),
+                ),
+              ),
+            ),
+            Transform.translate(
+              offset: Offset(-dx, 1),
+              child: ClipRect(
+                clipper: _Slice(t < .93 ? .45 : .05, t < .93 ? .75 : .3),
+                child: Text(
+                  widget.text,
+                  style: style.copyWith(color: const Color(0xFF5A0B12)),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 }
 
-/// Chips for today's locked apps, labelled with each app's real name.
-class _LockedApps extends StatefulWidget {
-  const _LockedApps({required this.model, required this.blocker});
-  final GameModel model;
-  final AppBlocker blocker;
+class _Slice extends CustomClipper<Rect> {
+  _Slice(this.top, this.bottom);
+  final double top;
+  final double bottom;
 
   @override
-  State<_LockedApps> createState() => _LockedAppsState();
+  Rect getClip(Size s) =>
+      Rect.fromLTRB(0, s.height * top, s.width, s.height * bottom);
+
+  @override
+  bool shouldReclip(_Slice old) => old.top != top || old.bottom != bottom;
 }
 
-class _LockedAppsState extends State<_LockedApps> {
+/// The Dungeon seal: a crimson diamond with a gold cross, a dashed ring
+/// turning once every 40 s.
+class _Seal extends StatefulWidget {
+  const _Seal({required this.size});
+  final double size;
+
+  @override
+  State<_Seal> createState() => _SealState();
+}
+
+class _SealState extends State<_Seal> with SingleTickerProviderStateMixin {
+  late final _c = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 40),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _c,
+    builder: (context, _) => CustomPaint(
+      size: Size.square(widget.size),
+      painter: SealPainter(_c.value),
+    ),
+  );
+}
+
+class SealPainter extends CustomPainter {
+  SealPainter(this.turn);
+  final double turn;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.scale(size.width / 44);
+    final c = const Offset(22, 22);
+    final gold = Paint()
+      ..color = Hud.gold
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    canvas.save();
+    canvas.translate(22, 22);
+    canvas.rotate(turn * 2 * pi);
+    for (var a = 0.0; a < 2 * pi; a += 6 / 20) {
+      canvas.drawArc(
+        Rect.fromCircle(center: Offset.zero, radius: 20),
+        a,
+        3 / 20,
+        false,
+        gold,
+      );
+    }
+    canvas.restore();
+    canvas.drawPath(
+      Path()
+        ..moveTo(22, 6)
+        ..lineTo(36, 22)
+        ..lineTo(22, 38)
+        ..lineTo(8, 22)
+        ..close(),
+      Paint()
+        ..color = const Color(0xFFD7263D)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.6,
+    );
+    final x = Paint()
+      ..color = Hud.gold
+      ..strokeWidth = 1.6;
+    canvas
+      ..drawLine(c + const Offset(-7, -6), c + const Offset(7, 6), x)
+      ..drawLine(c + const Offset(7, -6), c + const Offset(-7, 6), x);
+  }
+
+  @override
+  bool shouldRepaint(SealPainter old) => old.turn != turn;
+}
+
+// ---------------------------------------------------------------------------
+// Lock panel
+
+class _LockPanel extends StatefulWidget {
+  const _LockPanel({
+    required this.model,
+    required this.blocker,
+    required this.onEditApps,
+  });
+  final GameModel model;
+  final AppBlocker blocker;
+  final VoidCallback onEditApps;
+
+  @override
+  State<_LockPanel> createState() => _LockPanelState();
+}
+
+class _LockPanelState extends State<_LockPanel> {
   Map<String, String> _labels = const {};
+  final _rand = Random();
+
+  static const _fallback = {
+    'com.instagram.android': 'Instagram',
+    'com.google.android.youtube': 'YouTube',
+    'com.pubg.imobile': 'BGMI',
+  };
 
   @override
   void initState() {
@@ -210,42 +320,629 @@ class _LockedAppsState extends State<_LockedApps> {
   }
 
   String _name(String pkg) =>
-      (_labels[pkg] ?? _fallbackNames[pkg] ?? pkg.split('.').last)
-          .toUpperCase();
-
-  static const _fallbackNames = {
-    'com.instagram.android': 'Instagram',
-    'com.google.android.youtube': 'YouTube',
-    'com.pubg.imobile': 'BGMI',
-  };
+      _labels[pkg] ?? _fallback[pkg] ?? pkg.split('.').last;
 
   @override
   Widget build(BuildContext context) {
     final p = HudScope.of(context);
-    final packages = widget.model.service.blockedToday.toList()
-      ..sort((a, b) => _name(a).compareTo(_name(b)));
-    if (packages.isEmpty) {
-      return Text(
-        'No apps chosen. A failed day locks nothing until you choose some.',
-        textAlign: TextAlign.center,
-        style: Hud.mono(11, Hud.warn),
-      );
+    final m = widget.model;
+    final lock = m.state.lock;
+    final now = m.now;
+    final String big;
+    final String cap;
+    var dimBig = false;
+    if (m.lockActive) {
+      big = hms(lock!.end.difference(now));
+      cap = 'UNTIL ACCESS IS RESTORED';
+    } else if (m.lockReleased) {
+      big = hms(lock!.end.difference(now));
+      final r = m.releaseEndsAt!.difference(now);
+      cap =
+          'RELEASED · LOCK RESUMES IN ${r.inMinutes.toString().padLeft(2, '0')}:${(r.inSeconds % 60).toString().padLeft(2, '0')}';
+    } else if (m.lockPending) {
+      // The start is withheld: scrambled digits that never resolve.
+      String two() => '${_rand.nextInt(10)}${_rand.nextInt(10)}';
+      big = '${two()}:${two()}:${two()}';
+      cap = 'THE LOCK WILL BEGIN WITHOUT WARNING';
+      dimBig = true;
+    } else {
+      big = '00:00:00';
+      cap = 'NO LOCK TODAY';
+      dimBig = true;
     }
-    return Wrap(
-      alignment: WrapAlignment.center,
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        for (final pkg in packages)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(border: Border.all(color: p.line)),
-            child: Text(_name(pkg), style: Hud.mono(10, p.hi, spacing: .1)),
+    final apps = m.service.blockedToday.toList()
+      ..sort((a, b) => _name(a).compareTo(_name(b)));
+    final open = !m.lockActive;
+    final hours = lock == null
+        ? 0
+        : (lock.end.difference(lock.start).inMinutes / 60).round();
+    return Panel(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        children: [
+          Text(
+            big,
+            style: Hud.mono(
+              46,
+              dimBig ? p.hi.withValues(alpha: .75) : Colors.white,
+              weight: FontWeight.w700,
+            ).copyWith(shadows: p.textGlow(1), height: 1.1),
           ),
+          const SizedBox(height: 6),
+          Text(
+            cap,
+            textAlign: TextAlign.center,
+            style: Hud.head(12, p.hi, spacing: .2),
+          ),
+          if (lock != null && lock.day == m.service.today) ...[
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _Meta(
+                  m.dungeonPenalty ? '$hours H LOCK · ×2' : '$hours H LOCK',
+                  gold: m.dungeonPenalty,
+                ),
+                const SizedBox(width: 8),
+                _Meta('${apps.length} APP${apps.length == 1 ? '' : 'S'}'),
+              ],
+            ),
+          ],
+          const SizedBox(height: 12),
+          if (apps.isEmpty)
+            Text(
+              'No apps chosen. A failed day locks nothing until you choose some.',
+              textAlign: TextAlign.center,
+              style: Hud.mono(11, Hud.warn),
+            )
+          else
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final pkg in apps) _AppChip(_name(pkg), open: open),
+              ],
+            ),
+          const SizedBox(height: 12),
+          StepButton('EDIT LOCKED APPS', onPressed: widget.onEditApps),
+        ],
+      ),
+    );
+  }
+}
+
+class _Meta extends StatelessWidget {
+  const _Meta(this.text, {this.gold = false});
+  final String text;
+  final bool gold;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    final c = gold ? Hud.gold : p.hi;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: gold ? Hud.gold : p.sys.withValues(alpha: .25),
+        ),
+      ),
+      child: Text(text, style: Hud.mono(10, c, spacing: .14)),
+    );
+  }
+}
+
+class _AppChip extends StatelessWidget {
+  const _AppChip(this.name, {required this.open});
+  final String name;
+  final bool open;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    const green = Color(0xFF5BD69A);
+    final c = open ? green : p.text;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: open
+            ? green.withValues(alpha: .06)
+            : p.sys.withValues(alpha: .07),
+        border: Border.all(
+          color: open
+              ? green.withValues(alpha: .5)
+              : p.sys.withValues(alpha: .6),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(open ? Icons.lock_open : Icons.lock, size: 12, color: c),
+          const SizedBox(width: 6),
+          Text(name, style: Hud.mono(11, c)),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Release
+
+class _Release extends StatelessWidget {
+  const _Release({required this.model});
+  final GameModel model;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    final used = model.releasesUsed;
+    final active = model.lockReleased;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (active)
+          Opacity(
+            opacity: .45,
+            child: CutButton('RELEASE ACTIVE', onPressed: null),
+          )
+        else
+          ChargeButton(
+            key: ValueKey('release-$used'),
+            label: 'HOLD 3S · RELEASE 15 MIN',
+            danger: true,
+            holdFor: const Duration(seconds: 3),
+            onConfirmed: () async {
+              final ok = await model.releaseLock();
+              if (ok && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Release ${model.releasesUsed} logged. Apps open for 15 minutes.',
+                    ),
+                  ),
+                );
+              }
+            },
+          ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Text('RELEASES USED', style: Hud.mono(10, p.dim, spacing: .14)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Wrap(
+                spacing: 4,
+                children: [
+                  for (var k = 0; k < max(6, used); k++)
+                    Container(
+                      width: 8,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: k < used ? Hud.warn : Colors.transparent,
+                        border: Border.all(
+                          color: k < used
+                              ? Hud.warn
+                              : p.sys.withValues(alpha: .25),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Text(
+              '$used',
+              style: Hud.mono(10, Hud.warn, weight: FontWeight.w700),
+            ),
+          ],
+        ),
       ],
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// Debt
+
+class _DebtPanel extends StatelessWidget {
+  const _DebtPanel({
+    required this.model,
+    required this.debt,
+    required this.dungeon,
+  });
+  final GameModel model;
+  final PenaltyDebt debt;
+  final bool dungeon;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    final parts = <Widget>[];
+    void add(Widget w) {
+      if (parts.isNotEmpty) {
+        parts.add(
+          Container(
+            height: 1,
+            margin: const EdgeInsets.symmetric(vertical: 14),
+            color: p.sys.withValues(alpha: .2),
+          ),
+        );
+      }
+      parts.add(w);
+    }
+
+    switch (debt.kind) {
+      case PenaltyKind.exercise:
+        add(
+          _CountDebt(
+            label: 'PUSH-UPS OWED',
+            done: debt.primaryDone,
+            owed: debt.primaryOwed,
+            unit: 'REPS',
+            steps: const [1, 10],
+            onAdd: (n) => model.recordPenalty(primary: n),
+          ),
+        );
+        if (debt.secondaryOwed > 0) {
+          add(
+            _CountDebt(
+              label: 'SQUATS OWED',
+              done: debt.secondaryDone,
+              owed: debt.secondaryOwed,
+              unit: 'REPS',
+              steps: const [1, 10],
+              onAdd: (n) => model.recordPenalty(secondary: n),
+            ),
+          );
+        }
+      case PenaltyKind.reading:
+        add(
+          _CountDebt(
+            label: 'PAGES OWED',
+            done: debt.primaryDone,
+            owed: debt.primaryOwed,
+            unit: 'PAGES',
+            steps: const [1, 5],
+            onAdd: (n) => model.recordPenalty(primary: n),
+          ),
+        );
+        if (debt.secondaryOwed > 0) {
+          add(_ReflectionDebt(model: model, debt: debt));
+        }
+      case PenaltyKind.focus:
+        add(_BlockDebt(model: model, debt: debt));
+    }
+    return Panel(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            dungeon ? '[ DUNGEON DEBT · ×2 ]' : '[ PENALTY DEBT ]',
+            textAlign: TextAlign.center,
+            style: Hud.head(12, p.hi, spacing: .24),
+          ),
+          Container(
+            height: 1,
+            margin: const EdgeInsets.only(top: 10, bottom: 12),
+            color: p.sys.withValues(alpha: .2),
+          ),
+          ...parts,
+          const SizedBox(height: 12),
+          Text(
+            debt.isPaid
+                ? 'Debt cleared. ${dungeon ? 'The Dungeon Penalty' : 'The Penalty Zone'} ends when the lock expires.'
+                : 'Clear the debt today. Anything unpaid doubles at midnight.',
+            textAlign: TextAlign.center,
+            style: Hud.mono(
+              11,
+              debt.isPaid ? Hud.gold : p.dim,
+            ).copyWith(height: 1.5),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DebtHeader extends StatelessWidget {
+  const _DebtHeader(this.label, this.value, this.of);
+  final String label;
+  final String value;
+  final String of;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          Expanded(
+            child: Text(label, style: Hud.head(12, p.text, spacing: .18)),
+          ),
+          Text.rich(
+            TextSpan(
+              text: value,
+              style: Hud.mono(22, Colors.white, weight: FontWeight.w700),
+              children: [TextSpan(text: ' / $of', style: Hud.mono(12, p.dim))],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Cleared extends StatelessWidget {
+  const _Cleared(this.what);
+  final String what;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(top: 10),
+    padding: const EdgeInsets.all(10),
+    decoration: BoxDecoration(
+      color: Hud.gold.withValues(alpha: .06),
+      border: Border.all(color: Hud.gold.withValues(alpha: .45)),
+    ),
+    child: Row(
+      children: [
+        const Icon(Icons.check, size: 18, color: Hud.gold),
+        const SizedBox(width: 10),
+        Text('$what CLEARED', style: Hud.mono(12, Hud.gold)),
+      ],
+    ),
+  );
+}
+
+class _DebtBar extends StatelessWidget {
+  const _DebtBar(this.value);
+  final double value;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    return SizedBox(
+      height: 4,
+      child: Stack(
+        children: [
+          const Positioned.fill(child: ColoredBox(color: Color(0x2E7D8BA8))),
+          FractionallySizedBox(
+            widthFactor: value.clamp(0, 1),
+            heightFactor: 1,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: p.sys,
+                boxShadow: [BoxShadow(color: p.glowColor, blurRadius: 8)],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CountDebt extends StatelessWidget {
+  const _CountDebt({
+    required this.label,
+    required this.done,
+    required this.owed,
+    required this.unit,
+    required this.steps,
+    required this.onAdd,
+  });
+
+  final String label;
+  final int done;
+  final int owed;
+  final String unit;
+  final List<int> steps;
+  final ValueChanged<int> onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    final paid = done >= owed;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _DebtHeader(label, '$done', '$owed'),
+        _DebtBar(owed == 0 ? 1 : done / owed),
+        if (paid)
+          _Cleared(label.replaceAll(' OWED', ''))
+        else ...[
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              for (final s in steps) ...[
+                Expanded(
+                  child: StepButton('+$s $unit', onPressed: () => onAdd(s)),
+                ),
+                const SizedBox(width: 6),
+              ],
+              SizedBox(
+                width: 48,
+                child: StepButton(
+                  '↺',
+                  undo: true,
+                  semanticLabel: 'Undo ${label.toLowerCase()}',
+                  onPressed: done > 0 ? () => onAdd(-1) : null,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Personality penalty: five lines of at least four words each, kept in
+/// the trial log.
+class _ReflectionDebt extends StatefulWidget {
+  const _ReflectionDebt({required this.model, required this.debt});
+  final GameModel model;
+  final PenaltyDebt debt;
+
+  @override
+  State<_ReflectionDebt> createState() => _ReflectionDebtState();
+}
+
+class _ReflectionDebtState extends State<_ReflectionDebt> {
+  final _c = TextEditingController();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    final d = widget.debt;
+    final paid = d.secondaryDone >= d.secondaryOwed;
+    final n = min(reflectionLineCount(_c.text), reflectionLines);
+    final ok = n >= reflectionLines;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _DebtHeader(
+          'REFLECTION OWED',
+          '${d.secondaryDone}',
+          '${d.secondaryOwed}',
+        ),
+        if (paid)
+          const _Cleared('REFLECTION')
+        else ...[
+          TextField(
+            controller: _c,
+            minLines: 5,
+            maxLines: 9,
+            style: Hud.mono(12, p.text).copyWith(height: 1.55),
+            cursorColor: p.sys,
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              isDense: true,
+              filled: true,
+              fillColor: Colors.black38,
+              hintText: 'Why did the quest fail? What will you change tomorrow? One thought per line.',
+              hintStyle: Hud.mono(12, p.dim),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.zero,
+                borderSide: BorderSide(color: p.sys.withValues(alpha: .25)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.zero,
+                borderSide: BorderSide(color: p.sys),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'A LINE NEEDS 4+ WORDS',
+                  style: Hud.mono(10, p.dim, spacing: .12),
+                ),
+              ),
+              Text(
+                '$n / $reflectionLines',
+                style: Hud.mono(
+                  10,
+                  ok ? const Color(0xFF5BD69A) : p.hi,
+                  weight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          CutButton(
+            'SUBMIT',
+            onPressed: ok
+                ? () async {
+                    if (await widget.model.submitReflection(_c.text)) {
+                      _c.clear();
+                    }
+                    if (mounted) setState(() {});
+                  }
+                : null,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Focus penalty: a phone-free block with the chosen apps locked.
+class _BlockDebt extends StatelessWidget {
+  const _BlockDebt({required this.model, required this.debt});
+  final GameModel model;
+  final PenaltyDebt debt;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    final running = model.penaltyBlockRunning;
+    final runMin = running ? model.penaltyBlockSeconds ~/ 60 : 0;
+    final done = min(debt.primaryOwed, debt.primaryDone + runMin);
+    final leftSecs = max(
+      0,
+      (debt.primaryOwed - debt.primaryDone) * 60 -
+          (running ? model.penaltyBlockSeconds : 0),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _DebtHeader('PHONE-FREE MINUTES OWED', '$done', '${debt.primaryOwed}'),
+        _DebtBar(debt.primaryOwed == 0 ? 1 : done / debt.primaryOwed),
+        if (debt.isPaid && !running)
+          const _Cleared('PHONE-FREE BLOCK')
+        else ...[
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  hms(Duration(seconds: leftSecs)),
+                  style: Hud.mono(
+                    30,
+                    Colors.white,
+                    weight: FontWeight.w700,
+                  ).copyWith(shadows: p.textGlow(.8)),
+                ),
+              ),
+              Text(
+                running ? 'APPS LOCKED' : 'REMAINING',
+                style: Hud.mono(10, running ? p.hi : p.dim, spacing: .14),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (running)
+            ChargeButton(
+              label: 'HOLD TO END BLOCK',
+              danger: true,
+              onConfirmed: model.togglePenaltyBlock,
+            )
+          else
+            CutButton(
+              'START PENALTY BLOCK',
+              onPressed: model.togglePenaltyBlock,
+            ),
+        ],
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 /// Warns when the Android blocker service is off, so locks can't be enforced.
 class _EnforcementStatus extends StatefulWidget {
@@ -288,12 +985,7 @@ class _EnforcementStatusState extends State<_EnforcementStatus> {
     final p = HudScope.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: p.panel,
-          border: Border.all(color: p.sys),
-        ),
+      child: Panel(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -304,8 +996,9 @@ class _EnforcementStatusState extends State<_EnforcementStatus> {
               style: Hud.mono(11, p.text),
             ),
             const SizedBox(height: 10),
-            HudButton(
+            CutButton(
               'FIX',
+              danger: true,
               onPressed: () async {
                 final st = await widget.blocker.systemStatus();
                 if (!st.usageAccess) return widget.blocker.requestUsageAccess();
@@ -315,214 +1008,6 @@ class _EnforcementStatusState extends State<_EnforcementStatus> {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _CountWindow extends StatelessWidget {
-  const _CountWindow({
-    required this.title,
-    required this.done,
-    required this.owed,
-    required this.steps,
-    required this.unit,
-    required this.onAdd,
-  });
-
-  final String title;
-  final int done;
-  final int owed;
-  final List<int> steps;
-
-  /// "REP" or "PAGE"; pluralised on the buttons.
-  final String unit;
-  final ValueChanged<int> onAdd;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = HudScope.of(context);
-    final paid = done >= owed;
-    return SystemWindow(
-      title: title,
-      delay: const Duration(milliseconds: 120),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            '$done / $owed',
-            textAlign: TextAlign.center,
-            style: Hud.head(
-              40,
-              paid ? Hud.gold : p.hi,
-              spacing: .02,
-            ).copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
-          ),
-          const SizedBox(height: 10),
-          HudBar(value: done / owed, done: paid),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              for (final (i, n) in steps.indexed) ...[
-                if (i > 0) const SizedBox(width: 8),
-                Expanded(
-                  child: HudButton(
-                    '+$n ${n == 1 ? unit : '${unit}S'}',
-                    onPressed: paid ? null : () => onAdd(n),
-                  ),
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            paid ? 'Paid.' : 'Anything unpaid doubles at midnight.',
-            textAlign: TextAlign.center,
-            style: Hud.mono(11, paid ? Hud.gold : Hud.warn),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Personality penalty: a written reflection on why the quest failed. At
-/// least five lines of the user's own words; saved in the trial log.
-class _ReflectionWindow extends StatefulWidget {
-  const _ReflectionWindow({
-    required this.done,
-    required this.owed,
-    required this.onSubmit,
-  });
-
-  final int done;
-  final int owed;
-  final Future<bool> Function(String text) onSubmit;
-
-  @override
-  State<_ReflectionWindow> createState() => _ReflectionWindowState();
-}
-
-class _ReflectionWindowState extends State<_ReflectionWindow> {
-  final _c = TextEditingController();
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final p = HudScope.of(context);
-    final paid = widget.done >= widget.owed;
-    final ok = reflectionAccepted(_c.text);
-    return SystemWindow(
-      title: 'REFLECTION OWED · ${widget.done} / ${widget.owed}',
-      delay: const Duration(milliseconds: 160),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            paid ? 'Reflection recorded.' : 'Why did the quest fail, and what changes tomorrow? Five lines at least.',
-            textAlign: TextAlign.center,
-            style: Hud.mono(11, paid ? Hud.gold : p.dim),
-          ),
-          if (!paid) ...[
-            const SizedBox(height: 10),
-            TextField(
-              controller: _c,
-              minLines: 5,
-              maxLines: 10,
-              style: Hud.mono(12, p.text),
-              cursorColor: p.sys,
-              onChanged: (_) => setState(() {}),
-              decoration: InputDecoration(
-                isDense: true,
-                hintText: 'Write in your own words.',
-                hintStyle: Hud.mono(12, p.dim),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.zero,
-                  borderSide: BorderSide(color: p.line),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.zero,
-                  borderSide: BorderSide(color: p.sys),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            HudButton(
-              ok ? 'SUBMIT REFLECTION' : 'AT LEAST 5 LINES',
-              onPressed: ok
-                  ? () async {
-                      if (await widget.onSubmit(_c.text)) _c.clear();
-                      setState(() {});
-                    }
-                  : null,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-/// Focus penalty: a phone-free block. The chosen apps lock while it runs;
-/// only whole minutes count, and only today.
-class _BlockWindow extends StatelessWidget {
-  const _BlockWindow({required this.model, required this.debt});
-
-  final GameModel model;
-  final PenaltyDebt debt;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = HudScope.of(context);
-    final running = model.penaltyBlockRunning;
-    final paid = debt.isPaid;
-    final runningMinutes = model.penaltyBlockSeconds ~/ 60;
-    return SystemWindow(
-      title: 'PHONE-FREE MINUTES OWED',
-      delay: const Duration(milliseconds: 120),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            '${debt.primaryDone + (running ? runningMinutes : 0)} / ${debt.primaryOwed}',
-            textAlign: TextAlign.center,
-            style: Hud.head(
-              40,
-              paid ? Hud.gold : p.hi,
-              spacing: .02,
-            ).copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
-          ),
-          if (running) ...[
-            const SizedBox(height: 6),
-            Text(
-              hms(Duration(seconds: model.penaltyBlockSeconds)),
-              textAlign: TextAlign.center,
-              style: Hud.mono(14, Colors.white),
-            ),
-          ],
-          const SizedBox(height: 10),
-          HudBar(value: debt.primaryDone / debt.primaryOwed, done: paid),
-          const SizedBox(height: 10),
-          HudButton(
-            running ? 'END BLOCK' : 'START PENALTY BLOCK',
-            onPressed: paid && !running ? null : model.togglePenaltyBlock,
-          ),
-          const SizedBox(height: 10),
-          Text(
-            paid
-                ? 'Paid.'
-                : running
-                ? 'Chosen apps are locked until the block ends.'
-                : 'Chosen apps lock while the block runs. Anything unpaid doubles at midnight.',
-            textAlign: TextAlign.center,
-            style: Hud.mono(11, paid ? Hud.gold : Hud.warn),
-          ),
-        ],
       ),
     );
   }

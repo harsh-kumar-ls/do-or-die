@@ -21,11 +21,7 @@
     },
     {
       "type": "action",
-      "description": "On the 'CHOOSE YOUR SYSTEM' screen, click the FITNESS card"
-    },
-    {
-      "type": "action",
-      "description": "Click 'BIND FITNESS'"
+      "description": "Click 'CHOOSE FITNESS SYSTEM'"
     },
     {
       "type": "action",
@@ -33,7 +29,7 @@
     },
     {
       "type": "action",
-      "description": "Wait 3 seconds for the rank badge and the '[ DAILY QUEST ]' cards to appear"
+      "description": "Wait 5 seconds for the rank badge and the '[ DAILY QUEST ]' cards to appear"
     },
     {
       "type": "action",
@@ -65,11 +61,11 @@
     },
     {
       "type": "assertion",
-      "description": "The '[ STATUS ]' window shows the rank letter 'E', the label 'FITNESS SYSTEM \u00b7 RANK', 'LEVEL' with value '1', and 'NEXT GATE' with value '0 / 21 CLEARED'"
+      "description": "The '[ STATUS ]' screen shows the rank letter 'E' with 'RANK E \u00b7 PLAYER' and 'FITNESS SYSTEM', 'LEVEL' with value '1', and a ring reading '0 / 21' and 'CLEARED' with 'NEXT GATE \u00b7 0 / 21' under it"
     },
     {
       "type": "assertion",
-      "description": "An 'ATTRIBUTES' window shows five attributes labelled 'STR', 'VIT', 'INT', 'CHA' and 'DIS', and 'POINTS' with value '0'"
+      "description": "An 'ATTRIBUTES' panel shows five columns labelled 'STR', 'VIT', 'INT', 'CHA' and 'DIS', and the text 'NO POINTS'"
     }
   ]
 }

@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Do or Die — Penalty tab + block screens (prototype)</title>
+<!-- Fonts load from Google Fonts here; bundle them as assets in the Flutter build. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* =========================================================
+   BRAND TOKENS
+   ========================================================= */
+:root{
+  --void:#05070D; --void-glow:#0B1730; --panel:rgba(10,18,34,0.72);
+  --sys:#4FB3FF; --hi:#A9DCFF; --text:#DBE7FF; --dim:#7D8BA8;
+  --gold:#F5C96A; --warn:#FF8A93;
+  --pz-red:#FF3B4A; --pz-bg:#090204;
+  --dp-crimson:#D7263D; --dp-gold:#F5C96A; --dp-bg:#060102;
+  --rank-e:#9AA4B8; --rank-d:#5BD69A; --rank-c:#4FB3FF; --rank-b:#B07CFF; --rank-a:#FF9F45; --rank-s:#F5C96A;
+  --f-title:"Chakra Petch",system-ui,sans-serif;
+  --f-body:"JetBrains Mono",ui-monospace,monospace;
+  --safe-top:44px; --safe-bottom:34px; --pad:16px; --touch:48px;
+  --ease:cubic-bezier(.2,.8,.2,1);
+}
+/* theme slots, swapped per look */
+.t-zone{--acc:var(--pz-red);--acc2:#ff8790;--title:#ff5562;--line:rgba(255,59,74,.6);--line-dim:rgba(255,59,74,.2);--fill:rgba(255,59,74,.07);
+  --bg:var(--pz-bg);--bg-glow:#2a050a;--glow:0 0 10px rgba(255,59,74,.7);--scan:.34}
+.t-dungeon{--acc:var(--dp-crimson);--acc2:var(--dp-gold);--title:var(--dp-gold);--line:rgba(215,38,61,.65);--line-dim:rgba(215,38,61,.22);--fill:rgba(215,38,61,.07);
+  --bg:var(--dp-bg);--bg-glow:#1d0308;--glow:0 0 12px rgba(245,201,106,.45);--scan:.22}
+.t-block{--acc:var(--sys);--acc2:var(--hi);--title:var(--hi);--line:rgba(79,179,255,.55);--line-dim:rgba(79,179,255,.18);--fill:rgba(79,179,255,.07);
+  --bg:var(--void);--bg-glow:var(--void-glow);--glow:0 0 8px rgba(79,179,255,.55);--scan:.16}
+
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{min-height:100%;background:#020308;color:var(--text);font-family:var(--f-body)}
+body{display:flex;gap:28px;justify-content:center;align-items:flex-start;padding:24px}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+textarea{font:inherit;color:inherit}
+
+/* reviewer panel */
+.rev{width:300px;font-size:12px;line-height:1.6;color:var(--dim)}
+.rev h2{font-family:var(--f-title);letter-spacing:.18em;font-size:13px;color:var(--hi);margin:16px 0 8px}
+.rev .opts{display:flex;flex-wrap:wrap;gap:6px}
+.rev .opts button{font-size:11px;letter-spacing:.08em;color:var(--dim);border:1px solid rgba(79,179,255,.18);padding:8px 10px;min-height:36px}
+.rev .opts button.on{color:var(--hi);border-color:var(--sys)}
+.rev .opts button:disabled{opacity:.3}
+.rev p{margin-bottom:8px}.rev b{color:var(--text);font-weight:500}.rev .gap{color:var(--warn)}
+
+/* =========================================================
+   PHONE
+   ========================================================= */
+.phone{width:390px;height:844px;position:relative;overflow:hidden;border-radius:38px;flex:none;user-select:none;-webkit-user-select:none;
+  background:radial-gradient(120% 55% at 50% -10%,var(--bg-glow) 0%,var(--bg) 62%);box-shadow:0 0 0 1px #1a0d12,0 30px 80px rgba(0,0,0,.6)}
+.phone::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;
+  background-image:linear-gradient(var(--fill) 1px,transparent 1px),linear-gradient(90deg,var(--fill) 1px,transparent 1px);background-size:26px 26px;
+  mask-image:radial-gradient(90% 70% at 50% 40%,#000 30%,transparent 100%)}
+/* heavy scanlines; opacity set per look (zone strongest) */
+.phone::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:60;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,var(--scan)) 0 1px,transparent 1px 3px)}
+/* ANIM zone flicker: whole screen brightness dips to 0.85 for 60 ms, twice, every 5 s. Disabled under reduced motion. */
+.t-zone .flick{position:absolute;inset:0;z-index:59;pointer-events:none;background:#000;opacity:0;animation:flick 5s steps(1) infinite}
+@keyframes flick{0%,100%{opacity:0}61%{opacity:.15}62%{opacity:0}64%{opacity:.12}65%{opacity:0}}
+.scr{position:absolute;inset:0;z-index:1;display:none;flex-direction:column;padding:var(--safe-top) var(--pad) 0}
+.scr.on{display:flex}
+
+.kicker{font-size:10px;letter-spacing:.22em;color:var(--dim);text-transform:uppercase}
+.num{font-family:var(--f-body);font-weight:700;font-variant-numeric:tabular-nums}
+
+/* ---------- glitch title (zone only) ---------- */
+/* ANIM glitch: 240 ms burst every 2.6 s — two offset copies (red / pale) clip-slice and jitter ±3 px.
+   Flutter: two Text layers with ClipRect slices driven by one controller; skip when reduce-motion is on. */
+.glitch{position:relative;display:inline-block}
+.t-zone .glitch::before,.t-zone .glitch::after{content:attr(data-t);position:absolute;inset:0;opacity:0}
+.t-zone .glitch::before{color:#ff9aa2;animation:gA 2.6s infinite steps(1)}
+.t-zone .glitch::after{color:#5a0b12;animation:gB 2.6s infinite steps(1)}
+@keyframes gA{0%,90%,100%{opacity:0;transform:none;clip-path:none}91%{opacity:1;transform:translate(-3px,0);clip-path:inset(10% 0 55% 0)}93%{opacity:1;transform:translate(3px,0);clip-path:inset(60% 0 8% 0)}95%{opacity:1;transform:translate(-2px,0);clip-path:inset(30% 0 40% 0)}}
+@keyframes gB{0%,90%,100%{opacity:0;transform:none}92%{opacity:.9;transform:translate(3px,1px);clip-path:inset(45% 0 25% 0)}94%{opacity:.9;transform:translate(-3px,-1px);clip-path:inset(5% 0 70% 0)}}
+@media (prefers-reduced-motion:reduce){.glitch::before,.glitch::after,.flick,.scramble{animation:none!important}}
+
+/* ---------- top bar ---------- */
+.top{display:flex;align-items:center;gap:8px;height:56px;flex:none;position:relative;z-index:2}
+.top .dt{flex:1}
+.top .dt .d{font-family:var(--f-title);font-weight:700;letter-spacing:.2em;font-size:14px}
+.top .dt .k{font-size:10px;letter-spacing:.16em;color:var(--dim);margin-top:2px}
+.ibtn{width:48px;height:48px;display:flex;align-items:center;justify-content:center;border:1px solid var(--line-dim);color:var(--acc2)}
+.ibtn svg{width:20px;height:20px}
+.rbadge{width:48px;height:52px;color:var(--rank-d)}
+.rbadge svg{width:100%;height:100%}
+
+/* ---------- content column ---------- */
+.body{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding-bottom:12px;position:relative;z-index:2;scrollbar-width:none}
+.body::-webkit-scrollbar{display:none}
+.hdr{text-align:center;padding:4px 0 2px}
+.hdr .tt{font-family:var(--f-title);font-weight:700;font-size:22px;letter-spacing:.24em;color:var(--title);text-shadow:var(--glow)}
+.hdr .st{font-size:11px;line-height:1.5;color:var(--acc2);margin-top:6px;opacity:.85}
+.t-dungeon .hdr .tt{font-size:20px;letter-spacing:.3em}
+.t-dungeon .hdr .seal{display:block;margin:0 auto 6px;width:44px;height:44px}
+.hdr .seal{display:none}
+/* ANIM dungeon seal: slow ceremonial pulse, gold glow 0 -> 14 px -> 0 over 4 s; outer ring rotates 40 s per turn. */
+.t-dungeon .seal{animation:seal 4s ease-in-out infinite}
+@keyframes seal{50%{filter:drop-shadow(0 0 14px rgba(245,201,106,.7))}}
+.t-dungeon .seal .rot{transform-box:fill-box;transform-origin:center;animation:spin 40s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* framed panel */
+.pnl{position:relative;flex:none}
+.pnl>.b{position:absolute;width:12px;height:12px;border-color:var(--acc2);border-style:solid;z-index:2;pointer-events:none}
+.pnl>.b.tl{top:-4px;left:-4px;border-width:2px 0 0 2px}.pnl>.b.tr{top:-4px;right:-4px;border-width:2px 2px 0 0}
+.pnl>.b.bl{bottom:-4px;left:-4px;border-width:0 0 2px 2px}.pnl>.b.br{bottom:-4px;right:-4px;border-width:0 2px 2px 0}
+.pnl .w{padding:1px;background:linear-gradient(160deg,var(--acc),var(--line-dim) 45%,var(--line));
+  clip-path:polygon(10px 0,calc(100% - 10px) 0,100% 10px,100% calc(100% - 10px),calc(100% - 10px) 100%,10px 100%,0 calc(100% - 10px),0 10px)}
+.pnl .wi{padding:14px;background:linear-gradient(180deg,rgba(28,6,10,.97),rgba(12,2,4,.97));
+  clip-path:polygon(9.5px 0,calc(100% - 9.5px) 0,100% 9.5px,100% calc(100% - 9.5px),calc(100% - 9.5px) 100%,9.5px 100%,0 calc(100% - 9.5px),0 9.5px)}
+.t-dungeon .pnl .wi{background:linear-gradient(180deg,rgba(22,4,8,.97),rgba(8,1,3,.98))}
+.wt{font-family:var(--f-title);font-weight:700;font-size:12px;letter-spacing:.24em;color:var(--title);text-align:center;padding-bottom:10px;margin-bottom:12px;border-bottom:1px solid var(--line-dim)}
+
+/* lock countdown */
+.lock{text-align:center}
+.lock .big{font-size:46px;color:#fff;text-shadow:var(--glow);letter-spacing:.02em;line-height:1.1}
+.lock .big.pend{color:var(--acc2);opacity:.75}
+.lock .cap{font-family:var(--f-title);font-weight:700;letter-spacing:.2em;font-size:12px;color:var(--acc2);margin-top:6px}
+.lock .meta{display:flex;justify-content:center;gap:8px;margin-top:10px;font-size:10px;letter-spacing:.14em}
+.lock .meta span{border:1px solid var(--line-dim);padding:3px 8px;color:var(--acc2)}
+.lock .meta .x2{border-color:var(--gold);color:var(--gold)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:12px}
+.chip{display:flex;align-items:center;gap:6px;padding:5px 9px;border:1px solid var(--line);font-size:11px;color:var(--text);background:var(--fill);transition:all .3s}
+.chip svg{width:12px;height:12px}
+.chip.open{border-color:rgba(91,214,154,.5);color:var(--rank-d);background:rgba(91,214,154,.06)}
+.chip.open .lkI{display:none}
+.chip .opI{display:none}.chip.open .opI{display:block}
+
+/* emergency release */
+.rel{display:flex;flex-direction:column;gap:8px}
+.hbtn{position:relative;overflow:hidden;min-height:52px;width:100%;border:1px solid var(--acc);color:var(--acc2);font-family:var(--f-title);font-weight:700;letter-spacing:.2em;font-size:13px;touch-action:none;
+  clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);background:var(--fill)}
+.hbtn .fill{position:absolute;inset:0;background:var(--acc);opacity:.35;transform:scaleX(var(--p,0));transform-origin:left}
+.hbtn span{position:relative}
+.hbtn:disabled{opacity:.45;cursor:default}
+/* ANIM release hold: linear 3000 ms fill; a tick sound + haptic each second; 200 ms drain on early release. */
+.tally{display:flex;align-items:center;justify-content:space-between;font-size:10px;letter-spacing:.14em;color:var(--dim)}
+.tally .marks{display:flex;gap:4px}
+.tally .marks i{width:8px;height:14px;border:1px solid var(--line-dim)}
+.tally .marks i.u{background:var(--warn);border-color:var(--warn)}
+.tally b{color:var(--warn);font-weight:700}
+
+/* debt window */
+.dt-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+.dt-row .l{font-family:var(--f-title);font-weight:700;letter-spacing:.18em;font-size:12px;color:var(--text)}
+.dt-row .v{font-size:22px;color:#fff}
+.dt-row .v small{font-size:12px;color:var(--dim);font-weight:400}
+.dbar{height:4px;background:rgba(125,139,168,.18);position:relative;overflow:hidden;margin-bottom:10px}
+.dbar i{position:absolute;inset:0 auto 0 0;background:var(--acc);box-shadow:var(--glow);transition:width .3s var(--ease)}
+.btns{display:flex;gap:6px}
+.cbtn{flex:1;min-height:var(--touch);border:1px solid var(--line);color:var(--acc2);font-size:13px;font-weight:700;background:var(--fill);
+  clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);transition:transform .1s}
+.cbtn:active:not(:disabled){transform:scale(.95)}
+.cbtn:disabled{opacity:.35}
+.cbtn.undo{flex:0 0 48px;color:var(--dim);border-color:var(--line-dim);font-weight:400}
+.cbtn.big{font-family:var(--f-title);letter-spacing:.2em}
+.sep{height:1px;background:var(--line-dim);margin:14px 0}
+textarea.refl{width:100%;min-height:126px;resize:none;background:rgba(0,0,0,.35);border:1px solid var(--line-dim);color:var(--text);padding:10px;font-size:12px;line-height:1.55;outline:none;user-select:text;-webkit-user-select:text}
+textarea.refl:focus{border-color:var(--acc)}
+.rmeta{display:flex;justify-content:space-between;font-size:10px;letter-spacing:.12em;color:var(--dim);margin:6px 0 8px}
+.rmeta b{color:var(--acc2)}
+.rmeta b.ok{color:var(--rank-d)}
+.pclock{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.pclock .t{flex:1;font-size:30px;color:#fff;text-shadow:var(--glow)}
+.pclock .s{font-size:10px;letter-spacing:.14em;color:var(--dim)}
+.pclock.run .s{color:var(--acc2);animation:blinkS 1.4s ease-in-out infinite}
+@keyframes blinkS{50%{opacity:.4}}
+/* cleared debt */
+.cleared{display:none;align-items:center;gap:10px;padding:10px;border:1px solid rgba(245,201,106,.45);background:rgba(245,201,106,.06);color:var(--gold);font-size:12px;margin-top:10px}
+.cleared svg{width:18px;height:18px;flex:none}
+.dpart.done .cleared{display:flex;animation:fadeUp .4s var(--ease)}
+.dpart.done .ctl{display:none}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}}
+.exitnote{font-size:11px;line-height:1.5;color:var(--dim);text-align:center;margin-top:12px}
+
+/* nav */
+.nav{flex:none;display:flex;height:calc(64px + var(--safe-bottom));padding-bottom:var(--safe-bottom);margin:0 calc(var(--pad) * -1);border-top:1px solid var(--line-dim);background:rgba(0,0,0,.6);position:relative;z-index:2}
+.nav button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-family:var(--f-title);font-size:11px;letter-spacing:.2em;color:var(--dim);position:relative}
+.nav button svg{width:20px;height:20px}
+.nav button.on{color:var(--title);text-shadow:var(--glow)}
+.nav button.on::before{content:"";position:absolute;top:-1px;left:28%;right:28%;height:2px;background:var(--acc);box-shadow:var(--glow)}
+
+/* =========================================================
+   BLOCK OVERLAY (what Android draws over a locked app)
+   ========================================================= */
+.ovl{padding:var(--safe-top) 24px calc(var(--safe-bottom) + 16px);text-align:center;justify-content:space-between}
+.ovl .sbar{position:absolute;top:14px;left:28px;right:28px;display:flex;justify-content:space-between;font-size:12px;color:var(--text);opacity:.8}
+.ovl .mid{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+.ovl .appic{position:relative;width:96px;height:96px;margin-bottom:8px}
+.ovl .appic .ic{width:96px;height:96px;border-radius:24px;background:#121b2e;border:1px solid #1f2b44;display:flex;align-items:center;justify-content:center;filter:grayscale(1) brightness(.55)}
+.ovl .appic .ic svg{width:44px;height:44px}
+.ovl .appic .lk{position:absolute;right:-10px;bottom:-10px;width:40px;height:40px;background:var(--bg);border:1.5px solid var(--acc);display:flex;align-items:center;justify-content:center;
+  clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
+.ovl .appic .lk svg{width:20px;height:20px}
+/* ANIM overlay enter: app icon drops 12 px + fades 300 ms; lock badge stamps scale 1.6 -> 1 at 200 ms; title types/glitches in at 350 ms. */
+.ovl.on .appic{animation:drop .3s var(--ease)}
+.ovl.on .appic .lk{animation:stampS .25s .2s cubic-bezier(.55,0,1,.45) both}
+@keyframes drop{from{opacity:0;transform:translateY(-12px)}}
+@keyframes stampS{from{opacity:0;transform:scale(1.6)}}
+.ovl .ot{font-family:var(--f-title);font-weight:700;font-size:24px;letter-spacing:.24em;color:var(--title);text-shadow:var(--glow)}
+.ovl .reason{font-size:13px;line-height:1.6;color:var(--text);max-width:300px}
+.ovl .reason b{color:var(--acc2);font-weight:500}
+.ovl .ocd{font-size:52px;color:#fff;text-shadow:var(--glow);margin-top:10px;line-height:1}
+.ovl .ocl{font-family:var(--f-title);font-weight:700;letter-spacing:.2em;font-size:12px;color:var(--acc2)}
+.ovl .ofine{font-size:11px;color:var(--dim);line-height:1.5;max-width:290px}
+.leave{width:100%;min-height:56px;border:1px solid var(--acc);color:var(--acc2);background:var(--fill);font-family:var(--f-title);font-weight:700;letter-spacing:.3em;font-size:15px;
+  clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);transition:transform .12s}
+.leave:active{transform:scale(.97)}
+.t-dungeon .ovl .ring{position:absolute;inset:0;pointer-events:none;background:radial-gradient(60% 40% at 50% 45%,rgba(215,38,61,.16),transparent 70%)}
+.t-block .ovl .ring{position:absolute;inset:0;pointer-events:none;background:radial-gradient(60% 40% at 50% 45%,rgba(79,179,255,.12),transparent 70%)}
+.toast{position:absolute;left:24px;right:24px;bottom:calc(var(--safe-bottom) + 84px);z-index:45;padding:10px 12px;font-size:11px;text-align:center;
+  border:1px solid var(--line);background:rgba(0,0,0,.9);opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:none}
+.toast.on{opacity:1;transform:none}
+.flash{position:absolute;inset:0;z-index:58;background:var(--acc);opacity:0;pointer-events:none}
+.flash.go{animation:fl .3s ease-out}
+@keyframes fl{15%{opacity:.35}100%{opacity:0}}
+</style>
+</head>
+<body>
+
+<div class="phone t-zone" id="phone">
+  <div class="flick"></div>
+
+  <!-- ================= PENALTY TAB ================= -->
+  <section class="scr on" id="tab">
+    <div class="top">
+      <div class="dt"><div class="d">SAT · 31 OCT</div><div class="k" id="topK">DAY 12 / 30 · FITNESS</div></div>
+      <button class="ibtn" aria-label="Sound"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8 H6 L11 4 V16 L6 12 H3 Z"/><path d="M14 7 a4 4 0 0 1 0 6"/></svg></button>
+      <div class="rbadge"><svg viewBox="0 0 48 52"><path d="M24 2 L46 14 V38 L24 50 L2 38 V14 Z" fill="rgba(10,18,34,.9)" stroke="currentColor" stroke-width="2"/><text x="24" y="33" text-anchor="middle" font-family="Chakra Petch" font-weight="700" font-size="20" fill="currentColor">D</text></svg></div>
+    </div>
+    <div class="body" id="tabBody">
+      <div class="hdr">
+        <!-- EXPORT: dungeon-seal.svg -->
+        <svg class="seal" viewBox="0 0 44 44" fill="none"><circle class="rot" cx="22" cy="22" r="20" stroke="#F5C96A" stroke-width="1" stroke-dasharray="3 3"/>
+          <path d="M22 6 L36 22 L22 38 L8 22 Z" stroke="#D7263D" stroke-width="1.6"/><path d="M15 16 L29 28 M29 16 L15 28" stroke="#F5C96A" stroke-width="1.6"/></svg>
+        <div class="tt glitch" id="hT" data-t="[ PENALTY ZONE ]">[ PENALTY ZONE ]</div>
+        <p class="st" id="hS">Daily quest failed · Fri 30 Oct</p>
+      </div>
+
+      <div class="pnl"><span class="b tl"></span><span class="b tr"></span><span class="b bl"></span><span class="b br"></span><div class="w"><div class="wi lock">
+        <div class="big num" id="lockBig">03:12:45</div>
+        <div class="cap" id="lockCap">UNTIL ACCESS IS RESTORED</div>
+        <div class="meta" id="lockMeta"></div>
+        <div class="chips" id="chips"></div>
+      </div></div></div>
+
+      <div class="rel">
+        <button class="hbtn" id="relBtn"><i class="fill"></i><span id="relLbl">HOLD 3S · RELEASE 15 MIN</span></button>
+        <div class="tally"><span>RELEASES USED</span><span class="marks" id="marks"></span><b id="relN">2</b></div>
+      </div>
+
+      <div class="pnl"><span class="b tl"></span><span class="b tr"></span><span class="b bl"></span><span class="b br"></span><div class="w"><div class="wi">
+        <div class="wt" id="debtT">[ PENALTY DEBT ]</div>
+        <div id="debt"></div>
+        <p class="exitnote" id="exitNote">Clear the debt to exit the Penalty Zone.</p>
+      </div></div></div>
+    </div>
+    <nav class="nav">
+      <button><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 2 L18 10 L10 18 L2 10 Z"/><path d="M7 10 H13"/></svg>QUEST</button>
+      <button><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 16 V10 M10 16 V4 M16 16 V8"/></svg>STATUS</button>
+      <button class="on"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 2 L19 17 H1 Z"/><path d="M10 8 V12 M10 14 V15"/></svg>PENALTY</button>
+    </nav>
+  </section>
+
+  <!-- ================= BLOCK OVERLAY ================= -->
+  <section class="scr ovl" id="ovl">
+    <div class="ring"></div>
+    <div class="sbar"><span id="ovClock">14:47</span><span>▮▮▮ 82%</span></div>
+    <div class="mid">
+      <div class="appic"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#7D8BA8" stroke-width="1.6"><rect x="4" y="4" width="16" height="16" rx="5"/><circle cx="12" cy="12" r="4"/></svg></div>
+        <div class="lk"><svg viewBox="0 0 20 20"><rect x="4" y="9" width="12" height="9" fill="currentColor" style="color:var(--acc)"/><path d="M7 9 V6.5 a3 3 0 0 1 6 0 V9" fill="none" stroke="currentColor" stroke-width="1.6" style="color:var(--acc)"/></svg></div></div>
+      <div class="ot glitch" id="oT" data-t="[ ACCESS DENIED ]">[ ACCESS DENIED ]</div>
+      <p class="reason" id="oR"></p>
+      <div class="ocd num" id="oCd">03:12:45</div>
+      <div class="ocl" id="oCl">UNTIL ACCESS IS RESTORED</div>
+      <p class="ofine" id="oF"></p>
+    </div>
+    <button class="leave" id="leave">LEAVE</button>
+  </section>
+
+  <div class="flash" id="flash"></div>
+  <div class="toast" id="toast"></div>
+</div>
+
+<aside class="rev">
+  <h2>SCREEN</h2><div class="opts" id="oScr"></div>
+  <h2>LOOK</h2><div class="opts" id="oLook"></div>
+  <h2>LOCK</h2><div class="opts" id="oLock"></div>
+  <h2>SYSTEM</h2><div class="opts" id="oSys"></div>
+  <h2>SIMULATED TIME</h2><div class="opts" id="oSpd"></div>
+  <h2>NOTES</h2>
+  <p class="gap"><b>Release has no cost.</b> It is counted and shown, but nothing else. Tie each release to extra debt or cap it per lock.</p>
+  <p class="gap"><b>Debt vs lock.</b> Clearing the debt here exits the Penalty Zone but does not end the lock early. Decide what an uncleared debt does at midnight.</p>
+  <p class="gap"><b>Reflection gaming.</b> A "line" counts only with 4 or more words, so five lines of "a" don't pass.</p>
+  <p><b>Dungeon Penalty</b> doubles both: an 8 h lock and double debt. Its title is still and ceremonial, with no glitch.</p>
+  <p><b>Block overlay:</b> LEAVE sends the user to the home screen. Android can't kill the locked app, so the overlay must reappear every time that app returns to the foreground.</p>
+  <p><b>Glitch and flicker</b> stop when the OS reduce-motion setting is on. Keep it that way for photosensitive users.</p>
+</aside>
+
+<script>
+const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)];
+const R={scr:'tab',look:'zone',lock:'active',sys:'fitness',spd:1,lockLeft:3*3600+12*60+45,rel:0,relN:2,blockLeft:38*60+12,D:null};
+const APPS=[['Instagram','<rect x="4" y="4" width="16" height="16" rx="5"/><circle cx="12" cy="12" r="4"/>'],['YouTube','<rect x="2" y="5" width="20" height="14" rx="4"/><path d="M10 9 L15 12 L10 15Z"/>'],
+  ['Reels','<path d="M6 4 V20 M12 8 V20 M18 12 V20"/>'],['Netflix','<path d="M7 4 V20 M17 4 V20 M7 4 L17 20"/>']];
+const LKI='<svg class="lkI" viewBox="0 0 12 12"><rect x="2" y="5" width="8" height="6" fill="currentColor"/><path d="M3.5 5 V3.5 a2.5 2.5 0 0 1 5 0 V5" fill="none" stroke="currentColor" stroke-width="1.2"/></svg><svg class="opI" viewBox="0 0 12 12"><rect x="2" y="5" width="8" height="6" fill="currentColor"/><path d="M3.5 5 V3.5 a2.5 2.5 0 0 1 5 0" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>';
+const CHK='<svg viewBox="0 0 18 18" fill="none"><path d="M3 9 L7 13 L15 4" stroke="#F5C96A" stroke-width="2.4"/></svg>';
+const hms=s=>{s=Math.max(0,Math.floor(s));return[s/3600|0,(s%3600)/60|0,s%60].map(x=>String(x).padStart(2,'0')).join(':')};
+const mmss=s=>{s=Math.max(0,Math.floor(s));return String(s/60|0).padStart(2,'0')+':'+String(s%60).padStart(2,'0')};
+const buzz=ms=>{try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){}};
+let tt;const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),2000)};
+const flash=()=>{const f=$('#flash');f.classList.remove('go');void f.offsetWidth;f.classList.add('go')};
+let AC;const blip=(f,d=.08,ty='square',v=.03)=>{try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();const o=AC.createOscillator(),g=AC.createGain();
+  o.type=ty;o.frequency.value=f;g.gain.value=v;g.gain.exponentialRampToValueAtTime(.0001,AC.currentTime+d);o.connect(g).connect(AC.destination);o.start();o.stop(AC.currentTime+d)}catch(e){}};
+
+/* ---------- debt definitions; Dungeon doubles every amount ---------- */
+function debtDefs(){const x=R.look==='dungeon'?2:1;return{
+  fitness:[{k:'reps',l:'PUSH-UPS OWED',t:50*x,v:20*x,u:'reps',steps:[1,10]}],
+  personality:[{k:'pages',l:'PAGES OWED',t:20*x,v:5,u:'pages',steps:[1,5]},{k:'refl',l:'REFLECTION OWED',lines:5*x}],
+  focus:[{k:'block',l:'PHONE-FREE MINUTES OWED',t:60*x*60,v:0,run:false}]}[R.sys]}
+function wordsOk(line){return line.trim().split(/\s+/).filter(Boolean).length>=4}
+
+function renderTab(){
+  const dg=R.look==='dungeon',hT=$('#hT');
+  hT.textContent=hT.dataset.t=dg?'[ DUNGEON PENALTY ]':'[ PENALTY ZONE ]';
+  $('#hS').textContent=dg?'The Dungeon was not cleared. Double lock, double penalty.':'Daily quest failed · Fri 30 Oct';
+  $('#topK').textContent=(dg?'DUNGEON FLOOR 2 FAILED':'DAY 12 / 30')+' · '+R.sys.toUpperCase();
+  $('#lockMeta').innerHTML=dg?'<span class="x2">8 H LOCK · ×2</span><span>4 APPS</span>':'<span>4 H LOCK</span><span>4 APPS</span>';
+  $('#chips').innerHTML=APPS.map(([n])=>`<span class="chip">${LKI}${n}</span>`).join('');
+  $('#debtT').textContent=dg?'[ DUNGEON DEBT · ×2 ]':'[ PENALTY DEBT ]';
+  $('#exitNote').textContent=dg?'Clear the debt to exit the Dungeon Penalty.':'Clear the debt to exit the Penalty Zone.';
+  R.D=debtDefs();
+  $('#debt').innerHTML=R.D.map((d,i)=>{let h='';
+    if(d.k==='reps'||d.k==='pages')h=`<div class="dt-row"><span class="l">${d.l}</span><span class="v num"><span class="vv">${d.v}</span> <small>/ ${d.t}</small></span></div>
+      <div class="dbar"><i></i></div><div class="ctl btns">${d.steps.map(s=>`<button class="cbtn" data-a="add" data-v="${s}">+${s} ${d.k==='reps'?'REPS':'PAGES'}</button>`).join('')}<button class="cbtn undo" data-a="undo" aria-label="Undo">↺</button></div>`;
+    if(d.k==='refl')h=`<div class="dt-row"><span class="l">${d.l}</span><span class="v num" style="font-size:14px"><span class="vv">0</span> <small>/ ${d.lines} lines</small></span></div>
+      <div class="ctl"><textarea class="refl" placeholder="Why did the quest fail? What will you change tomorrow? One thought per line."></textarea>
+      <div class="rmeta"><span>A LINE NEEDS 4+ WORDS</span><b class="lc">0 / ${d.lines}</b></div>
+      <button class="cbtn big" data-a="submit" disabled style="width:100%">SUBMIT</button></div>`;
+    if(d.k==='block')h=`<div class="dt-row"><span class="l">${d.l}</span><span class="v num"><span class="vv">0</span> <small>/ ${d.t/60}</small></span></div>
+      <div class="dbar"><i></i></div><div class="ctl"><div class="pclock"><span class="t num">${hms(d.t)}</span><span class="s">REMAINING</span></div>
+      <div class="btns"><button class="cbtn big" data-a="bstart">START PENALTY BLOCK</button></div></div>`;
+    return `<div class="dpart" data-i="${i}">${i?'<div class="sep"></div>':''}${h}<div class="cleared">${CHK}<span>${d.l.replace(' OWED','')} CLEARED</span></div></div>`}).join('');
+  R.D.forEach((d,i)=>upd(i,true));
+  $$('.refl').forEach(t=>t.addEventListener('input',()=>{const i=+t.closest('.dpart').dataset.i,d=R.D[i];
+    const n=t.value.split('\n').filter(wordsOk).length;d.n=n;const lc=t.closest('.dpart').querySelector('.lc');
+    lc.textContent=`${Math.min(n,d.lines)} / ${d.lines}`;lc.classList.toggle('ok',n>=d.lines);t.closest('.dpart').querySelector('.vv').textContent=Math.min(n,d.lines);
+    t.closest('.dpart').querySelector('[data-a="submit"]').disabled=n<d.lines}));
+  lockUI();relUI();
+}
+function upd(i,silent){const d=R.D[i],el=$(`.dpart[data-i="${i}"]`);if(!el)return;
+  if(d.k==='reps'||d.k==='pages'){el.querySelector('.vv').textContent=d.v;el.querySelector('.dbar i').style.width=d.v/d.t*100+'%';if(d.v>=d.t&&!d.done)clear(i)}
+  if(d.k==='block'){el.querySelector('.vv').textContent=Math.floor(d.v/60);el.querySelector('.dbar i').style.width=d.v/d.t*100+'%';
+    el.querySelector('.pclock .t').textContent=hms(d.t-d.v);el.querySelector('.pclock').classList.toggle('run',d.run);
+    const b=el.querySelector('[data-a="bstart"]');b.textContent=d.run?'BLOCK RUNNING · APPS LOCKED':'START PENALTY BLOCK';b.disabled=d.run;if(d.v>=d.t&&!d.done)clear(i)}}
+function clear(i){const d=R.D[i];d.done=true;d.run=false;$(`.dpart[data-i="${i}"]`).classList.add('done');blip(880,.12,'sine',.05);setTimeout(()=>blip(1320,.18,'sine',.05),90);buzz(30);
+  if(R.D.every(x=>x.done)){$('#exitNote').innerHTML=`<span style="color:var(--gold)">Debt cleared. ${R.look==='dungeon'?'The Dungeon Penalty':'The Penalty Zone'} ends when the lock expires.</span>`}}
+$('#debt').addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(!b||b.disabled)return;const i=+b.closest('.dpart').dataset.i,d=R.D[i];if(d.done)return;
+  if(b.dataset.a==='add'){d.v=Math.min(d.t,d.v+ +b.dataset.v);blip(500+d.v/d.t*400,.05,'sine');buzz(8);upd(i)}
+  if(b.dataset.a==='undo'){d.v=Math.max(0,d.v-1);upd(i)}
+  if(b.dataset.a==='submit'){flash();toast('Reflection recorded.');clear(i)}
+  if(b.dataset.a==='bstart'){d.run=true;flash();blip(160,.3,'sawtooth',.04);toast('Penalty block started. All lock targets are closed.');upd(i)}});
+
+/* ---------- lock + release ---------- */
+const SCR='0123456789';
+let scrT;function lockUI(){
+  const big=$('#lockBig'),cap=$('#lockCap'),pend=R.lock==='pending';
+  big.classList.toggle('pend',pend);clearInterval(scrT);
+  /* ANIM pending: digits scramble every 90 ms (random), never resolving — the time is withheld. */
+  if(pend){scrT=setInterval(()=>{big.textContent=[0,0,0].map(()=>SCR[Math.random()*10|0]+SCR[Math.random()*10|0]).join(':')},90);
+    cap.textContent='THE LOCK WILL BEGIN WITHOUT WARNING'}
+  else{big.textContent=hms(R.lockLeft);cap.textContent=R.rel>0?`RELEASED · LOCK RESUMES IN ${mmss(R.rel)}`:'UNTIL ACCESS IS RESTORED'}
+  $$('.chip').forEach(c=>c.classList.toggle('open',R.rel>0||pend));
+}
+function relUI(){const b=$('#relBtn'),pend=R.lock==='pending';
+  b.disabled=pend||R.rel>0;$('#relLbl').textContent=pend?'NO LOCK ACTIVE':R.rel>0?`RELEASE ACTIVE · ${mmss(R.rel)}`:'HOLD 3S · RELEASE 15 MIN';
+  $('#relN').textContent=R.relN;$('#marks').innerHTML=Array.from({length:Math.max(6,R.relN)},(_,k)=>`<i class="${k<R.relN?'u':''}"></i>`).join('')}
+(function bindRel(){const el=$('#relBtn');let t0,raf,on=false,lastS=0;
+  const tick=()=>{const p=Math.min(1,(performance.now()-t0)/3000);el.style.setProperty('--p',p);const s=Math.floor(p*3);if(s>lastS){lastS=s;blip(300+s*120,.06);buzz(15)}
+    if(p>=1){on=false;el.style.setProperty('--p',0);R.rel=15*60;R.relN++;flash();blip(220,.4,'sawtooth',.04);toast(`Release ${R.relN} logged. Apps open for 15 minutes.`);lockUI();relUI();return}raf=requestAnimationFrame(tick)};
+  el.addEventListener('pointerdown',e=>{if(el.disabled)return;e.preventDefault();el.setPointerCapture?.(e.pointerId);on=true;lastS=0;t0=performance.now();raf=requestAnimationFrame(tick)});
+  ['pointerup','pointercancel','pointerleave'].forEach(v=>el.addEventListener(v,()=>{if(!on)return;on=false;cancelAnimationFrame(raf);el.style.setProperty('--p',0)}))})();
+
+/* ---------- overlay ---------- */
+function renderOvl(){
+  const o=$('#ovl'),T=$('#oT'),look=R.look;o.classList.remove('on');void o.offsetWidth;o.classList.add('on');
+  if(look==='block'){T.textContent=T.dataset.t='[ PHONE-FREE BLOCK ]';
+    $('#oR').innerHTML='<b>Instagram</b> is closed while your block runs. You started it at 14:09.';
+    $('#oCd').textContent=mmss(R.blockLeft);$('#oCl').textContent='LEFT IN THIS BLOCK';
+    $('#oF').textContent='Ending the block early stops your progress toward today’s quest.'}
+  else if(look==='dungeon'){T.textContent=T.dataset.t='[ DUNGEON PENALTY ]';
+    $('#oR').innerHTML='<b>Instagram</b> is sealed. The Dungeon was not cleared.';
+    $('#oCd').textContent=hms(R.lockLeft+4*3600);$('#oCl').textContent='UNTIL THE SEAL BREAKS';
+    $('#oF').textContent='Double lock. Clear your Dungeon debt in Do or Die.'}
+  else{T.textContent=T.dataset.t='[ ACCESS DENIED ]';
+    $('#oR').innerHTML='<b>Instagram</b> is locked. Yesterday’s daily quest was failed.';
+    $('#oCd').textContent=hms(R.lockLeft);$('#oCl').textContent='UNTIL ACCESS IS RESTORED';
+    $('#oF').textContent='Emergency release is in Do or Die · Penalty.'}
+}
+$('#leave').addEventListener('click',()=>{toast('Returns to the home screen.');buzz(10)});
+
+/* ---------- master render ---------- */
+function render(){
+  const ph=$('#phone');ph.className='phone t-'+(R.scr==='ovl'?R.look:(R.look==='block'?'zone':R.look));
+  if(R.scr==='tab'&&R.look==='block')R.look='zone';
+  ph.className='phone t-'+R.look;
+  $('#tab').classList.toggle('on',R.scr==='tab');$('#ovl').classList.toggle('on',R.scr==='ovl');
+  if(R.scr==='tab')renderTab();else renderOvl();syncOpts();
+}
+function opts(id,key,list){$(id).innerHTML=list.map(([v,l])=>`<button data-v="${v}">${l}</button>`).join('');
+  $$(id+' button').forEach(b=>b.addEventListener('click',()=>{R[key]=b.dataset.v==+b.dataset.v?+b.dataset.v:b.dataset.v;if(key==='spd')R.spd=+b.dataset.v;
+    if(key==='lock'){R.rel=0}render()}))}
+function syncOpts(){[['#oScr','scr'],['#oLook','look'],['#oLock','lock'],['#oSys','sys'],['#oSpd','spd']].forEach(([id,k])=>$$(id+' button').forEach(b=>b.classList.toggle('on',String(R[k])===b.dataset.v)));
+  $('#oLook button[data-v="block"]').disabled=R.scr==='tab';$$('#oLock button,#oSys button').forEach(b=>b.disabled=R.scr==='ovl')}
+opts('#oScr','scr',[['tab','Penalty tab'],['ovl','Block screen']]);
+opts('#oLook','look',[['zone','Penalty Zone'],['dungeon','Dungeon Penalty'],['block','Phone-free block']]);
+opts('#oLock','lock',[['active','Lock active'],['pending','Lock pending']]);
+opts('#oSys','sys',[['fitness','Fitness'],['personality','Personality'],['focus','Focus']]);
+opts('#oSpd','spd',[['1','×1'],['60','×60']]);
+
+setInterval(()=>{const k=R.spd;
+  if(R.lock==='active'){if(R.rel>0)R.rel=Math.max(0,R.rel-k);else R.lockLeft=Math.max(0,R.lockLeft-k)}
+  R.blockLeft=Math.max(0,R.blockLeft-k);
+  if(R.scr==='tab'){if(R.lock==='active')lockUI();relUI();
+    R.D&&R.D.forEach((d,i)=>{if(d.run&&!d.done){d.v=Math.min(d.t,d.v+k);upd(i)}})}
+  else renderOvlTick()},1000);
+function renderOvlTick(){if(R.look==='block')$('#oCd').textContent=mmss(R.blockLeft);else $('#oCd').textContent=hms(R.lockLeft+(R.look==='dungeon'?4*3600:0))}
+render();
+</script>
+</body>
+</html>

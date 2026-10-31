@@ -1,13 +1,17 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../domain/dungeon.dart';
 import '../../domain/progression.dart';
 import '../game_model.dart';
 import '../theme.dart';
-import '../widgets/hud_controls.dart';
-import '../widgets/system_window.dart';
+import '../widgets/hud_kit.dart';
+import '../widgets/system_frame.dart';
 
+/// Status, built from design/claude-design/status.html: rank hero, core
+/// rows and the Gate ring, the reduction valve, report and system check,
+/// and attributes with pending points confirmed in one go.
 class StatusScreen extends StatelessWidget {
   const StatusScreen({
     super.key,
@@ -19,22 +23,18 @@ class StatusScreen extends StatelessWidget {
     this.onOpenReport,
   });
 
-  /// Opens the System Check screen.
-  final VoidCallback? onOpenSystemCheck;
-
-  /// Archives this game and returns to the Awakening.
-  final Future<void> Function()? onRestartTrial;
-
-  /// Opens the next-System choice (only once the current one is complete).
-  final VoidCallback? onChooseSystem;
-
-  /// Opens the 30-day report.
-  final VoidCallback? onOpenReport;
-
   final GameModel model;
+
+  /// Opened by seven quick taps (hidden diagnostics).
   final VoidCallback? onOpenDiagnostics;
 
-  /// Where the user stands on the way to the next Gate.
+  /// Kept for the System Check screen, which now holds the restart.
+  final Future<void> Function()? onRestartTrial;
+  final VoidCallback? onOpenSystemCheck;
+  final VoidCallback? onChooseSystem;
+  final VoidCallback? onOpenReport;
+
+  /// Where the user stands on the way to the next Gate (ring label).
   static String gateLine(GameModel m) {
     final sys = m.systems;
     if (sys == null || sys.active == null) return '—';
@@ -44,12 +44,33 @@ class StatusScreen extends StatelessWidget {
     }
     final floor = m.floorToday;
     if (floor > 0) {
-      return floor == 3 ? 'RANK TRIAL TODAY' : 'FLOOR $floor TODAY';
+      return floor == 3 ? 'RANK TRIAL TODAY' : 'DUNGEON · FLOOR $floor';
     }
     if (sys.dungeon != null) return 'DUNGEON FROM TOMORROW';
-    if (m.gate != null) return 'OPEN · ENTER ON QUEST';
-    if (m.gateBlockedDays > 0) return 'SHUT · ${m.gateBlockedDays} DAYS';
-    return '${m.clearedInWindow} / ${DungeonRules.clearedNeeded} CLEARED';
+    if (m.gate != null) return 'GATE OPEN · ENTER ON QUEST';
+    if (m.gateBlockedDays > 0) return 'GATE SHUT · ${m.gateBlockedDays} DAYS';
+    return 'NEXT GATE · ${m.clearedInWindow} / ${DungeonRules.clearedNeeded}';
+  }
+
+  /// (current, best) streaks of cleared days, from the log.
+  static (int, int) streaks(GameModel m) {
+    final judged = <String, bool>{};
+    for (final e in m.service.game.log) {
+      if (e.type == 'quest_cleared') judged[e.data['day'] as String] = true;
+      if (e.type == 'quest_failed') judged[e.data['day'] as String] = false;
+    }
+    final days = judged.keys.toList()..sort();
+    var best = 0, run = 0;
+    for (final d in days) {
+      run = judged[d]! ? run + 1 : 0;
+      best = max(best, run);
+    }
+    var cur = 0;
+    for (final d in days.reversed) {
+      if (judged[d] != true) break;
+      cur++;
+    }
+    return (cur, best);
   }
 
   @override
@@ -58,200 +79,219 @@ class StatusScreen extends StatelessWidget {
     final s = model.state;
     final spec = model.systemSpec;
     final sys = model.systems;
-    final rankColor = Hud.rankColor(model.rank);
+    final rc = Hud.rankColor(model.rank);
+    final (streak, best) = streaks(model);
+    final dry = model.service.isDryRunToday;
+    final trainedStats = spec?.stats.toSet() ?? Stat.values.toSet();
 
-    final rank = Column(
-      children: [
-        Text(
-          model.rank.name.toUpperCase(),
-          textAlign: TextAlign.center,
-          style: Hud.head(76, sys == null ? p.hi : rankColor, spacing: 0)
-              .copyWith(
-                height: 1,
-                shadows: [
-                  Shadow(
-                    color: (sys == null ? p.sys : rankColor).withValues(
-                      alpha: .7,
-                    ),
-                    blurRadius: p.glow * 2.4,
-                  ),
-                ],
-              ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          spec == null ? 'RANK' : '${spec.name.toUpperCase()} · RANK',
-          textAlign: TextAlign.center,
-          style: Hud.mono(12, p.dim, spacing: .2),
-        ),
-        if (sys != null && sys.titles.isNotEmpty) ...[
-          const SizedBox(height: 6),
-          Text(
-            sys.titles.last,
-            textAlign: TextAlign.center,
-            style: Hud.mono(11, Hud.gold, spacing: .08),
-          ),
-        ],
-      ],
-    );
-
-    final rows = Column(
-      children: [
-        _kv(p, 'LEVEL', '${s.level}'),
-        _kv(p, 'EXPERIENCE', '${s.xp} / ${model.xpToNext}'),
-        if (sys != null) _kv(p, 'NEXT GATE', gateLine(model)),
-        _kv(p, 'CURRENT STREAK', '${_streak(model)} days'),
-        _kv(p, 'TRIAL DAY', '${model.service.trialDay} / 30'),
-        _kv(p, 'PENALTIES', model.trialMode),
-        if (sys != null && sys.active != null && !model.canChooseSystem)
-          _ReductionRow(model: model),
-      ],
-    );
-
-    final footer = <Widget>[
-      if (model.canChooseSystem && onChooseSystem != null) ...[
-        const SizedBox(height: 8),
-        HudButton('CHOOSE NEXT SYSTEM', onPressed: onChooseSystem),
-      ],
-      if (onOpenReport != null || onOpenSystemCheck != null) ...[
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            if (onOpenReport != null)
-              Expanded(
-                child: HudButton(
-                  'REPORT',
-                  dense: true,
-                  onPressed: onOpenReport,
-                ),
-              ),
-            if (onOpenReport != null && onOpenSystemCheck != null)
-              const SizedBox(width: 8),
-            if (onOpenSystemCheck != null)
-              Expanded(
-                child: HudButton(
-                  model.systemIssues == 0
-                      ? 'SYSTEM CHECK'
-                      : 'CHECK · ${model.systemIssues} TO FIX',
-                  dense: true,
-                  onPressed: onOpenSystemCheck,
-                ),
-              ),
-          ],
-        ),
-      ],
-      if (onRestartTrial != null) ...[
-        Container(
-          height: 1,
-          margin: const EdgeInsets.only(top: 8, bottom: 10),
-          color: p.sys.withValues(alpha: p.lineAlpha * .6),
-        ),
-        if (model.restartBlockedReason case final reason?)
-          Text(
-            reason,
-            textAlign: TextAlign.center,
-            style: Hud.mono(11, Hud.warn),
-          )
-        else
-          HoldButton(
-            label: 'HOLD 3S · RESTART TRIAL',
-            doneLabel: 'RESTARTING',
-            holdFor: const Duration(seconds: 3),
-            onConfirmed: onRestartTrial!,
-          ),
-      ],
-    ];
-
-    Widget tile(Stat stat) => Expanded(
-      child: SizedBox(
-        height: 56,
-        child: _StatTile(
-          stat: stat,
-          value: s.stats[stat] ?? 0,
-          canSpend: s.unspentStatPoints > 0,
-          onSpend: () => model.allocateStat(stat),
-        ),
-      ),
-    );
-
-    final attributes = SystemWindow(
-      title: 'ATTRIBUTES',
-      delay: const Duration(milliseconds: 120),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+    final hero = SizedBox(
+      height: 112,
+      child: Row(
         children: [
-          Row(
-            children: [
-              tile(Stat.strength),
-              const SizedBox(width: 8),
-              tile(Stat.vitality),
-              const SizedBox(width: 8),
-              tile(Stat.intellect),
-            ],
+          SizedBox(
+            width: 100,
+            height: 112,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                CustomPaint(
+                  size: const Size(100, 112),
+                  painter: _RankFrame(rc),
+                ),
+                _Breathing(
+                  color: rc,
+                  child: Text(
+                    model.rank.name.toUpperCase(),
+                    style: Hud.head(84, rc, spacing: 0).copyWith(height: 1),
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              tile(Stat.charisma),
-              const SizedBox(width: 8),
-              tile(Stat.discipline),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '${s.unspentStatPoints}',
-                        style: Hud.head(
-                          22,
-                          s.unspentStatPoints > 0 ? Hud.gold : p.dim,
-                          spacing: 0,
-                        ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Kicker('Rank ${model.rank.name.toUpperCase()} · Player'),
+                const SizedBox(height: 4),
+                Text(
+                  spec?.name.toUpperCase() ?? 'NO SYSTEM',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Hud.head(17, p.text, spacing: .2),
+                ),
+                const SizedBox(height: 8),
+                Text('LATEST TITLE', style: Hud.mono(9, p.dim, spacing: .2)),
+                const SizedBox(height: 2),
+                Text(
+                  sys == null || sys.titles.isEmpty ? '—' : sys.titles.last,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Hud.head(14, Hud.gold, spacing: .08).copyWith(
+                    shadows: [
+                      Shadow(
+                        color: Hud.gold.withValues(alpha: .45),
+                        blurRadius: 10,
                       ),
-                      Text('POINTS', style: Hud.mono(10, p.dim, spacing: .14)),
                     ],
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
     );
 
-    return LayoutBuilder(
-      builder: (context, c) => _SevenTaps(
-        onTriggered: onOpenDiagnostics,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(18, 4, 18, 16),
+    Widget row(String k, Widget v) => Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(k, style: Hud.mono(9, p.dim, spacing: .2)),
+        const SizedBox(height: 1),
+        v,
+      ],
+    );
+    TextSpan big(String a, [String? small]) => TextSpan(
+      text: a,
+      style: Hud.mono(15, Colors.white, weight: FontWeight.w700),
+      children: [
+        if (small != null)
+          TextSpan(text: ' $small', style: Hud.mono(11, p.dim)),
+      ],
+    );
+
+    final core = Panel(
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                row('LEVEL', Text.rich(big('${s.level}'))),
+                const SizedBox(height: 9),
+                row(
+                  'EXPERIENCE',
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text.rich(big('${s.xp}', '/ ${model.xpToNext}')),
+                      const SizedBox(height: 4),
+                      XpBar(xp: s.xp, max: model.xpToNext, height: 4),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 9),
+                row(
+                  'CURRENT STREAK',
+                  Text.rich(big('$streak', 'days · best $best')),
+                ),
+                const SizedBox(height: 9),
+                row(
+                  'TRIAL DAY',
+                  Text.rich(
+                    dry
+                        ? big(
+                            '${model.service.trialDay}',
+                            '· dry run, no penalties',
+                          )
+                        : TextSpan(
+                            text: 'LIVE',
+                            style: Hud.mono(
+                              15,
+                              Hud.rankColor(Rank.d),
+                              weight: FontWeight.w700,
+                            ),
+                            children: [
+                              TextSpan(
+                                text: ' · day ${model.service.trialDay}',
+                                style: Hud.mono(11, p.dim),
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          SizedBox(
+            width: 124,
+            child: Column(
+              children: [
+                _GateRing(
+                  cleared: model.clearedInWindow,
+                  of: DungeonRules.clearedNeeded,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  gateLine(model),
+                  textAlign: TextAlign.center,
+                  style: Hud.mono(9, p.dim, spacing: .14),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return _SevenTaps(
+      onTriggered: onOpenDiagnostics,
+      child: LayoutBuilder(
+        builder: (context, c) => SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
           child: ConstrainedBox(
-            // At least the screen's height, so the Status window can stretch
-            // to fill spare space; taller content makes the page scroll.
             constraints: BoxConstraints(minHeight: c.maxHeight - 20),
             child: IntrinsicHeight(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(
-                    child: SystemWindow(
-                      expand: true,
-                      title: '[ STATUS ]',
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          rank,
-                          const Spacer(),
-                          const SizedBox(height: 10),
-                          rows,
-                          const Spacer(),
-                          ...footer,
-                        ],
-                      ),
-                    ),
+                  Text(
+                    '[ STATUS ]',
+                    textAlign: TextAlign.center,
+                    style: Hud.head(
+                      12,
+                      p.hi,
+                      spacing: .3,
+                    ).copyWith(shadows: p.textGlow(.8)),
                   ),
-                  const SizedBox(height: 12),
-                  attributes,
+                  const SizedBox(height: 8),
+                  hero,
+                  const SizedBox(height: 8),
+                  core,
+                  const SizedBox(height: 10),
+                  if (model.canChooseSystem && onChooseSystem != null) ...[
+                    CutButton('CHOOSE NEXT SYSTEM', onPressed: onChooseSystem),
+                    const SizedBox(height: 10),
+                  ] else if (sys != null && sys.active != null) ...[
+                    _Reduction(model: model),
+                    const SizedBox(height: 10),
+                  ],
+                  Row(
+                    children: [
+                      if (onOpenReport != null)
+                        Expanded(
+                          child: CutButton('REPORT', onPressed: onOpenReport),
+                        ),
+                      if (onOpenReport != null && onOpenSystemCheck != null)
+                        const SizedBox(width: 8),
+                      if (onOpenSystemCheck != null)
+                        Expanded(
+                          child: CutButton(
+                            model.systemIssues == 0
+                                ? 'SYSTEM CHECK'
+                                : 'CHECK · ${model.systemIssues}',
+                            danger: model.systemIssues > 0,
+                            onPressed: onOpenSystemCheck,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const Spacer(),
+                  const SizedBox(height: 10),
+                  _Attributes(model: model, trained: trainedStats),
                 ],
               ),
             ),
@@ -260,47 +300,545 @@ class StatusScreen extends StatelessWidget {
       ),
     );
   }
+}
 
-  static Widget _kv(HudPalette p, String k, String v) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 5),
-    child: Row(
-      children: [
-        Text(k, style: Hud.mono(12, p.dim, spacing: .06)),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            v,
-            textAlign: TextAlign.right,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Hud.mono(12, p.text, weight: FontWeight.w500),
+class _RankFrame extends CustomPainter {
+  _RankFrame(this.c);
+  final Color c;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.scale(size.width / 118, size.height / 132);
+    canvas.drawPath(
+      Path()
+        ..moveTo(59, 3)
+        ..lineTo(114, 34)
+        ..lineTo(114, 98)
+        ..lineTo(59, 129)
+        ..lineTo(4, 98)
+        ..lineTo(4, 34)
+        ..close(),
+      Paint()
+        ..color = c.withValues(alpha: .55)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5,
+    );
+    final inner = Path()
+      ..moveTo(59, 14)
+      ..lineTo(104, 40)
+      ..lineTo(104, 92)
+      ..lineTo(59, 118)
+      ..lineTo(14, 92)
+      ..lineTo(14, 40)
+      ..close();
+    final dash = Paint()
+      ..color = c.withValues(alpha: .3)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = .8;
+    for (final m in inner.computeMetrics()) {
+      for (var d = 0.0; d < m.length; d += 7) {
+        canvas.drawPath(m.extractPath(d, d + 3), dash);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_RankFrame old) => old.c != c;
+}
+
+/// The rank letter's glow breathes 8 to 22 px over 3.2 s.
+class _Breathing extends StatefulWidget {
+  const _Breathing({required this.color, required this.child});
+  final Color color;
+  final Widget child;
+
+  @override
+  State<_Breathing> createState() => _BreathingState();
+}
+
+class _BreathingState extends State<_Breathing>
+    with SingleTickerProviderStateMixin {
+  late final _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1600),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _c,
+    builder: (context, child) => DefaultTextStyle.merge(
+      style: TextStyle(
+        shadows: [
+          Shadow(color: widget.color, blurRadius: 8 + 6 * _c.value),
+          Shadow(
+            color: widget.color.withValues(alpha: .5 + .1 * _c.value),
+            blurRadius: 22 + 18 * _c.value,
+          ),
+        ],
+      ),
+      child: child!,
+    ),
+    child: widget.child,
+  );
+}
+
+/// 21 segments; cleared ones light gold in order on entry.
+class _GateRing extends StatefulWidget {
+  const _GateRing({required this.cleared, required this.of});
+  final int cleared;
+  final int of;
+
+  @override
+  State<_GateRing> createState() => _GateRingState();
+}
+
+class _GateRingState extends State<_GateRing>
+    with SingleTickerProviderStateMixin {
+  late final _c = AnimationController(
+    vsync: this,
+    duration: Duration(milliseconds: 120 + widget.of * 25 + 150),
+  )..forward();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    return SizedBox(
+      width: 124,
+      height: 124,
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (context, _) => CustomPaint(
+          painter: _RingSegments(
+            cleared: widget.cleared,
+            of: widget.of,
+            lit: ((_c.value * _c.duration!.inMilliseconds - 120) / 25)
+                .floor()
+                .clamp(0, widget.of),
+          ),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text.rich(
+                  TextSpan(
+                    text: '${widget.cleared}',
+                    style: Hud.mono(22, Colors.white, weight: FontWeight.w700),
+                    children: [
+                      TextSpan(
+                        text: ' / ${widget.of}',
+                        style: Hud.mono(13, p.dim, weight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
+                ),
+                Text('CLEARED', style: Hud.mono(8, p.dim, spacing: .18)),
+              ],
+            ),
           ),
         ),
-      ],
-    ),
-  );
-
-  /// Consecutive cleared days ending with the most recent judged day.
-  static int _streak(GameModel m) {
-    final judged = <String, bool>{};
-    for (final e in m.service.game.log) {
-      if (e.type == 'quest_cleared') judged[e.data['day'] as String] = true;
-      if (e.type == 'quest_failed') judged[e.data['day'] as String] = false;
-    }
-    final days = judged.keys.toList()..sort();
-    var streak = 0;
-    for (final d in days.reversed) {
-      if (judged[d] != true) break;
-      streak++;
-    }
-    return streak;
+      ),
+    );
   }
 }
 
-/// Fires [onTriggered] after 7 quick taps within 4 seconds, like Android's
-/// hidden developer options. Holds never count, so a 3-second hold on a
-/// button inside can't open anything by accident. Uses raw pointer events,
-/// so it never competes with the buttons it wraps.
+class _RingSegments extends CustomPainter {
+  _RingSegments({required this.cleared, required this.of, required this.lit});
+  final int cleared;
+  final int of;
+  final int lit;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = size.center(Offset.zero);
+    final r = size.width * 52 / 124;
+    final step = 2 * pi / of;
+    final gap = 2 * pi / 180;
+    for (var i = 0; i < of; i++) {
+      final on = i < cleared && i < lit;
+      canvas.drawArc(
+        Rect.fromCircle(center: c, radius: r),
+        -pi / 2 + i * step + gap,
+        step - 2 * gap,
+        false,
+        Paint()
+          ..color = on ? Hud.gold : const Color(0x387D8BA8)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 9
+          ..maskFilter = on ? const MaskFilter.blur(BlurStyle.solid, 2) : null,
+      );
+    }
+    final inner = Paint()
+      ..color = const Color(0x384FB3FF)
+      ..style = PaintingStyle.stroke;
+    final innerR = size.width * 40 / 124;
+    for (var a = 0.0; a < 2 * pi; a += 6 / innerR) {
+      canvas.drawArc(
+        Rect.fromCircle(center: c, radius: innerR),
+        a,
+        2 / innerR,
+        false,
+        inner,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_RingSegments old) =>
+      old.cleared != cleared || old.lit != lit || old.of != of;
+}
+
+/// Quest reduction: 0, 10 or 20 percent from tomorrow, at half XP. Locked
+/// during a Dungeon (floors ignore it anyway).
+class _Reduction extends StatelessWidget {
+  const _Reduction({required this.model});
+  final GameModel model;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    final tomorrow = model.reductionTomorrow;
+    final locked = model.service.dungeonInProgress;
+    final caption = locked
+        ? 'Locked during the Dungeon. Floors use the full quest.'
+        : tomorrow == 0
+        ? (model.reductionToday == 0
+              ? 'Full quest · full XP.'
+              : 'Today ${model.reductionToday}% · back to the full quest tomorrow.')
+        : '−$tomorrow% targets · applies tomorrow · half XP';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Kicker('Quest reduction'),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            for (final (i, pct) in const [0, 10, 20].indexed) ...[
+              if (i > 0) const SizedBox(width: 6),
+              Expanded(
+                child: _SegButton(
+                  label: '$pct%',
+                  selected: tomorrow == pct,
+                  cut: pct > 0,
+                  semantic: 'Reduce quest by $pct percent from tomorrow',
+                  onTap: locked ? null : () => model.setReduction(pct),
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          caption,
+          style: Hud.mono(10, tomorrow > 0 ? Hud.warn : p.dim, spacing: .1),
+        ),
+      ],
+    );
+  }
+}
+
+class _SegButton extends StatelessWidget {
+  const _SegButton({
+    required this.label,
+    required this.selected,
+    required this.cut,
+    required this.semantic,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final bool cut;
+  final String semantic;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    final c = !selected
+        ? p.dim
+        : cut
+        ? Hud.warn
+        : p.hi;
+    final edge = !selected
+        ? p.sys.withValues(alpha: .18)
+        : cut
+        ? Hud.warn
+        : p.sys;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: semantic,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Opacity(
+          opacity: onTap == null ? .4 : 1,
+          child: ClipPath(
+            clipper: const ChamferClipper(
+              6,
+              corners: [true, false, true, false],
+            ),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              height: 48,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: selected ? edge.withValues(alpha: .07) : Colors.black26,
+                border: Border.all(color: edge),
+              ),
+              child: ExcludeSemantics(
+                child: Text(label, style: Hud.head(15, c, spacing: .12)),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Five attributes as vertical bars. Points are held as pending until
+/// CONFIRM; RESET drops them. Stats the System doesn't train are dimmed.
+class _Attributes extends StatefulWidget {
+  const _Attributes({required this.model, required this.trained});
+  final GameModel model;
+  final Set<Stat> trained;
+
+  @override
+  State<_Attributes> createState() => _AttributesState();
+}
+
+class _AttributesState extends State<_Attributes> {
+  final _pending = <Stat, int>{};
+  static const _max = 30;
+  static const _order = [
+    Stat.strength,
+    Stat.vitality,
+    Stat.intellect,
+    Stat.charisma,
+    Stat.discipline,
+  ];
+  static const _short = {
+    Stat.strength: 'STR',
+    Stat.intellect: 'INT',
+    Stat.discipline: 'DIS',
+    Stat.vitality: 'VIT',
+    Stat.charisma: 'CHA',
+  };
+
+  int get _pendingTotal => _pending.values.fold(0, (a, b) => a + b);
+
+  Future<void> _confirm() async {
+    final all = {..._pending};
+    setState(_pending.clear);
+    for (final e in all.entries) {
+      for (var i = 0; i < e.value; i++) {
+        await widget.model.allocateStat(e.key);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    final s = widget.model.state;
+    final points = s.unspentStatPoints;
+    final left = points - _pendingTotal;
+    final has = _pendingTotal > 0;
+    return Panel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            height: 32,
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    'ATTRIBUTES',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Hud.head(11, p.hi, spacing: .24),
+                  ),
+                ),
+                const Spacer(),
+                if (has) ...[
+                  _Small('RESET', onTap: () => setState(_pending.clear)),
+                  const SizedBox(width: 6),
+                  _Small('CONFIRM', gold: true, onTap: _confirm),
+                ] else
+                  Text(
+                    points == 0
+                        ? 'NO POINTS'
+                        : '$points POINT${points == 1 ? '' : 'S'}',
+                    style: Hud.mono(
+                      10,
+                      points == 0 ? p.dim : Hud.gold,
+                      spacing: .16,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              for (final stat in _order)
+                Expanded(
+                  child: _StatColumn(
+                    label: _short[stat]!,
+                    value: s.stats[stat] ?? 0,
+                    pending: _pending[stat] ?? 0,
+                    max: _max,
+                    trained: widget.trained.contains(stat),
+                    canAdd: left > 0,
+                    onAdd: () => setState(
+                      () => _pending[stat] = (_pending[stat] ?? 0) + 1,
+                    ),
+                    semantic: 'Add a point to ${stat.name}',
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Small extends StatelessWidget {
+  const _Small(this.label, {required this.onTap, this.gold = false});
+  final String label;
+  final VoidCallback onTap;
+  final bool gold;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    final c = gold ? Hud.gold : p.dim;
+    return Semantics(
+      button: true,
+      label: label,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Container(
+            height: 32,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: gold ? Hud.gold : p.sys.withValues(alpha: .18),
+              ),
+            ),
+            child: ExcludeSemantics(
+              child: Text(label, style: Hud.head(10, c, spacing: .16)),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StatColumn extends StatelessWidget {
+  const _StatColumn({
+    required this.label,
+    required this.value,
+    required this.pending,
+    required this.max,
+    required this.trained,
+    required this.canAdd,
+    required this.onAdd,
+    required this.semantic,
+  });
+
+  final String label;
+  final int value;
+  final int pending;
+  final int max;
+  final bool trained;
+  final bool canAdd;
+  final VoidCallback onAdd;
+  final String semantic;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    final base = (value / max).clamp(0.0, 1.0);
+    final extra = (pending / max).clamp(0.0, 1.0 - base);
+    return Column(
+      children: [
+        Text(label, style: Hud.head(12, trained ? p.hi : p.dim, spacing: .14)),
+        const SizedBox(height: 4),
+        SizedBox(
+          height: 18,
+          child: Text.rich(
+            TextSpan(
+              text: '$value',
+              style: Hud.mono(15, Colors.white, weight: FontWeight.w700),
+              children: [
+                if (pending > 0)
+                  TextSpan(text: '+$pending', style: Hud.mono(11, Hud.gold)),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        SizedBox(
+          width: 10,
+          height: 50,
+          child: Stack(
+            children: [
+              const Positioned.fill(
+                child: ColoredBox(color: Color(0x2E7D8BA8)),
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: 50 * base,
+                child: ColoredBox(
+                  color: trained ? p.sys : const Color(0xFF4A5670),
+                ),
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 50 * base,
+                height: 50 * extra,
+                child: const ColoredBox(color: Hud.gold),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
+        SizedBox(
+          width: 48,
+          child: StepButton(
+            '+',
+            semanticLabel: semantic,
+            onPressed: canAdd ? onAdd : null,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _SevenTaps extends StatefulWidget {
   const _SevenTaps({required this.child, this.onTriggered});
 
@@ -342,142 +880,4 @@ class _SevenTapsState extends State<_SevenTaps> {
     onPointerCancel: (_) => _downAt = null,
     child: widget.child,
   );
-}
-
-class _StatTile extends StatelessWidget {
-  const _StatTile({
-    required this.stat,
-    required this.value,
-    required this.canSpend,
-    required this.onSpend,
-  });
-
-  final Stat stat;
-  final int value;
-  final bool canSpend;
-  final VoidCallback onSpend;
-
-  static const _short = {
-    Stat.strength: 'STR',
-    Stat.intellect: 'INT',
-    Stat.discipline: 'DIS',
-    Stat.vitality: 'VIT',
-    Stat.charisma: 'CHA',
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final p = HudScope.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(
-        border: Border.all(color: p.sys.withValues(alpha: .22)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(_short[stat]!, style: Hud.mono(11, p.dim, spacing: .14)),
-                Text('$value', style: Hud.head(22, p.text, spacing: 0))
-                    .animate(key: ValueKey(value))
-                    .tint(
-                      color: p.hi,
-                      begin: value == 0 ? 0 : .8,
-                      end: 0,
-                      duration: 600.ms,
-                    ),
-              ],
-            ),
-          ),
-          Semantics(
-            container: true,
-            button: true,
-            label: 'Add a point to ${stat.name}',
-            child: GestureDetector(
-              onTap: canSpend ? onSpend : null,
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 200),
-                opacity: canSpend ? 1 : .25,
-                child: Container(
-                  width: 28,
-                  height: 28,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(border: Border.all(color: p.sys)),
-                  child: Text('+', style: Hud.mono(14, p.hi)),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// The reduction valve: lower tomorrow's quest by 0, 10 or 20 percent for an
-/// injury or illness. Those days earn half XP.
-class _ReductionRow extends StatelessWidget {
-  const _ReductionRow({required this.model});
-
-  final GameModel model;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = HudScope.of(context);
-    final tomorrow = model.reductionTomorrow;
-    final today = model.reductionToday;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'QUEST REDUCTION',
-                  style: Hud.mono(13, p.dim, spacing: .06),
-                ),
-                Text(
-                  today == tomorrow
-                      ? (today == 0 ? 'Full quest' : 'Today $today% · half XP')
-                      : 'Tomorrow $tomorrow%${tomorrow > 0 ? ' · half XP' : ''}',
-                  style: Hud.mono(10, tomorrow > 0 ? Hud.warn : p.dim),
-                ),
-              ],
-            ),
-          ),
-          for (final pct in const [0, 10, 20]) ...[
-            const SizedBox(width: 6),
-            Semantics(
-              button: true,
-              selected: tomorrow == pct,
-              label: 'Reduce quest by $pct percent from tomorrow',
-              child: GestureDetector(
-                onTap: () => model.setReduction(pct),
-                child: Container(
-                  width: 42,
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: tomorrow == pct
-                        ? p.sys.withValues(alpha: .18)
-                        : Colors.transparent,
-                    border: Border.all(color: tomorrow == pct ? p.sys : p.line),
-                  ),
-                  child: Text(
-                    '$pct%',
-                    style: Hud.mono(11, tomorrow == pct ? p.hi : p.dim),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
 }

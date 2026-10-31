@@ -14,6 +14,7 @@ import 'screens/status_screen.dart';
 import 'screens/system_check_screen.dart';
 import 'theme.dart';
 import 'widgets/hud_background.dart';
+import 'widgets/hud_kit.dart';
 import 'widgets/notice_overlay.dart';
 
 enum _Tab { quest, status, penalty }
@@ -58,11 +59,12 @@ class _AppShellState extends State<AppShell> {
       listenable: widget.model,
       builder: (context, _) {
         final m = widget.model;
-        final palette = _tab != _Tab.penalty
-            ? HudPalette.system
-            : m.dungeonPenalty
-            ? HudPalette.dungeon
-            : HudPalette.penalty;
+        final palette = switch (_tab) {
+          _Tab.penalty =>
+            m.dungeonPenalty ? HudPalette.dungeon : HudPalette.penalty,
+          _Tab.quest when m.floorToday > 0 => HudPalette.dungeon,
+          _ => HudPalette.system,
+        };
         final notice = m.notice;
         return HudScope(
           palette: palette,
@@ -78,7 +80,6 @@ class _AppShellState extends State<AppShell> {
                     children: [
                       Column(
                         children: [
-                          _TopBar(model: m, penalty: _tab == _Tab.penalty),
                           Expanded(
                             child: AnimatedSwitcher(
                               duration: const Duration(milliseconds: 220),
@@ -97,6 +98,15 @@ class _AppShellState extends State<AppShell> {
                                             builder: (_) => SystemCheckScreen(
                                               model: m,
                                               blocker: widget.blocker,
+                                              onRestartTrial:
+                                                  widget.onAbandoned == null
+                                                  ? null
+                                                  : () async {
+                                                      if (await m.service
+                                                          .abandon()) {
+                                                        widget.onAbandoned!();
+                                                      }
+                                                    },
                                             ),
                                           ),
                                         ),
@@ -196,6 +206,7 @@ class _AppShellState extends State<AppShell> {
                         Positioned.fill(
                           child: NoticeOverlay(
                             notice: notice,
+                            counter: m.noticeCounter,
                             onDismiss: m.dismissNotice,
                           ),
                         ),
@@ -207,99 +218,6 @@ class _AppShellState extends State<AppShell> {
           ),
         );
       },
-    );
-  }
-}
-
-class _TopBar extends StatelessWidget {
-  const _TopBar({required this.model, required this.penalty});
-  final GameModel model;
-  final bool penalty;
-
-  static const _days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
-  static const _months = [
-    'JAN',
-    'FEB',
-    'MAR',
-    'APR',
-    'MAY',
-    'JUN',
-    'JUL',
-    'AUG',
-    'SEP',
-    'OCT',
-    'NOV',
-    'DEC',
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final p = HudScope.of(context);
-    final now = model.now;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 10, 18, 10),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Text(
-                '${_days[now.weekday - 1]} ${now.day} ${_months[now.month - 1]}',
-                style: Hud.mono(11, p.dim, spacing: .12),
-              ),
-              const SizedBox(width: 10),
-              ValueListenableBuilder<bool>(
-                valueListenable: Fx.instance.muted,
-                builder: (context, muted, _) => Semantics(
-                  container: true,
-                  button: true,
-                  label: muted ? 'Turn sound on' : 'Mute sound',
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () {
-                      Fx.instance.setMuted(!muted);
-                      if (muted) Fx.instance.play(Cue.tap);
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.all(6),
-                      child: Icon(
-                        muted
-                            ? Icons.volume_off_outlined
-                            : Icons.volume_up_outlined,
-                        size: 16,
-                        color: muted ? p.dim : p.hi,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 10),
-          Flexible(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerRight,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: p.sys.withValues(alpha: p.lineAlpha + .2),
-                  ),
-                ),
-                child: Text(
-                  !penalty
-                      ? 'RANK ${model.rank.name.toUpperCase()}'
-                      : model.dungeonPenalty
-                      ? 'DUNGEON PENALTY'
-                      : 'PENALTY',
-                  style: Hud.head(11, p.hi, spacing: .15),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -318,9 +236,9 @@ class _NavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = HudScope.of(context);
-    Widget item(_Tab t, String label, {bool alert = false}) {
+    Widget item(_Tab t, String label, int icon, {bool alert = false}) {
       final on = t == current;
-      final color = alert ? HudPalette.penalty.hi : (on ? p.hi : p.dim);
+      final color = on ? p.hi : p.dim;
       return Expanded(
         child: Semantics(
           container: true,
@@ -330,29 +248,58 @@ class _NavBar extends StatelessWidget {
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () => onTap(t),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+            child: SizedBox(
+              height: 64,
+              child: Stack(
+                alignment: Alignment.center,
                 children: [
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 220),
-                    height: 2,
-                    width: on ? 28 : 0,
-                    margin: const EdgeInsets.only(bottom: 8),
-                    decoration: BoxDecoration(
-                      color: alert ? HudPalette.penalty.sys : p.sys,
-                      boxShadow: [
-                        BoxShadow(color: p.glowColor, blurRadius: p.glow * .8),
-                      ],
+                  Positioned(
+                    top: 0,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 220),
+                      height: 2,
+                      width: on ? 44 : 0,
+                      decoration: BoxDecoration(
+                        color: p.sys,
+                        boxShadow: [
+                          BoxShadow(color: p.glowColor, blurRadius: 8),
+                        ],
+                      ),
                     ),
                   ),
                   ExcludeSemantics(
-                    child: Text(
-                      label,
-                      style: Hud.head(11, color, spacing: .22),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        NavIcon(icon, color: color),
+                        const SizedBox(height: 4),
+                        Text(
+                          label,
+                          style: Hud.head(
+                            11,
+                            color,
+                            spacing: .2,
+                          ).copyWith(shadows: on ? p.textGlow(.6) : null),
+                        ),
+                      ],
                     ),
                   ),
+                  if (alert)
+                    Positioned(
+                      top: 12,
+                      right: 0,
+                      left: 36,
+                      child: Center(
+                        child: Transform.rotate(
+                          angle: .785,
+                          child: Container(
+                            width: 7,
+                            height: 7,
+                            color: Hud.warn,
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -368,9 +315,9 @@ class _NavBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          item(_Tab.quest, 'QUEST'),
-          item(_Tab.status, 'STATUS'),
-          item(_Tab.penalty, 'PENALTY', alert: penaltyAlert),
+          item(_Tab.quest, 'QUEST', 0),
+          item(_Tab.status, 'STATUS', 1),
+          item(_Tab.penalty, 'PENALTY', 2, alert: penaltyAlert),
         ],
       ),
     );

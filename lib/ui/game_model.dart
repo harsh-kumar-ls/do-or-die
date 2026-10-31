@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
@@ -18,23 +19,102 @@ import '../domain/systems.dart';
 import '../domain/tasks.dart';
 import 'fx.dart';
 
+/// The kinds of System notice, each with its own look and entrance
+/// (design/claude-design/notices.html).
+enum NoticeKind {
+  cleared,
+  levelUp,
+  warning,
+  dryRun,
+  gate,
+  rankUp,
+  dungeonFailed,
+  complete,
+  info,
+}
+
+enum RowTone { plain, ok, bad, gold }
+
+class NoticeRow {
+  const NoticeRow(this.label, this.value, [this.tone = RowTone.plain]);
+  final String label;
+  final String value;
+  final RowTone tone;
+}
+
 /// A System notice waiting to be shown.
 class SystemNotice {
   const SystemNotice({
+    this.kind = NoticeKind.info,
     required this.title,
-    required this.lines,
-    this.levelUp,
-    this.danger = false,
+    this.kicker = '',
+    this.lines = const [],
+    this.rows = const [],
+    this.note,
+    this.xp,
+    this.xpFrom,
+    this.xpMax,
+    this.level,
+    this.points,
+    this.stats = const [],
+    this.rankFrom,
+    this.rankTo,
+    this.rankTitle,
+    this.closesAt,
     this.cue,
   });
 
+  final NoticeKind kind;
   final String title;
+  final String kicker;
   final List<String> lines;
-  final int? levelUp;
-  final bool danger;
+  final List<NoticeRow> rows;
+  final String? note;
+
+  /// QUEST CLEARED: the reward, and the bar it fills.
+  final int? xp;
+  final int? xpFrom;
+  final int? xpMax;
+
+  /// LEVEL UP: the new level, points and the stats they suit.
+  final int? level;
+  final int? points;
+  final List<String> stats;
+
+  /// RANK UP and GATE.
+  final Rank? rankFrom;
+  final Rank? rankTo;
+  final String? rankTitle;
+  final DateTime? closesAt;
 
   /// Overrides the default sound for this notice.
   final Cue? cue;
+
+  bool get danger =>
+      kind == NoticeKind.warning || kind == NoticeKind.dungeonFailed;
+
+  /// Order within one batch: failures first, then the rewards, then what
+  /// opens next.
+  int get priority => switch (kind) {
+    NoticeKind.warning || NoticeKind.dungeonFailed || NoticeKind.dryRun => 0,
+    NoticeKind.cleared => 1,
+    NoticeKind.levelUp => 2,
+    NoticeKind.rankUp => 3,
+    NoticeKind.info => 4,
+    NoticeKind.gate || NoticeKind.complete => 5,
+  };
+
+  Cue get sound =>
+      cue ??
+      switch (kind) {
+        NoticeKind.cleared => Cue.confirm,
+        NoticeKind.levelUp => Cue.levelUp,
+        NoticeKind.warning => Cue.penalty,
+        NoticeKind.gate => Cue.gateOpen,
+        NoticeKind.rankUp || NoticeKind.complete => Cue.rankUp,
+        NoticeKind.dungeonFailed => Cue.dungeonPenalty,
+        NoticeKind.dryRun || NoticeKind.info => Cue.notice,
+      };
 }
 
 /// Wraps [GameService] for the UI: rebuilds listeners after every change,
@@ -153,9 +233,15 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
 
   SystemNotice? get notice => _notices.firstOrNull;
 
+  /// "NOTICE 2 / 3" while a batch of several is showing; empty otherwise.
+  String get noticeCounter =>
+      _batch > 1 ? 'NOTICE ${_batch - _notices.length + 1} / $_batch' : '';
+  int _batch = 0;
+
   void dismissNotice() {
     if (_notices.isEmpty) return;
     _notices.removeAt(0);
+    if (_notices.isEmpty) _batch = 0;
     notifyListeners();
   }
 
@@ -278,6 +364,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       _queue(
         SystemNotice(
           title: '[ REPORT ]',
+          kicker: 'SYSTEM',
           lines: [
             '${service.trialDay - 1} days have passed.',
             'The report is ready. Open it from the Status tab.',
@@ -449,18 +536,17 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     return _run(() => service.allocateStat(stat));
   }
 
-  /// Queues a notice and plays its cue as it appears.
-  void _queue(SystemNotice n) {
-    _notices.add(n);
-    Fx.instance.play(
-      n.cue ??
-          (n.levelUp != null
-              ? Cue.levelUp
-              : n.danger
-              ? Cue.penalty
-              : Cue.notice),
-    );
+  /// Queues notices; a batch is sorted so failures come first. Each plays
+  /// its sound when it appears (see NoticeOverlay).
+  void _queueAll(List<SystemNotice> batch) {
+    if (batch.isEmpty) return;
+    batch.sort((a, b) => a.priority.compareTo(b.priority));
+    if (_notices.isEmpty) _batch = 0;
+    _notices.addAll(batch);
+    _batch += batch.length;
   }
+
+  void _queue(SystemNotice n) => _queueAll([n]);
 
   /// Running timers can complete a task without any tap, so check on every
   /// rebuild tick too.
@@ -468,28 +554,62 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     if (_checkCompletion()) notifyListeners();
   }
 
+  /// The day whose completion was already announced in-app, so the verdict
+  /// at midnight doesn't announce it twice.
+  DayKey? _announced;
+
   bool _checkCompletion() {
     final complete = isQuestComplete;
     final changed = complete && !_wasComplete;
     _wasComplete = complete;
     if (changed) {
+      _announced = service.today;
+      final goals = tasks.where((t) => !t.isCap).length;
       _queue(
         SystemNotice(
-          title: '[ NOTIFICATION ]',
-          lines: [
-            'The daily quest has been completed.',
-            'Reward: +$xpReward XP',
-            'The reward is granted when the day ends.',
+          kind: NoticeKind.cleared,
+          title: floorToday > 0
+              ? '[ FLOOR $floorToday CLEARED ]'
+              : '[ QUEST CLEARED ]',
+          kicker: floorToday > 0 ? 'DUNGEON' : 'DAILY QUEST',
+          xp: xpReward,
+          xpFrom: state.xp,
+          xpMax: xpToNext,
+          rows: [
+            NoticeRow('Objectives', '$goals / $goals'),
+            if (floorToday > 0)
+              NoticeRow('Dungeon progress', 'Floor $floorToday / 3')
+            else if (systems != null)
+              NoticeRow(
+                'Days cleared',
+                '${clearedInWindow + 1} / ${DungeonRules.clearedNeeded} for the Gate',
+              ),
+            NoticeRow(
+              floorToday > 0 ? 'Dungeon Penalty' : 'Penalty Zone',
+              'Avoided',
+              RowTone.ok,
+            ),
           ],
+          note: 'The reward is granted at 00:00.',
         ),
       );
     }
     return changed;
   }
 
-  void _drainSystemEvents() => _systemNotices(service.takeSystemEvents());
+  void _drainSystemEvents() =>
+      _queueAll(_systemNotices(service.takeSystemEvents()));
+
+  static const _statShort = {
+    Stat.strength: 'STR',
+    Stat.intellect: 'INT',
+    Stat.discipline: 'DIS',
+    Stat.vitality: 'VIT',
+    Stat.charisma: 'CHA',
+  };
 
   void _noticesFor(List<GameEvent> events, List<SystemEvent> systemEvents) {
+    final batch = <SystemNotice>[];
     // A failed floor gets the Dungeon notice instead of the ordinary one.
     final failedFloors = {
       for (final e in systemEvents.whereType<DungeonFailed>()) e.day,
@@ -498,20 +618,36 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       if (e is QuestFailed && failedFloors.contains(e.day)) continue;
       switch (e) {
         case QuestCleared(:final xpGained):
-          final levels = events.whereType<LevelUp>().where(
-            (l) => l.day == e.day,
-          );
-          _queue(
+          if (e.day == _announced) break;
+          batch.add(
             SystemNotice(
-              title: '[ NOTIFICATION ]',
-              lines: [
-                'Quest for ${_dayName(e)} cleared.',
-                'Reward granted: +$xpGained XP',
-              ],
-              levelUp: levels.isEmpty ? null : levels.last.newLevel,
+              kind: NoticeKind.cleared,
+              title: '[ QUEST CLEARED ]',
+              kicker: _dayName(e),
+              xp: xpGained,
+              xpFrom: max(0, state.xp - xpGained),
+              xpMax: xpToNext,
+              rows: const [NoticeRow('Penalty Zone', 'Avoided', RowTone.ok)],
+              note: 'Reward granted.',
             ),
           );
-        case QuestFailed():
+        case LevelUp(:final newLevel):
+          batch.add(
+            SystemNotice(
+              kind: NoticeKind.levelUp,
+              title: '[ LEVEL UP ]',
+              kicker: 'PLAYER',
+              level: newLevel,
+              points: service.engine.config.statPointsPerLevel,
+              stats: [
+                for (final st in systemSpec?.stats ?? const <Stat>[])
+                  _statShort[st]!,
+              ],
+              rows: [NoticeRow('Next level', '${state.xp} / $xpToNext XP')],
+              note: 'Allocate them in STATUS.',
+            ),
+          );
+        case QuestFailed(:final failedTaskIds):
           final penalty = events
               .whereType<PenaltyIssued>()
               .where((p) => p.day == e.day)
@@ -520,40 +656,63 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
               .whereType<LockScheduled>()
               .where((l) => l.day == e.day.addDays(1))
               .firstOrNull;
-          final exercise = penalty == null
+          final owed = penalty == null
               ? null
               : describePenalty(
                   penalty.kind,
                   penalty.primary,
                   penalty.secondary,
                 );
+          final hours = lock == null
+              ? null
+              : (lock.window.end.difference(lock.window.start).inMinutes / 60)
+                    .round();
           if (penalty != null && !penalty.enforced) {
-            // Dry run: nothing is enforced, so the whole penalty is shown.
             final live = service.liveFrom;
-            _queue(
+            batch.add(
               SystemNotice(
+                kind: NoticeKind.dryRun,
                 title: '[ DRY RUN ]',
-                lines: [
-                  'Quest for ${_dayName(e)} was not completed.',
-                  'Penalty that would apply: $exercise.',
-                  if (lock != null)
-                    'Lock that would apply: ${_hm(lock.window.start)} to ${_hm(lock.window.end)}.',
-                  if (live != null)
-                    'Not enforced. Penalties go live on ${_dateName(live)}.',
+                kicker: _dayName(e),
+                lines: const [
+                  'The daily quest was not completed.',
+                  'Dry run: nothing is enforced.',
                 ],
+                rows: [
+                  NoticeRow('Objectives missed', '${failedTaskIds.length}'),
+                  if (lock != null)
+                    NoticeRow(
+                      'Lock that would apply',
+                      '${_hm(lock.window.start)} – ${_hm(lock.window.end)}',
+                    ),
+                  if (owed != null) NoticeRow('Debt that would apply', owed),
+                ],
+                note: live == null
+                    ? null
+                    : 'Penalties go live on ${_dateName(live)}.',
               ),
             );
           } else {
-            _queue(
+            batch.add(
               SystemNotice(
+                kind: NoticeKind.warning,
                 title: '[ WARNING ]',
-                danger: true,
-                lines: [
-                  'Quest for ${_dayName(e)} was not completed.',
-                  if (exercise != null) 'Penalty issued: $exercise.',
-                  if (lock != null)
-                    'A lock will begin at an undisclosed time today.',
+                kicker: _dayName(e),
+                lines: const [
+                  'The daily quest was not completed.',
+                  'The Penalty Zone is now active.',
                 ],
+                rows: [
+                  NoticeRow('Objectives missed', '${failedTaskIds.length}'),
+                  if (hours != null)
+                    NoticeRow(
+                      'App lock',
+                      '$hours h · time withheld',
+                      RowTone.bad,
+                    ),
+                  if (owed != null) NoticeRow('Penalty debt', owed),
+                ],
+                note: 'Clear the debt in PENALTY.',
               ),
             );
           }
@@ -561,79 +720,137 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
           break;
       }
     }
-    _systemNotices(systemEvents);
+    batch.addAll(_systemNotices(systemEvents, events));
+    _queueAll(batch);
   }
 
   static String _r(Rank r) => r.name.toUpperCase();
 
-  void _systemNotices(List<SystemEvent> events) {
-    for (final e in events) {
-      _queue(switch (e) {
-        GateOpened(:final gate) => SystemNotice(
-          title: '[ GATE ]',
-          cue: Cue.gateOpen,
-          lines: [
-            'A Gate has opened.',
-            'Rank ${_r(gate.from)} Dungeon. Enter within 48 hours.',
-            'Clear three floors to reach rank ${_r(Rank.values[gate.from.index + 1])}.',
-          ],
-        ),
-        GateExpired() => const SystemNotice(
-          title: '[ NOTIFICATION ]',
-          lines: ['The Gate has closed.', 'It may open again in 3 days.'],
-        ),
-        DungeonEntered() => const SystemNotice(
-          title: '[ DUNGEON ]',
-          cue: Cue.gateOpen,
-          lines: [
-            'You have entered the Dungeon.',
-            'Floor 1 begins at 00:00.',
-            'Floor 2 must be cleared by 18:00.',
-            'Floor 3 is the Rank Trial.',
-          ],
-        ),
-        FloorCleared(:final floor) => SystemNotice(
-          title: '[ DUNGEON ]',
-          lines: [
-            'Floor $floor cleared.',
-            floor == 1
-                ? 'Floor 2 begins. Clear it by 18:00.'
-                : 'The Rank Trial begins.',
-          ],
-        ),
-        DungeonCleared(:final newRank, :final title) => SystemNotice(
-          title: '[ RANK UP ]',
-          cue: Cue.rankUp,
-          lines: [
-            'The Dungeon has been cleared.',
-            'Rank ${_r(newRank)}.',
-            'Title earned: $title.',
-            '+${DungeonRules.clearStatPoints} stat points.',
-          ],
-        ),
-        DungeonFailed(:final floor) => SystemNotice(
-          title: '[ DUNGEON FAILED ]',
-          danger: true,
-          cue: Cue.dungeonPenalty,
-          lines: [
-            'Floor $floor was not cleared.',
-            service.isDryRunToday
-                ? 'Dry run: no penalty is enforced.'
-                : 'Dungeon Penalty today: double lock and double reps.',
-            'The Gate is shut for ${DungeonRules.failCooldown} days. Your rank is kept.',
-          ],
-        ),
-        SystemCompleted(:final system) => SystemNotice(
-          title: '[ SYSTEM COMPLETE ]',
-          cue: Cue.rankUp,
-          lines: [
-            '${systemCatalogue[system]!.name} complete.',
-            'Rank S held for ${SystemsState.catalogueHoldDays} days.',
-            'A new System may now be chosen.',
-          ],
-        ),
-      });
-    }
+  List<SystemNotice> _systemNotices(
+    List<SystemEvent> events, [
+    List<GameEvent> gameEvents = const [],
+  ]) {
+    return [
+      for (final e in events)
+        switch (e) {
+          GateOpened(:final gate) => SystemNotice(
+            kind: NoticeKind.gate,
+            title: '[ GATE ]',
+            kicker: 'GATE DETECTED',
+            rankFrom: gate.from,
+            rankTo: Rank.values[min(gate.from.index + 1, Rank.s.index)],
+            closesAt: gate.expiresAt,
+            lines: [
+              'A Gate has opened.',
+              'Rank ${_r(gate.from)} Dungeon.',
+              'Enter within 48 hours.',
+            ],
+            rows: [
+              const NoticeRow('Dungeon', '3 days · 3 floors'),
+              NoticeRow(
+                'Floor 3',
+                'Rank Trial ${_r(gate.from)} → ${_r(Rank.values[min(gate.from.index + 1, Rank.s.index)])}',
+              ),
+            ],
+          ),
+          GateExpired() => const SystemNotice(
+            title: '[ NOTIFICATION ]',
+            kicker: 'GATE',
+            lines: ['The Gate has closed.', 'It may open again in 3 days.'],
+          ),
+          DungeonEntered() => const SystemNotice(
+            title: '[ DUNGEON ]',
+            kicker: 'GATE ENTERED',
+            cue: Cue.gateOpen,
+            lines: ['You have entered the Dungeon.'],
+            rows: [
+              NoticeRow('Floor 1', 'Tomorrow · +25%'),
+              NoticeRow('Floor 2', '+50% · by 18:00'),
+              NoticeRow('Floor 3', 'Rank Trial'),
+            ],
+          ),
+          FloorCleared(:final floor) => SystemNotice(
+            title: '[ FLOOR $floor CLEARED ]',
+            kicker: 'DUNGEON',
+            lines: [
+              floor == 1
+                  ? 'Floor 2 begins. Clear it by 18:00.'
+                  : 'The Rank Trial begins.',
+            ],
+          ),
+          DungeonCleared(:final newRank, :final title) => SystemNotice(
+            kind: NoticeKind.rankUp,
+            title: '[ RANK UP ]',
+            kicker: 'RANK TRIAL CLEARED',
+            rankFrom: Rank.values[max(0, newRank.index - 1)],
+            rankTo: newRank,
+            rankTitle: title,
+            points: DungeonRules.clearStatPoints,
+            note: 'Rank ${_r(newRank)} quests begin tomorrow.',
+          ),
+          DungeonFailed(:final floor) => _dungeonFailed(e, floor, gameEvents),
+          SystemCompleted(:final system) => SystemNotice(
+            kind: NoticeKind.complete,
+            title: '[ SYSTEM COMPLETE ]',
+            kicker: 'SYSTEM',
+            lines: [
+              'The ${systemCatalogue[system]!.name} is complete.',
+              'Rank S reached.',
+            ],
+            rows: [
+              NoticeRow('Days held at S', '${SystemsState.catalogueHoldDays}'),
+              NoticeRow(
+                'Dungeons cleared',
+                '${service.game.log.where((l) => l.type == 'dungeon_cleared').length}',
+              ),
+            ],
+            note: 'You may now bind a new System.',
+          ),
+        },
+    ];
+  }
+
+  SystemNotice _dungeonFailed(
+    SystemEvent e,
+    int floor,
+    List<GameEvent> gameEvents,
+  ) {
+    final penalty = gameEvents
+        .whereType<PenaltyIssued>()
+        .where((p) => p.day == e.day)
+        .firstOrNull;
+    final lock = gameEvents
+        .whereType<LockScheduled>()
+        .where((l) => l.day == e.day.addDays(1))
+        .firstOrNull;
+    final dry = penalty != null && !penalty.enforced;
+    return SystemNotice(
+      kind: NoticeKind.dungeonFailed,
+      title: '[ DUNGEON FAILED ]',
+      kicker: 'DUNGEON',
+      lines: [
+        'Floor $floor was not cleared.',
+        dry
+            ? 'Dry run: no penalty is enforced.'
+            : 'Dungeon Penalty today: double lock and double penalty.',
+      ],
+      rows: [
+        if (lock != null)
+          NoticeRow(
+            'App lock',
+            '×2 · ${(lock.window.end.difference(lock.window.start).inMinutes / 60).round()} h',
+            RowTone.bad,
+          ),
+        if (penalty != null)
+          NoticeRow(
+            'Penalty debt',
+            '×2 · ${describePenalty(penalty.kind, penalty.primary, penalty.secondary)}',
+            RowTone.bad,
+          ),
+        NoticeRow('Rank', '${_r(rank)} · kept', RowTone.gold),
+      ],
+      note: 'The Gate is shut for ${DungeonRules.failCooldown} days.',
+    );
   }
 
   static String _hm(DateTime t) =>

@@ -95,6 +95,7 @@ class WatcherService : Service() {
         } else if (BlockerState.isLocked(this)) {
             startActivity(
                 Intent(this, BlockActivity::class.java)
+                    .putExtra(BlockActivity.EXTRA_PACKAGE, pkg)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
             )
             BlockerState.recordBlock(this, pkg)

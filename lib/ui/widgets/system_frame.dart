@@ -117,10 +117,13 @@ class _EdgePainter extends CustomPainter {
     canvas.drawPath(
       path,
       Paint()
-        ..shader = const LinearGradient(
+        ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xF50D182E), Color(0xF5080E1B)],
+          colors: [
+            Color.lerp(p.top, p.voidColor, .25)!.withValues(alpha: .97),
+            Color.lerp(p.top, p.voidColor, .7)!.withValues(alpha: .97),
+          ],
         ).createShader(Offset.zero & size),
     );
     canvas.drawPath(
@@ -195,6 +198,7 @@ class _CutButtonState extends State<CutButton> {
     final on = widget.onPressed != null;
     final edge = widget.danger ? Hud.warn : p.sys;
     return Semantics(
+      container: true,
       button: true,
       enabled: on,
       label: widget.label,
@@ -357,6 +361,7 @@ class _ChargeButtonState extends State<ChargeButton>
     final edge = widget.danger ? Hud.warn : p.sys;
     final fillColor = widget.danger ? const Color(0xFFFF3B4A) : p.sys;
     return Semantics(
+      container: true,
       button: true,
       enabled: widget.enabled,
       label: widget.label,

@@ -21,11 +21,11 @@
     },
     {
       "type": "action",
-      "description": "On the 'CHOOSE YOUR SYSTEM' screen, click the PERSONALITY card"
+      "description": "On the 'CHOOSE YOUR SYSTEM' screen, click the small diamond button named 'Show the Personality System' under the card, then wait 1 second"
     },
     {
       "type": "action",
-      "description": "Click 'BIND PERSONALITY'"
+      "description": "Click 'CHOOSE PERSONALITY SYSTEM'"
     },
     {
       "type": "action",
@@ -33,7 +33,7 @@
     },
     {
       "type": "action",
-      "description": "Wait 3 seconds for the rank badge and the '[ DAILY QUEST ]' cards to appear"
+      "description": "Wait 5 seconds for the rank badge and the '[ DAILY QUEST ]' cards to appear"
     },
     {
       "type": "action",
@@ -61,15 +61,15 @@
     },
     {
       "type": "assertion",
-      "description": "The 'Write one journal line' objective shows '0 / 1' and a 'HOLD TO CONFIRM' button"
+      "description": "The 'Write one journal line' objective shows '0 / 1' and a small square button named 'Hold to confirm Write one journal line'"
     },
     {
       "type": "action",
-      "description": "Click 'HOLD TO CONFIRM' once in the 'Write one journal line' objective (test build: a click confirms)"
+      "description": "Click the 'Hold to confirm Write one journal line' button once (test build: a click confirms)"
     },
     {
       "type": "assertion",
-      "description": "That button now reads 'CONFIRMED' and 'Write one journal line' shows '1 / 1'"
+      "description": "'Write one journal line' now shows '1 / 1' and its square button is gone"
     }
   ]
 }
