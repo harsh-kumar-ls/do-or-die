@@ -20,7 +20,7 @@ The detailed records stay where they are. This file summarises them and points t
 | | |
 |---|---|
 | **Version** | 0.6.0 (build 9), installed on the phone 2026-10-31 and launched cleanly |
-| **Phone** | iQOO Neo 7 (I2214), Android 16, OriginOS 6 |
+| **Phone** | Personal Android test phone |
 | **Current run** | Personality System, rank E. Day 1 was 2026-10-31; days 1–3 were a dry run, so penalties are live from 2026-11-03 (default 3-day dry run; confirm on Status) |
 | **Tests** | 201 automated tests pass; format and analyze clean; TestSprite 14/14 on the web build |
 | **Code** | Everything committed and pushed on `main` (latest commit `a8c8038`) |
@@ -64,7 +64,7 @@ A habit app run by a cold, game-style **System**. Original theme, inspired only 
 | M2 Storage and log | One saved document plus an append-only trial log (JSON and CSV export); user-chosen lock list with edit rules |
 | M3 Quest UI | Quest, Status and Penalty screens, System notices, original sounds and haptics |
 | M4 Notifications and trusted time | Scheduled warnings and notices; a trusted clock so changing the phone's time can't dodge a failure |
-| M5 Blocking spike | Proved app blocking works on the iQOO |
+| M5 Blocking spike | Proved app blocking works on the phone |
 | M6 Penalty Zone | Real locks on the user's chosen apps, block screen, protected apps |
 | M7 Dry run | 3 days of penalties logged but not applied; restart trial (refused while a penalty is owed) |
 | M8 Hardening | Watchdog for the blocker, System Check screen, outage logging, regression pass |
@@ -158,7 +158,7 @@ tools/         sound generator, TestSprite plan generator, local web server
 - [ ] Check the Status, Penalty and System Check tabs on the phone (so far only checked in the browser).
 - [ ] Try SHARE on the report once at least one day has been judged; send a screenshot of the card.
 - [ ] When a day is failed, check the new block screen and the Penalty Zone debt panel.
-- [ ] Confirm UPI and SBI YONO still work during a lock.
+- [ ] Confirm UPI and banking apps still work during a lock.
 - [ ] Send screenshots of anything that looks wrong.
 
 ### 6.2 Device checks still open (from BUILD_LOOP.md)

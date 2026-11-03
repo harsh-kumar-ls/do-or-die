@@ -49,9 +49,9 @@ integration_test/  on-device flows
 |---|---|---|---|
 | **T1 Unit** | `flutter test` | Penalty math, deadlines, carry-over, XP, level scaling, clock-change safety | Mac, every change |
 | **T2 Widget** | `flutter test` | Screens render and react (quest list, timer, counter, penalty screen) | Mac, every change |
-| **T3 Integration** | `flutter test integration_test` | Full flows on the real app | iQOO phone or emulator |
+| **T3 Integration** | `flutter test integration_test` | Full flows on the real app | Test phone or emulator |
 | **T4 TestSprite** | `testsprite` CLI | End-to-end UI flows against the **Flutter web build** with platform stubs | Web build |
-| **T5 Manual device checklist** | Me, on the phone | App blocking, notifications, reboot survival, battery-killer survival | iQOO Neo 7 |
+| **T5 Manual device checklist** | Me, on the phone | App blocking, notifications, reboot survival, battery-killer survival | Test phone |
 
 **Honest limits of TestSprite here.** TestSprite drives web frontends and HTTP APIs. It cannot drive the native Android app, and cannot test app blocking, the accessibility service, notifications or reboot behaviour. Those belong to T3 and T5. T4 covers the quest, timer, XP and penalty **UI logic** through the web build. One thing to verify early: Flutter web draws to a canvas, which can be hard for browser-based test agents to read. The first TestSprite step is a **spike**: build the web skeleton, run one simple test, and see whether it works before building a test plan around it. Credentials are already set up; `testsprite doctor` passes (one warning: the agent verification skill isn't installed yet).
 
@@ -64,7 +64,7 @@ integration_test/  on-device flows
 Each prompt is what I'd run for that iteration of the loop.
 
 ### M0: Environment
-**Prompt:** Install Flutter and the Android command-line tools; create the Flutter project in this folder; confirm `flutter doctor` is clean for Android and web; confirm the iQOO is visible to adb.
+**Prompt:** Install Flutter and the Android command-line tools; create the Flutter project in this folder; confirm `flutter doctor` is clean for Android and web; confirm the phone is visible to adb.
 **Done when:** `flutter doctor` passes, a blank app runs on the phone and in Chrome.
 **Needs from the user:** permission for multi-GB installs; USB debugging enabled on the phone.
 
@@ -88,10 +88,10 @@ Each prompt is what I'd run for that iteration of the loop.
 
 ### M4: Notifications and deadline handling (Android)
 **Prompt:** Quest-issued, pre-deadline warning, and failure notifications; exact end-of-day evaluation that works after reboot and when the app is closed.
-**Done when (T3, T5):** notifications arrive with the app killed and after a reboot on the iQOO.
+**Done when (T3, T5):** notifications arrive with the app killed and after a reboot on the phone.
 
 ### M5: BLOCKING SPIKE (do right after M0 in practice)
-**Prompt:** Minimal Android accessibility service plus foreground service that detects Instagram, YouTube and BGMI in the foreground and shows a block screen. Nothing else. Test survival against the iQOO's background-killing.
+**Prompt:** Minimal Android accessibility service plus foreground service that detects Instagram, YouTube and BGMI in the foreground and shows a block screen. Nothing else. Test survival against the phone's background-killing.
 **Done when (T5 only):** the block holds after the app is swiped away, after the screen locks for 30+ minutes, and after a reboot. **If this fails, stop and replan before M6.**
 
 ### M6: Penalty Zone
@@ -103,7 +103,7 @@ Each prompt is what I'd run for that iteration of the loop.
 **Done when:** days 1–3 can run in dry-run, then switch to live.
 
 ### M8: Hardening
-**Prompt:** Permission and battery-optimization setup guide screens for the iQOO; regression pass on T1–T5.
+**Prompt:** Permission and battery-optimization setup guide screens for the phone; regression pass on T1–T5.
 **Done when:** a fresh install can be set up by following the in-app steps alone.
 
 ---
@@ -117,12 +117,12 @@ Each prompt is what I'd run for that iteration of the loop.
 ---
 
 ## 6. Current status
-- [x] **M0 Environment (2026-10-20).** Flutter 3.47.7 / Dart 3.13.5, Android SDK 36, JDK 17, adb. iQOO Neo 7 (I2214, Android 16, OriginOS 6) authorized over USB. `flutter doctor` passes for Android and web (Xcode warning is expected; iOS is v3). Fix applied: cleared the macOS quarantine flag on the Homebrew Flutter SDK and re-downloaded its Dart SDK cache, because the analyzer was blocked. Not yet done: a blank app run on the phone and in Chrome.
+- [x] **M0 Environment (2026-10-20).** Flutter 3.47.7 / Dart 3.13.5, Android SDK 36, JDK 17, adb. Test phone authorized over USB. `flutter doctor` passes for Android and web (Xcode warning is expected; iOS is v3). Fix applied: cleared the macOS quarantine flag on the Homebrew Flutter SDK and re-downloaded its Dart SDK cache, because the analyzer was blocked. Not yet done: a blank app run on the phone and in Chrome.
 - [x] **M1 Domain core (2026-10-20).** `lib/domain/`: day keys, clock, config, tasks and plan versions, penalty calculator, debt, sleep window, random lock scheduler, progression, quest engine. Gates: format clean, analyze clean, 30/30 unit tests pass.
   - XP and rank thresholds are placeholders (`config.dart`, `progression.dart`).
   - Known gap: a clock moved **forward** fails the skipped days. Trusted-time checking is M4.
-- [x] **M5 blocking spike: PASSED (2026-10-20).** Accessibility-service approach works on the iQOO Neo 7 / OriginOS 6. No replan needed.
-  - [x] Accessibility service enabled on the iQOO without needing "restricted settings" (adb install).
+- [x] **M5 blocking spike: PASSED (2026-10-20).** Accessibility-service approach works on the test phone. No replan needed.
+  - [x] Accessibility service enabled on the phone without needing "restricted settings" (adb install).
   - [x] Basic block: Instagram, YouTube and BGMI all blocked with the Penalty Zone screen (user-confirmed + logs).
   - Bug found and fixed: pressing Home before opening the block screen raced the launcher animation, so only BGMI showed the screen. Now the screen opens directly over the app; Back and Leave go home; a 1.2s fallback presses Home if the screen fails to appear.
   - [x] Survives app swiped from recents (user-confirmed)
@@ -134,7 +134,7 @@ Each prompt is what I'd run for that iteration of the loop.
   - Not yet covered: the Android blocker still reads its own hard-coded list; wiring the user's list into the service is M6.
 - [ ] **M3 quest UI (in progress, 2026-10-20).** Design A2 + P3 approved. Built: onboarding, Quest, Status, Penalty, System notices, HUD shell; fonts bundled (OFL). Timer progress now stored in seconds; live HH:MM:SS clock. 63/63 tests pass; format and analyze clean.
   - User feedback fixed: screens now fill the height (FillColumn + expanding windows); study clock was not live (lazy `late final` timer never started) — fixed with a regression test proven to fail on the old code.
-  - Sound and haptics added (2026-10-20): 9 original synthesized cues (`tools/gen_sfx.py` → `assets/sfx/`), played via `flutter_soloud`, each paired with a haptic (`lib/ui/fx.dart`); mute toggle in the top bar, persisted. Native build OK on Android; no audio errors in logcat on the iQOO. Audible check is user-only.
+  - Sound and haptics added (2026-10-20): 9 original synthesized cues (`tools/gen_sfx.py` → `assets/sfx/`), played via `flutter_soloud`, each paired with a haptic (`lib/ui/fx.dart`); mute toggle in the top bar, persisted. Native build OK on Android; no audio errors in logcat on the phone. Audible check is user-only.
   - Still to do: particles/shaders (web audio needs flutter_soloud's web script setup; currently silent on web by design).
 - **TestSprite (T4) set up (2026-10-20).** Project `d37f7ffc-2ffc-4da9-88ea-8ee0106eba69` (local origin, tunnel to `http://127.0.0.1:8080`).
   - Web build for TestSprite: `flutter build web --release --dart-define=DOD_TEST_MODE=true`, served with `python3 -I -m http.server 8080 --bind 127.0.0.1 --directory build/web`. Test mode lets hold buttons accept a click (TestSprite's agent can't hold); real builds never set it, verified both ways.
@@ -156,7 +156,7 @@ Each prompt is what I'd run for that iteration of the loop.
   - `TrustedClock` (5 tests): the device clock corrected by Android's network-synced clock; the game, the screens and the native blocker (`TrustedTime.kt`) all read it, so changing the phone's clock can't reopen a judged day or shorten a lock. Banners for a manual clock, blocked notices, and late notices.
   - Decision: no background judging at midnight (risk of two engines writing the save at once). Covered by the scheduled notices, the "judgement pending" wake-up notice, and the M6 redirect. Revisit if the trial shows a gap.
   - Gates: format and analyze clean, 85/85 tests; desugaring build OK; installed.
-  - Device finding: OriginOS turned the accessibility service off after each of the last two updates, so it must be re-enabled after every update (the warning flags it).
+  - Device finding: the phone's vendor skin turned the accessibility service off after each of the last two updates, so it must be re-enabled after every update (the warning flags it).
   - **Confirmed on the phone (2026-10-20):** notifications allowed, "Alarms & reminders" allowed, and the 09:00 notice scheduled exact (delivery window 0, previously 1 hour). Delivery with the app closed is confirmed by tomorrow's 09:00 notice.
 - [x] **M7 Dry-run mode (built 2026-10-20).**
   - Engine: `isEnforced(failedDay)`. A dry-run day still works out the real penalty and the real random lock window, emits them with `enforced: false`, and logs them, but adds no debt, no lock and no carry-over.
@@ -173,7 +173,7 @@ Each prompt is what I'd run for that iteration of the loop.
 - [x] **M8 Hardening (done 2026-10-21).**
   - **Root cause of "the service turns off after every update": a force stop, not the update.** Android disables an app's accessibility service when the app is force-stopped, and every install command used here ended with `am force-stop`. A plain `adb install -r` keeps it on (verified). **Never force-stop the app when installing.**
   - The same mechanism is a real-world escape (Settings → Force stop, or an aggressive memory cleaner). Mitigations: the watchdog checks the service on every sync and **logs one `blocker_offline` incident per outage** (with `duringPenalty` and `repaired`), the count shows on the System Check, and Quest shows a BLOCKER OFFLINE banner. Optional **auto-repair**: if the user grants `WRITE_SECURE_SETTINGS` once via adb (their choice; it changes a security setting), the app turns its own service back on when it opens.
-  - **System Check** screen (from Status): service, notifications, on-time alerts, battery exemption (new request), automatic time, auto-repair, plus OriginOS hand-checks (Autostart, lock in Recents) and the outage count.
+  - **System Check** screen (from Status): service, notifications, on-time alerts, battery exemption (new request), automatic time, auto-repair, plus vendor-skin hand-checks (Autostart, lock in Recents) and the outage count.
   - `AppBlocker.canBlock` replaces type checks against the web stand-in (a test exposed that the type check also skipped test doubles).
   - Gates: format and analyze clean, **106/106 tests**.
   - **Regression pass:** TestSprite full run (10 tests) found one real regression: 06 Status hid LEVEL and QUESTS CLEARED in the Status window's inner scroll on a short browser window (caused by the pinned footer). A height cut-off did not fix it; the final fix removes the inner scroll entirely (the window stretches on tall screens, the page scrolls on short ones). After the fix: **all 10 TestSprite tests passed** (01 7/7, 02 10/10 on rerun after a one-off blank load, 03 9/9, 04 10/10, 05 15/15, 06 10/10, 07 10/10, 08 5/5, 09 9/9, 10 9/9).
@@ -229,4 +229,4 @@ Each prompt is what I'd run for that iteration of the loop.
 4. Focus System only: a phone-free block locks Instagram while running and unlocks when ended.
 5. Focus caps: the social-media reading rises after using a locked app for a few minutes.
 6. Penalty and Dungeon Penalty block screens look right (needs a failed day; check when it happens).
-7. UPI / SBI YONO still work with Developer options off.
+7. UPI and banking apps still work with Developer options off.

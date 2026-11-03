@@ -33,7 +33,7 @@ Everything else is secondary.
 
 **Physical penalty:** 50 push-ups (counted in the app; doing them in sets is allowed).
 
-**Phone:** iQOO Neo 7, Android 16, vendor skin "Orion OS 6" (assumed to mean OriginOS 6; confirm in Settings > About). Vivo/iQOO skins are known for aggressively killing background apps, so blocking reliability is tested first (see section 8).
+**Phone:** a personal Android phone with a vendor skin known for aggressively killing background apps, so blocking reliability is tested first (see section 8).
 
 **Apps to lock: chosen by the user, not fixed.** The user picks any installed apps from a list in the app. My choice for the trial: Instagram, YouTube, BGMI. Never selectable: phone, messages, maps, emergency, system settings, and this app. Changes to the list follow the edit rules (removing an app applies from the next day; adding one applies immediately).
 
@@ -172,7 +172,7 @@ I'd actually do step 6 as a spike right after step 1, because if blocking doesn'
 | 2 | ~~Apps to lock~~ Decided: Instagram, YouTube, BGMI | Done |
 | 3 | ~~Physical penalty~~ Decided: 50 push-ups | Done |
 | 4 | Do I want device-admin protection against uninstalling during the trial? | No |
-| 5 | ~~Phone~~ iQOO Neo 7, Android 16 (confirm the skin name) | Done |
+| 5 | ~~Phone~~ Decided: a personal Android phone | Done |
 | 6 | Final name and in-app title for me (placeholder "Hunter")? | No |
 | 7 | ~~Per-task deadlines~~ Decided: all end of day; penalty starts next day for the whole day | Done |
 | 8 | ~~Per task or per day~~ Decided: 50 per failed day | Done |

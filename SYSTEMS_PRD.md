@@ -15,7 +15,7 @@
 | **Why** | User-written quests stall: people set them too easy or too hard and never change them. A System that sets the quest, scales it by rank, and makes rank-ups a real fight gives structure and a reason to keep going. |
 | **Differentiator** | Rank-ups are earned by clearing a **Dungeon with a boss trial**, and failure has a real cost. Competitors are fitness-only and rank by streak or XP. |
 | **Decided** | One active System per user, no switching, next System only after completing the current one; System-written quests replace user-written ones; 21/30 opens a Gate; Dungeon failure = double lock + double reps in a separate zone, Gate closed 7 days; **no rank loss**. |
-| **Biggest risks** | Quest difficulty wrong for a user; physical safety at higher Fitness ranks; automatic checks (Health Connect, usage access) being unreliable on OriginOS. |
+| **Biggest risks** | Quest difficulty wrong for a user; physical safety at higher Fitness ranks; automatic checks (Health Connect, usage access) being unreliable on some Android vendor skins. |
 
 ---
 
@@ -132,7 +132,7 @@ A System that **writes the quest**, **raises it with rank**, and makes each rank
 - **The reduction valve is limited to 6 reduced days in any 30.** Past the limit the full quest returns automatically until older reduced days leave the window. Status shows the days left. The limit is computed only from the valve settings, so a past day's quest never changes.
 
 ### 5.6 Never-locked apps
-Phone, messages, contacts, maps, emergency, Settings, this app, the launcher, and banking and UPI apps (YONO SBI, Google Pay, PhonePe, Paytm, BHIM, CRED and the major bank apps) can never be lock targets, whatever the user picks. Saved lists drop them on load.
+Phone, messages, contacts, maps, emergency, Settings, this app, the launcher, and banking and UPI apps (Google Pay, PhonePe, Paytm, BHIM, CRED and the major bank apps) can never be lock targets, whatever the user picks. Saved lists drop them on load.
 
 ### 5.7 Attributes: deferred to V2 or V3 (decided 2026-10-31)
 STR, VIT, INT, CHA and DIS are earned and shown, and stat points can be assigned, but **they have no effect on play in V1.** Claude Design's review flagged that points which do nothing will feel fake within a week. To decide in V2 or V3:
@@ -263,7 +263,7 @@ Generated every 30 days and at the end of each Dungeon:
 |---|---|
 | Quest too hard or too easy for a user | Placement test; 20% reduction valve; values in one data file, tuned from the trial |
 | Injury at higher Fitness ranks | Conservative progressions; safety notice; stop rule; reduction valve |
-| Health Connect or usage stats unreliable on OriginOS | Honour-system fallback; System Check shows status |
+| Health Connect or usage stats unreliable on some vendor skins | Honour-system fallback; System Check shows status |
 | Dungeon Penalty too harsh, user quits | Releases still available; Gate cooldown not rank loss; monitor in trial |
 | Banking apps and developer mode | Not caused by the app; documented install path without developer mode |
 | Theme close to the source work | Feel and generic mechanics only; all names, text, art and sound original |
