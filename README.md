@@ -12,6 +12,7 @@ Inspired by the *vibe* of a "System" from game-style fiction. All art, names, so
 
 | File | What it is |
 |---|---|
+| [progress.md](progress.md) | Where the project stands: what is built, decided and next |
 | [PROJECT.md](PROJECT.md) | What is being built for the trial, and the penalty rules |
 | [BUILD_LOOP.md](BUILD_LOOP.md) | How it is built and tested, milestone by milestone, with current status |
 | [SYSTEMS_PRD.md](SYSTEMS_PRD.md) | Systems, ranks, Gates and Dungeons (phase 2) |
