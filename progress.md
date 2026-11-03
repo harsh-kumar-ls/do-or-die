@@ -191,7 +191,7 @@ You'll share your findings after a week or two of real use. When that happens, t
 
 ---
 
-## 7. Working rules (from CLAUDE.md and our sessions)
+## 7. Working rules
 
 - Tests first; gates in order; one milestone at a time; stop after 3 failed attempts on the same failure.
 - Penalty rules live in `lib/domain/` and one config file, never in UI code.

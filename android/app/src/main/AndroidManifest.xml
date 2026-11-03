@@ -7,7 +7,7 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <!-- Re-schedules pending notices after a reboot. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <!-- Lets the user exempt the app from battery optimisation, so OriginOS
+    <!-- Lets the user exempt the app from battery optimisation, so the phone's battery saver
          doesn't stop the blocker or delay notices. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- The Penalty Zone watcher. No accessibility service is used: payment and

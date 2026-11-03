@@ -19,8 +19,8 @@ const neverBlockPackages = {
 /// Banking and UPI apps: money must stay reachable during a lock. Mirrored
 /// in MainActivity.kt so they never appear in the app picker.
 const bankingPackages = {
-  'com.sbi.lotusintouch', // YONO SBI
-  'com.sbi.SBIFreedomPlus', // YONO Lite SBI
+  'com.sbi.lotusintouch',
+  'com.sbi.SBIFreedomPlus',
   'com.google.android.apps.nbu.paisa.user', // Google Pay
   'com.phonepe.app',
   'net.one97.paytm',

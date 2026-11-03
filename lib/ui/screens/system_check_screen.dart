@@ -157,7 +157,7 @@ class _SystemCheckScreenState extends State<SystemCheckScreen>
         ),
         const SizedBox(height: 14),
         SystemWindow(
-          title: 'ORIGINOS (CHECK BY HAND)',
+          title: 'PHONE SETTINGS (CHECK BY HAND)',
           delay: const Duration(milliseconds: 200),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,

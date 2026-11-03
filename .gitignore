@@ -50,3 +50,6 @@ app.*.map.json
 # TestSprite local run artifacts
 .testsprite/
 dist/
+
+# Local agent instructions (kept out of the public repo)
+CLAUDE.md
