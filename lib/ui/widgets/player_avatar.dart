@@ -1,19 +1,18 @@
 import 'dart:math';
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../domain/systems.dart';
 import '../game_model.dart';
 import '../theme.dart';
 
-/// How the Player is drawn: which System's gear, the glow colour, and an
-/// optional tint over the body (red in a Penalty Zone).
+/// How the Player is drawn: which System's colours, the glow colour, and an
+/// optional tint (red in a Penalty Zone).
 ///
-/// The art is original (design/avatars/player): a body layer, a glow layer
-/// the app tints and pulses, and one gear layer plus glow per System.
+/// The art is an original anime-style character rendered in Blender
+/// (design/avatars/player3d/player.blend): one render per System and one
+/// each for the Penalty Zone and the Dungeon Penalty.
 class AvatarLook {
   const AvatarLook({
     required this.glow,
@@ -28,7 +27,18 @@ class AvatarLook {
 
   /// A short glitch twice per loop (Penalty Zone).
   final bool glitch;
+
+  /// The render to show.
+  String get asset {
+    final name = tint != null
+        ? (tint == dungeonRed ? 'dungeon' : 'penalty')
+        : (gear ?? SystemKind.fitness).name;
+    return 'assets/avatars/anime/$name.webp';
+  }
 }
+
+const dungeonRed = Color(0xFFD7263D);
+const penaltyRed = Color(0xFFFF3B4A);
 
 /// Each System's colour.
 Color systemAura(SystemKind k) => switch (k) {
@@ -46,9 +56,7 @@ AvatarLook systemLook(SystemKind k) => AvatarLook(glow: systemAura(k), gear: k);
 AvatarLook playerLook(GameModel m) {
   final gear = m.systems?.progress.active;
   if (m.inPenalty) {
-    final red = m.dungeonPenalty
-        ? const Color(0xFFD7263D)
-        : const Color(0xFFFF3B4A);
+    final red = m.dungeonPenalty ? dungeonRed : penaltyRed;
     return AvatarLook(glow: red, gear: gear, tint: red, glitch: true);
   }
   if (m.floorToday > 0) return AvatarLook(glow: Hud.gold, gear: gear);
@@ -57,8 +65,6 @@ AvatarLook playerLook(GameModel m) {
     gear: gear,
   );
 }
-
-const _dir = 'assets/avatars/player';
 
 /// A living avatar: it breathes, its glow pulses, an aura and rising motes
 /// sit behind it, it leans toward a dragging finger and springs back, and a
@@ -148,32 +154,9 @@ class _PlayerAvatarState extends State<PlayerAvatar>
     widget.onTap?.call();
   }
 
-  /// A glow layer: a blurred halo under a sharp copy, both in [c].
-  Widget _glow(String file, Color c, double strength) {
-    final svg = SvgPicture.asset(
-      '$_dir/$file',
-      colorFilter: ColorFilter.mode(c, BlendMode.srcIn),
-    );
-    final blur = 2.5 + 3 * strength;
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        ImageFiltered(
-          imageFilter: ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur),
-          child: Opacity(
-            opacity: (.6 + .4 * strength).clamp(0.0, 1.0),
-            child: svg,
-          ),
-        ),
-        Opacity(opacity: (.75 + .25 * strength).clamp(0.0, 1.0), child: svg),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final look = widget.look;
-    final gear = look.gear?.name;
     return LayoutBuilder(
       builder: (context, box) {
         final size = Size(box.maxWidth, box.maxHeight);
@@ -203,7 +186,6 @@ class _PlayerAvatarState extends State<PlayerAvatar>
                 final glitch =
                     look.glitch &&
                     ((t > .31 && t < .335) || (t > .78 && t < .80));
-                final strength = .35 * breath + flare;
                 return Stack(
                   fit: StackFit.expand,
                   children: [
@@ -245,26 +227,21 @@ class _PlayerAvatarState extends State<PlayerAvatar>
                           ],
                           stops: [0, .8, 1],
                         ).createShader(r),
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            SvgPicture.asset(
-                              '$_dir/base.svg',
-                              colorFilter: look.tint == null
-                                  ? null
-                                  : ColorFilter.mode(
-                                      look.tint!.withValues(
-                                        alpha: glitch ? .45 : .16,
-                                      ),
-                                      BlendMode.srcATop,
-                                    ),
-                            ),
-                            _glow('glow.svg', look.glow, strength),
-                            if (gear != null) ...[
-                              SvgPicture.asset('$_dir/$gear.svg'),
-                              _glow('${gear}_glow.svg', look.glow, strength),
-                            ],
-                          ],
+                        child: ColorFiltered(
+                          colorFilter: ColorFilter.mode(
+                            glitch
+                                ? look.glow.withValues(alpha: .45)
+                                : Colors.white.withValues(alpha: .28 * flare),
+                            BlendMode.srcATop,
+                          ),
+                          child: Image.asset(
+                            look.asset,
+                            fit: BoxFit.cover,
+                            alignment: const Alignment(0, -.25),
+                            filterQuality: FilterQuality.medium,
+                            gaplessPlayback: true,
+                            excludeFromSemantics: true,
+                          ),
                         ),
                       ),
                     ),

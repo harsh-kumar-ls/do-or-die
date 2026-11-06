@@ -32,7 +32,7 @@ lib/platform/  Android bridges: app blocker, notifications, network time, usage 
 lib/ui/        screens, theme, sound and haptics
 android/       usage-access watcher, block screen, usage meter, trusted time
 test/          unit and widget tests
-tools/         sound generator, TestSprite plan generator, logo builder, local web server
+tools/         sound generator, TestSprite plan generator, local web server
 testsprite-plans/  end-to-end web tests (TestSprite)
 ```
 

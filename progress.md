@@ -19,7 +19,7 @@ The detailed records stay where they are. This file summarises them and points t
 
 | | |
 |---|---|
-| **Version** | 0.7.1 (build 11), installed on the phone 2026-11-06 and launched cleanly |
+| **Version** | 0.8.0 (build 12), installed on the phone 2026-11-06 and launched cleanly |
 | **Phone** | Personal Android test phone |
 | **Current run** | Personality System, rank E. Day 1 was 2026-10-31; days 1–3 were a dry run, so penalties are live from 2026-11-03 (default 3-day dry run; confirm on Status) |
 | **Tests** | 201 automated tests pass; format and analyze clean; TestSprite 14/14 on the web build |
@@ -96,6 +96,7 @@ Changes from the first live days:
 | 0.6.0 | Report share image, 6-day reduction limit, banking and UPI apps never lockable, verdict line for records that rest on your word |
 | 0.7.0 | The Player: an original animated avatar on Quest, Status and the System cards; System entry sequence; new app icon |
 | 0.7.1 | "Lock served" caption, System name fits on Status, outages measured by a watcher heartbeat (restarts no longer counted) |
+| 0.8.0 | The Player redone as an original anime-style 3D character (Blender), in five colour forms; new launcher icon |
 
 ---
 
