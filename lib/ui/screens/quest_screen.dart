@@ -2,13 +2,16 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import '../../domain/dungeon.dart';
 import '../../domain/progression.dart';
 import '../../domain/tasks.dart';
 import '../game_model.dart';
 import '../theme.dart';
 import '../widgets/hud_controls.dart';
 import '../widgets/hud_kit.dart';
+import '../widgets/player_avatar.dart';
 import '../widgets/system_frame.dart';
+import 'status_screen.dart';
 
 /// The Daily Quest, built from design/claude-design/daily-quest.html. On a
 /// Dungeon floor the whole tab takes the crimson and gold look.
@@ -53,6 +56,8 @@ class QuestScreen extends StatelessWidget {
                 rank: model.rank,
               ),
               ..._alerts(context),
+              _Presence(model: model),
+              const SizedBox(height: 8),
               if (model.gate != null && floor == 0) ...[
                 _GateBanner(model: model),
                 const SizedBox(height: 10),
@@ -991,6 +996,114 @@ class _Block extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// The Player avatar beside a line from the System. Tapping the avatar
+/// asks the System for the next line.
+class _Presence extends StatefulWidget {
+  const _Presence({required this.model});
+  final GameModel model;
+
+  @override
+  State<_Presence> createState() => _PresenceState();
+}
+
+class _PresenceState extends State<_Presence> {
+  int _line = 0;
+
+  static List<String> lines(GameModel m) {
+    final left = m.tasks.where((t) => !m.isDone(t) && !t.isCap).length;
+    final now = m.now;
+    final midnight = DateTime(now.year, now.month, now.day + 1);
+    final until = midnight.difference(now);
+    final (streak, _) = StatusScreen.streaks(m);
+    final need = DungeonRules.clearedNeeded - m.clearedInWindow;
+    return [
+      if (m.inPenalty)
+        m.dungeonPenalty
+            ? 'Dungeon Penalty in effect. The debt is doubled.'
+            : 'Penalty in effect. Pay the debt before 23:59.'
+      else if (m.isQuestComplete)
+        'Quest cleared. The System has noted it.'
+      else if (m.pastDeadline)
+        'The deadline has passed.'
+      else
+        '$left objective${left == 1 ? '' : 's'} remain${left == 1 ? 's' : ''}. ${until.inHours}h ${until.inMinutes % 60}m until judgement.',
+      streak == 0
+          ? 'No streak. Begin one today.'
+          : 'Streak: $streak day${streak == 1 ? '' : 's'}. Do not break it.',
+      if (m.floorToday == 0)
+        need <= 0
+            ? 'A Gate is due. Enter it.'
+            : 'Rank ${m.rank.name.toUpperCase()}. $need cleared days until the next Gate.'
+      else
+        'Dungeon floor ${m.floorToday}. There is no second attempt today.',
+      'The System is watching.',
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    final m = widget.model;
+    final all = lines(m);
+    final line = all[_line % all.length];
+    final look = playerLook(m);
+    final aura = look.glow;
+    return SizedBox(
+      height: 104,
+      child: Row(
+        children: [
+          SizedBox(
+            width: 92,
+            child: PlayerAvatar(
+              look: look,
+              semanticLabel: 'Player avatar. Tap for the next System line',
+              onTap: () => setState(() => _line++),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              decoration: BoxDecoration(
+                color: p.sys.withValues(alpha: .05),
+                border: Border(left: BorderSide(color: aura, width: 2)),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('THE SYSTEM', style: Hud.mono(9, aura, spacing: .24)),
+                  const SizedBox(height: 4),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 260),
+                    transitionBuilder: (child, a) => FadeTransition(
+                      opacity: a,
+                      child: SlideTransition(
+                        position: Tween(
+                          begin: const Offset(0, .25),
+                          end: Offset.zero,
+                        ).animate(a),
+                        child: child,
+                      ),
+                    ),
+                    child: Text(
+                      line,
+                      key: ValueKey(line),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: Hud.mono(12, p.text).copyWith(height: 1.4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -25,6 +25,10 @@
     },
     {
       "type": "action",
+      "description": "Wait 4 seconds while the System entry plays (the avatar is drawn in and '[ ... SYSTEM ]' and 'BOUND.' appear)"
+    },
+    {
+      "type": "action",
       "description": "On the 'PLACEMENT TEST' screen, click the big number for 'Most push-ups you can do in one set'"
     },
     {

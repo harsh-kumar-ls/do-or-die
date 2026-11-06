@@ -17,6 +17,7 @@ class SwitchableBlocker extends NoopAppBlocker {
   bool serviceOn = true;
   bool canRepair = false;
   int repairAttempts = 0;
+  DateTime? heartbeat;
 
   @override
   Future<SystemStatus> systemStatus() async => SystemStatus(
@@ -25,6 +26,7 @@ class SwitchableBlocker extends NoopAppBlocker {
     usageAccess: true,
     overlay: true,
     watcherRunning: serviceOn,
+    lastHeartbeatAt: heartbeat,
   );
 
   @override
@@ -131,5 +133,32 @@ void main() {
     );
     expect(entry.data['duringPenalty'], isTrue);
     expect(entry.data['repaired'], isFalse);
+  });
+
+  test(
+    'a watcher that was only restarting is not counted as an outage',
+    () async {
+      final m = await model();
+      blocker
+        ..serviceOn = false
+        ..canRepair = true
+        ..heartbeat = clock.now().subtract(const Duration(seconds: 20));
+      await m.tick();
+      expect(incidents(m), 0);
+      expect(blocker.repairAttempts, greaterThan(0));
+    },
+  );
+
+  test('a real outage is logged with how long the watcher was down', () async {
+    final m = await model();
+    blocker
+      ..serviceOn = false
+      ..canRepair = true
+      ..heartbeat = clock.now().subtract(const Duration(hours: 3));
+    await m.tick();
+    expect(incidents(m), 1);
+    final e = m.service.game.log.lastWhere((e) => e.type == 'blocker_offline');
+    expect(e.data['minutes'], 180);
+    expect(e.data['duringLock'], isFalse);
   });
 }

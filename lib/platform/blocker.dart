@@ -67,6 +67,7 @@ class SystemStatus {
     this.watcherRunning = false,
     this.batteryExempt = false,
     this.autoTime = true,
+    this.lastHeartbeatAt,
   });
 
   factory SystemStatus.fromMap(Map<Object?, Object?> m) => SystemStatus(
@@ -76,6 +77,10 @@ class SystemStatus {
     watcherRunning: m['watcherRunning'] as bool? ?? false,
     batteryExempt: m['batteryExempt'] as bool? ?? false,
     autoTime: m['autoTime'] as bool? ?? true,
+    lastHeartbeatAt: switch (m['lastHeartbeatAt']) {
+      final int ms when ms > 0 => DateTime.fromMillisecondsSinceEpoch(ms),
+      _ => null,
+    },
   );
 
   /// Locks can be enforced: both permissions granted and the watcher running.
@@ -95,6 +100,10 @@ class SystemStatus {
 
   /// Automatic date and time is on.
   final bool autoTime;
+
+  /// When the watcher last reported in (every 10 s while it runs), so the
+  /// length of an outage can be measured. Null if it never ran.
+  final DateTime? lastHeartbeatAt;
 }
 
 /// What the block screen says during a lock.

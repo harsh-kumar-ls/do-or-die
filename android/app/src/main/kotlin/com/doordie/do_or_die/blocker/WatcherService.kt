@@ -32,12 +32,18 @@ class WatcherService : Service() {
     private var lastEventQueryAt = 0L
     private var foregroundPackage: String? = null
     private var lastActionAt = 0L
+    private var lastHeartbeatAt = 0L
 
     private val loop = object : Runnable {
         override fun run() {
             val busy = BlockerState.isLocked(this@WatcherService) ||
                 BlockerState.needsJudgement(this@WatcherService)
             if (busy) check()
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastHeartbeatAt >= HEARTBEAT_MS) {
+                lastHeartbeatAt = now
+                BlockerState.recordHeartbeat(this@WatcherService)
+            }
             // Fast while it matters, slow otherwise (cheap: no query when idle).
             handler.postDelayed(this, if (busy) FAST_MS else IDLE_MS)
         }
@@ -141,6 +147,7 @@ class WatcherService : Service() {
         private const val FAST_MS = 700L
         private const val IDLE_MS = 5_000L
         private const val DEBOUNCE_MS = 1500L
+        private const val HEARTBEAT_MS = 10_000L
 
         /** True while the service is alive in this process. */
         @Volatile

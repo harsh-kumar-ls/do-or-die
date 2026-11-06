@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="76 56 360 360">
+  <!-- Focus gear: a visor band across both eyes. -->
+  <polygon points="200,206 312,196 318,226 204,236" fill="#0B0F17"/>
+  <polygon points="312,196 326,204 326,220 318,226" fill="#1A2130"/>
+</svg>

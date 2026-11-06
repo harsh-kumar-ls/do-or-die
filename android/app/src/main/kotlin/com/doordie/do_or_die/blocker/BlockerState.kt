@@ -23,6 +23,7 @@ object BlockerState {
     private const val KEY_FOCUS_ENDS_AT = "focusEndsAt"
     private const val KEY_JUDGE_DUE_FROM = "judgeDueFrom"
     private const val KEY_LAST_CONNECTED_AT = "lastConnectedAt"
+    private const val KEY_HEARTBEAT_AT = "lastHeartbeatAt"
     private const val KEY_LAST_DISCONNECTED_AT = "lastDisconnectedAt"
     private const val KEY_BLOCK_COUNT = "blockCount"
     private const val KEY_LAST_BLOCKED_PACKAGE = "lastBlockedPackage"
@@ -149,6 +150,13 @@ object BlockerState {
     fun recordServiceConnected(ctx: Context) {
         prefs(ctx).edit().putLong(KEY_LAST_CONNECTED_AT, System.currentTimeMillis()).apply()
     }
+
+    /** The watcher writes this while it runs, so a gap can be measured. */
+    fun recordHeartbeat(ctx: Context) {
+        prefs(ctx).edit().putLong(KEY_HEARTBEAT_AT, System.currentTimeMillis()).apply()
+    }
+
+    fun lastHeartbeat(ctx: Context): Long = prefs(ctx).getLong(KEY_HEARTBEAT_AT, 0L)
 
     fun recordServiceDisconnected(ctx: Context) {
         prefs(ctx).edit().putLong(KEY_LAST_DISCONNECTED_AT, System.currentTimeMillis()).apply()

@@ -158,19 +158,31 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
   /// Whether the blocker was on at the last check; null before the first.
   bool? _blockerWasOn;
 
+  /// A watcher found off whose last heartbeat is this recent was only
+  /// restarting (the app process starting, or an update), not down.
+  static const outageGrace = Duration(seconds: 60);
+
   /// Checks the blocker service is still on. If it was switched off (a force
-  /// stop does this), tries auto-repair, and logs one incident per outage.
+  /// stop does this), restarts it, and logs one incident per real outage
+  /// with how long the watcher was down.
   Future<void> _watchBlocker() async {
     final blocker = enforcer?.blocker;
     if (blocker == null || !blocker.canBlock) return;
     try {
       var status = await blocker.systemStatus();
       if (!status.serviceEnabled) {
+        final permitted = status.usageAccess && status.overlay;
+        final since = permitted ? status.lastHeartbeatAt : null;
+        final brief =
+            since != null && service.now.difference(since) < outageGrace;
         // A force stop kills the watcher; restarting it needs no special
         // permission, only the two the user already granted.
         final repaired = await blocker.startWatcher();
-        if (_blockerWasOn != false) {
-          await service.recordBlockerOffline(repaired: repaired);
+        if (_blockerWasOn != false && !brief) {
+          await service.recordBlockerOffline(
+            repaired: repaired,
+            downSince: since,
+          );
         }
         if (repaired) status = await blocker.systemStatus();
       }

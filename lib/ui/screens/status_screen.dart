@@ -8,6 +8,7 @@ import '../../domain/systems.dart' show maxReducedDays, reductionWindowDays;
 import '../game_model.dart';
 import '../theme.dart';
 import '../widgets/hud_kit.dart';
+import '../widgets/player_avatar.dart';
 import '../widgets/system_frame.dart';
 
 /// Status, built from design/claude-design/status.html: rank hero, core
@@ -80,30 +81,26 @@ class StatusScreen extends StatelessWidget {
     final s = model.state;
     final spec = model.systemSpec;
     final sys = model.systems;
-    final rc = Hud.rankColor(model.rank);
     final (streak, best) = streaks(model);
     final dry = model.service.isDryRunToday;
     final trainedStats = spec?.stats.toSet() ?? Stat.values.toSet();
 
+    final look = playerLook(model);
     final hero = SizedBox(
-      height: 112,
+      height: 150,
       child: Row(
         children: [
           SizedBox(
-            width: 100,
-            height: 112,
+            width: 124,
             child: Stack(
-              alignment: Alignment.center,
+              fit: StackFit.expand,
               children: [
-                CustomPaint(
-                  size: const Size(100, 112),
-                  painter: _RankFrame(rc),
-                ),
-                _Breathing(
-                  color: rc,
-                  child: Text(
-                    model.rank.name.toUpperCase(),
-                    style: Hud.head(84, rc, spacing: 0).copyWith(height: 1),
+                PlayerAvatar(look: look),
+                Positioned(
+                  right: 0,
+                  bottom: 4,
+                  child: IgnorePointer(
+                    child: RankHexSmall(rank: model.rank, width: 40),
                   ),
                 ),
               ],
@@ -117,11 +114,14 @@ class StatusScreen extends StatelessWidget {
               children: [
                 Kicker('Rank ${model.rank.name.toUpperCase()} · Player'),
                 const SizedBox(height: 4),
-                Text(
-                  spec?.name.toUpperCase() ?? 'NO SYSTEM',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Hud.head(17, p.text, spacing: .2),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    spec?.name.toUpperCase() ?? 'NO SYSTEM',
+                    maxLines: 1,
+                    style: Hud.head(17, p.text, spacing: .2),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text('LATEST TITLE', style: Hud.mono(9, p.dim, spacing: .2)),
@@ -301,50 +301,6 @@ class StatusScreen extends StatelessWidget {
       ),
     );
   }
-}
-
-class _RankFrame extends CustomPainter {
-  _RankFrame(this.c);
-  final Color c;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.scale(size.width / 118, size.height / 132);
-    canvas.drawPath(
-      Path()
-        ..moveTo(59, 3)
-        ..lineTo(114, 34)
-        ..lineTo(114, 98)
-        ..lineTo(59, 129)
-        ..lineTo(4, 98)
-        ..lineTo(4, 34)
-        ..close(),
-      Paint()
-        ..color = c.withValues(alpha: .55)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5,
-    );
-    final inner = Path()
-      ..moveTo(59, 14)
-      ..lineTo(104, 40)
-      ..lineTo(104, 92)
-      ..lineTo(59, 118)
-      ..lineTo(14, 92)
-      ..lineTo(14, 40)
-      ..close();
-    final dash = Paint()
-      ..color = c.withValues(alpha: .3)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = .8;
-    for (final m in inner.computeMetrics()) {
-      for (var d = 0.0; d < m.length; d += 7) {
-        canvas.drawPath(m.extractPath(d, d + 3), dash);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(_RankFrame old) => old.c != c;
 }
 
 /// The rank letter's glow breathes 8 to 22 px over 3.2 s.

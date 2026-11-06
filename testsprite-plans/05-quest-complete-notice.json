@@ -29,6 +29,10 @@
     },
     {
       "type": "action",
+      "description": "Wait 4 seconds while the System entry plays (the avatar is drawn in and '[ ... SYSTEM ]' and 'BOUND.' appear)"
+    },
+    {
+      "type": "action",
       "description": "Click 'SUBMIT'"
     },
     {

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="76 56 360 360">
+  <g fill="none" stroke="#FFFFFF" stroke-width="1.2" stroke-linejoin="round">
+    <polyline points="198,354 226,368 300,368 330,356"/>
+    <polyline points="330,356 372,392 384,420"/>
+  </g>
+  <!-- sigil pin: an open book in a diamond -->
+  <g fill="#FFFFFF">
+    <polygon points="226,346 236,336 246,346 236,356" fill-opacity=".35"/>
+    <polygon points="230,346 236,342 236,351"/>
+    <polygon points="242,346 236,342 236,351" fill-opacity=".7"/>
+  </g>
+</svg>

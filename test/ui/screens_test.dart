@@ -432,6 +432,20 @@ void main() {
     expect(find.text('Cleared 100%. Nothing to add.'), findsOneWidget);
   });
 
+  testUi('tapping the Player avatar asks the System for the next line', (
+    tester,
+  ) async {
+    final clock = FixedClock(DateTime(2026, 10, 19, 9));
+    await pumpShell(tester, clock: clock);
+    await acknowledgeAll(tester);
+    expect(find.textContaining('objectives remain'), findsOneWidget);
+    await tester.tap(
+      find.bySemanticsLabel('Player avatar. Tap for the next System line'),
+    );
+    await pumpFor(tester, 500);
+    expect(find.text('No streak. Begin one today.'), findsOneWidget);
+  });
+
   testUi('the report share card can drop the honesty figures', (tester) async {
     final clock = FixedClock(DateTime(2026, 10, 19, 9));
     await pumpShell(
@@ -519,6 +533,10 @@ void main() {
     await pumpOnboarding(tester, (r) => result = r);
     await makeContact(tester);
     await tapText(tester, 'CHOOSE FITNESS SYSTEM');
+    // The System entry plays, then the placement test follows.
+    await pumpFor(tester, 1500);
+    expect(find.text('[ FITNESS SYSTEM ]'), findsOneWidget);
+    await pumpFor(tester, 1800);
     expect(find.text('PLACEMENT TEST'), findsOneWidget);
     final fields = find.byType(TextField);
     await tester.enterText(fields.at(0), '80');

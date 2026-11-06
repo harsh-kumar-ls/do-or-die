@@ -74,6 +74,7 @@ class MainActivity : FlutterActivity() {
                             "watcherRunning" to WatcherService.running,
                             "batteryExempt" to isBatteryExempt(),
                             "autoTime" to TrustedTime.autoTimeEnabled(this),
+                            "lastHeartbeatAt" to BlockerState.lastHeartbeat(this),
                         ),
                     )
                     "requestBatteryExemption" -> {

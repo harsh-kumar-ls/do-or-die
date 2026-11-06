@@ -345,6 +345,10 @@ class _LockPanelState extends State<_LockPanel> {
       big = '${two()}:${two()}:${two()}';
       cap = 'THE LOCK WILL BEGIN WITHOUT WARNING';
       dimBig = true;
+    } else if (lock != null && !now.isBefore(lock.end)) {
+      big = '00:00:00';
+      cap = 'LOCK SERVED · ACCESS RESTORED';
+      dimBig = true;
     } else {
       big = '00:00:00';
       cap = 'NO LOCK TODAY';

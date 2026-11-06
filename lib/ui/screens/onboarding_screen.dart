@@ -16,6 +16,8 @@ import '../../platform/blocker.dart';
 import '../fx.dart';
 import '../theme.dart';
 import '../widgets/awakening_art.dart';
+import '../widgets/player_avatar.dart';
+import '../widgets/system_entry.dart';
 import '../widgets/system_frame.dart';
 
 class OnboardingResult {
@@ -792,7 +794,14 @@ class _SystemStepState extends State<_SystemStep>
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 10),
-        CutButton('CHOOSE $name', onPressed: widget.onBind),
+        CutButton(
+          'CHOOSE $name',
+          onPressed: () async {
+            final kind = widget.chosen;
+            if (kind != null) await showSystemEntry(context, kind);
+            if (mounted) widget.onBind();
+          },
+        ),
       ],
     );
   }
@@ -907,8 +916,25 @@ class _FlipCard extends StatelessWidget {
                 child: Center(
                   child: AspectRatio(
                     aspectRatio: 1,
-                    child: CustomPaint(
-                      painter: SystemEmblemPainter(kind, active ? seconds : 0),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Opacity(
+                          opacity: .35,
+                          child: CustomPaint(
+                            painter: SystemEmblemPainter(
+                              kind,
+                              active ? seconds : 0,
+                            ),
+                          ),
+                        ),
+                        ExcludeSemantics(
+                          child: PlayerAvatar(
+                            look: systemLook(kind),
+                            interactive: false,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
