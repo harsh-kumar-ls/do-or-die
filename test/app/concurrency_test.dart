@@ -96,7 +96,7 @@ void main() {
   test('a penalty paid during a day-close is not lost', () async {
     final g = await GameService.awaken(
       store: store,
-      system: SystemKind.fitness,
+      system: SystemKind.personality,
       placement: Rank.e,
       blockedPackages: const {'com.instagram.android'},
       dryRunDays: 0,
@@ -105,7 +105,7 @@ void main() {
       meter: meter,
     );
     clock.set(day1.addDays(1).at(9 * 60));
-    await g.tick(); // day 1 failed: 10 push-ups and 15 squats owed today
+    await g.tick(); // day 1 failed: 20 pages and a reflection owed today
     final a = g.recordPenalty(primary: 4);
     final b = g.recordPenalty(primary: 3);
     await Future.wait([a, b]);

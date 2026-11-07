@@ -23,6 +23,7 @@ class StatusScreen extends StatelessWidget {
     this.onOpenSystemCheck,
     this.onChooseSystem,
     this.onOpenReport,
+    this.onOpenSettings,
   });
 
   final GameModel model;
@@ -35,6 +36,9 @@ class StatusScreen extends StatelessWidget {
   final VoidCallback? onOpenSystemCheck;
   final VoidCallback? onChooseSystem;
   final VoidCallback? onOpenReport;
+
+  /// Rest period, lock time, switching System, export and privacy.
+  final VoidCallback? onOpenSettings;
 
   /// Where the user stands on the way to the next Gate (ring label).
   static String gateLine(GameModel m) {
@@ -240,14 +244,44 @@ class StatusScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    '[ STATUS ]',
-                    textAlign: TextAlign.center,
-                    style: Hud.head(
-                      12,
-                      p.hi,
-                      spacing: .3,
-                    ).copyWith(shadows: p.textGlow(.8)),
+                  SizedBox(
+                    height: 28,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Text(
+                          '[ STATUS ]',
+                          textAlign: TextAlign.center,
+                          style: Hud.head(
+                            12,
+                            p.hi,
+                            spacing: .3,
+                          ).copyWith(shadows: p.textGlow(.8)),
+                        ),
+                        if (onOpenSettings != null)
+                          Positioned(
+                            right: 0,
+                            child: Semantics(
+                              button: true,
+                              label: 'Settings',
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: onOpenSettings,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(4),
+                                  child: ExcludeSemantics(
+                                    child: Icon(
+                                      Icons.settings_outlined,
+                                      size: 22,
+                                      color: p.sys,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 8),
                   hero,

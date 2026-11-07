@@ -17,6 +17,10 @@ enum PenaltyKind {
 
   /// A phone-free block, in minutes, run with the in-app timer (Focus).
   focus,
+
+  /// No penalty besides the app lock (Fitness: exercise is never a
+  /// punishment).
+  none,
 }
 
 class PenaltyCalculator {
@@ -51,6 +55,8 @@ class PenaltyCalculator {
           config.blockMinutesCap,
         );
         return (minutes * multiplier, 0);
+      case PenaltyKind.none:
+        return (0, 0);
     }
   }
 
@@ -108,6 +114,7 @@ String describePenalty(PenaltyKind kind, int primary, int secondary) {
         plural(secondary, 'written reflection', 'written reflections'),
     ],
     PenaltyKind.focus => [if (primary > 0) '$primary phone-free minutes'],
+    PenaltyKind.none => <String>[],
   };
   return parts.join(' and ');
 }
@@ -142,11 +149,22 @@ class LockWindow {
     this.clamped = false,
     this.releasedUntil,
     this.releases = 0,
+    this.exitedAt,
   });
 
   final DayKey day;
   final DateTime start;
   final DateTime end;
+
+  /// When the emergency exit (or an upheld contest) ended the lock early.
+  final DateTime? exitedAt;
+
+  /// Ended before it began (an exit or upheld contest before the start).
+  bool get cancelled => !effectiveEnd.isAfter(start);
+
+  /// When the lock really ends: its end, or an earlier exit.
+  DateTime get effectiveEnd =>
+      exitedAt != null && exitedAt!.isBefore(end) ? exitedAt! : end;
 
   /// True if the lock was shortened to fit inside waking hours.
   final bool clamped;
@@ -158,7 +176,7 @@ class LockWindow {
   /// How many releases have been taken during this lock.
   final int releases;
 
-  bool inWindowAt(DateTime t) => !t.isBefore(start) && t.isBefore(end);
+  bool inWindowAt(DateTime t) => !t.isBefore(start) && t.isBefore(effectiveEnd);
 
   bool isReleasedAt(DateTime t) =>
       inWindowAt(t) && releasedUntil != null && t.isBefore(releasedUntil!);
@@ -176,22 +194,41 @@ class LockWindow {
     clamped: clamped,
     releasedUntil: now.add(length),
     releases: releases + 1,
+    exitedAt: exitedAt,
+  );
+
+  /// A copy that ends at [now] (emergency exit or an upheld contest).
+  LockWindow exitAt(DateTime now) => LockWindow(
+    day: day,
+    start: start,
+    end: end,
+    clamped: clamped,
+    releasedUntil: releasedUntil,
+    releases: releases,
+    exitedAt: now.isBefore(start) ? start : now,
   );
 }
 
 class LockScheduler {
   const LockScheduler();
 
-  /// Picks a random lock window on [day] that lies entirely inside waking
-  /// hours and starts no earlier than [notBefore]. Returns null if no waking
-  /// time is left that day.
+  /// Picks the lock window on [day], inside waking hours and no earlier than
+  /// [notBefore]. Returns null if no waking time is left that day.
+  ///
+  /// With [startMinute] (the user's chosen lock time) the window starts
+  /// there, moved inside waking hours if needed; a late verdict shortens it
+  /// but never moves its end. Without it (older games) the start is random.
   LockWindow? schedule({
     required DayKey day,
     required int durationMinutes,
     required SleepWindow sleep,
     required Random random,
     DateTime? notBefore,
+    int? startMinute,
   }) {
+    if (startMinute != null) {
+      return _scheduleAt(day, durationMinutes, sleep, notBefore, startMinute);
+    }
     var (wakeStart, wakeEnd) = sleep.wakingPeriod(day);
     if (notBefore != null && notBefore.isAfter(wakeStart)) {
       wakeStart = _ceilToMinute(notBefore);
@@ -215,6 +252,36 @@ class LockScheduler {
       start: start,
       end: start.add(Duration(minutes: durationMinutes)),
     );
+  }
+
+  LockWindow? _scheduleAt(
+    DayKey day,
+    int durationMinutes,
+    SleepWindow sleep,
+    DateTime? notBefore,
+    int startMinute,
+  ) {
+    final (wakeStart, wakeEnd) = sleep.wakingPeriod(day);
+    final waking = wakeEnd.difference(wakeStart).inMinutes;
+    final length = min(durationMinutes, waking);
+    var start = day.at(startMinute);
+    // A chosen time inside the rest period moves to the morning.
+    if (start.isBefore(wakeStart) || !start.isBefore(wakeEnd)) {
+      start = wakeStart;
+    }
+    // Too close to bedtime: the whole lock moves earlier.
+    if (start.add(Duration(minutes: length)).isAfter(wakeEnd)) {
+      start = wakeEnd.subtract(Duration(minutes: length));
+    }
+    final end = start.add(Duration(minutes: length));
+    final clamped = length < durationMinutes;
+    if (notBefore != null && notBefore.isAfter(start)) {
+      // Judged late: what is left of the window, never extended.
+      final late = _ceilToMinute(notBefore);
+      if (!late.isBefore(end)) return null;
+      return LockWindow(day: day, start: late, end: end, clamped: clamped);
+    }
+    return LockWindow(day: day, start: start, end: end, clamped: clamped);
   }
 
   static DateTime _ceilToMinute(DateTime t) {

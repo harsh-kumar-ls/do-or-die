@@ -109,6 +109,7 @@ Changes from the first live days:
 |---|---|
 | 2026-10-20 | Trial first, launch only if it works. Android only for now |
 | 2026-10-20 | Penalty rules: next-day penalty, random lock in waking hours, push-up cap 150 then squats, unpaid doubles. Exercise does not end the lock early |
+| 2026-11-07 | Audit loop iteration 1: Focus core (Fitness and Personality optional, switching allowed), lock at a chosen time with 2 releases and an emergency exit, contest a verdict, Settings, watcher only while needed, trusted time, blocker reset, disclosure. See BUILD_LOOP.md |
 | 2026-11-07 | Audit P0 fixes: the exercise penalty is the push-ups and squats of the user's own daily quest (no level scaling, no doubling); nothing carries over or doubles; game changes are serialised (fixes a lost-update bug); 18+ confirmation, health notice and stop rule in the terms; backup and device transfer off. See audit/AUDIT_REPORT_2026-11-07.md |
 | 2026-10-21 | Emergency exit replaced by the counted 15-minute release |
 | 2026-10-22 | No accessibility service (banking apps refuse it); usage-access watcher instead |

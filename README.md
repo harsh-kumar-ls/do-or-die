@@ -1,6 +1,6 @@
 # Do or Die
 
-A daily-habit app run by a cold, game-style **System**. You choose one System (Fitness, Personality or Focus), take a short placement test (rank E to C), and the System writes your daily quest for your rank. Clear it and you earn XP and stat points. Fail it and you enter the **Penalty Zone**: the apps you chose are locked at an unannounced time the next day, and you owe a penalty that fits your System: the push-ups and squats from your own daily quest for Fitness (never more), pages and a written reflection for Personality, a phone-free block for Focus. Anything unpaid expires at midnight and is logged; nothing carries over.
+A daily-habit app run by a cold, game-style **System**. You choose a System (Focus is the core; Fitness and Personality are optional packs, and you can switch), take a short placement test (rank E to C), and the System writes your daily quest for your rank. Clear it and you earn XP and stat points. Fail it and you enter the **Penalty Zone**: the apps you chose are locked for 4 hours the next day, from a time you picked, with two releases and an always-available emergency exit; Personality adds pages and a written reflection, Focus a phone-free block, Fitness nothing (exercise is never a punishment). One verdict in any 14 days can be contested. Anything unpaid expires at midnight and is logged; nothing carries over.
 
 Clear 21 of 30 days and a **Gate** opens. Enter it within 48 hours for a three-day **Dungeon**: floor 1 is the quest +25%, floor 2 is +50% and ends at 18:00, floor 3 is the Rank Trial. Clear it to rank up; fail a floor and the **Dungeon Penalty** follows (double lock, Gate shut 7 days; exercise never exceeds the daily quest). Ranks never go down, and a new System can be chosen only once the current one is complete (rank S held for 30 days). A 30-day report shows what happened, including every release taken. See [SYSTEMS_PRD.md](SYSTEMS_PRD.md).
 
@@ -45,7 +45,9 @@ flutter test
 flutter run            # on a connected Android phone
 ```
 
-The app blocker is a small background watcher, not an accessibility service: Indian UPI and banking apps refuse to run while any accessibility service is on. After installing, open **Status → SYSTEM CHECK** and fix anything marked ✕: allow **Usage access** and **Display over other apps**, allow notifications and **Alarms & reminders**, and exempt the app from battery optimisation. Android shows a permanent "Penalty Zone watcher" notification while the watcher runs.
+The app blocker is a small background watcher, not an accessibility service: Indian UPI and banking apps refuse to run while any accessibility service is on. After installing, open **Status → SYSTEM CHECK** and fix anything marked ✕: allow **Usage access** and **Display over other apps**, allow notifications and **Alarms & reminders**, and exempt the app from battery optimisation. The watcher runs only while a lock, a phone-free block or a verdict is pending (with a "Penalty Zone watcher" notification); exact alarms wake it at midnight and before a lock. Without "Alarms & reminders" it has to run all the time.
+
+Native logic has JVM unit tests: `cd android && ./gradlew :app:testDebugUnitTest`.
 
 A force stop stops the watcher; opening Do or Die starts it again, and every outage is recorded in the trial log. Install updates with a plain `adb install -r` (no force-stop).
 

@@ -223,7 +223,7 @@ void main() {
     expect(s.level, 2);
     expect(s.unspentStatPoints, 3);
     expect(s.debt!.primaryOwed, 10);
-    expect(s.lock!.duration, const Duration(minutes: 260));
+    expect(s.lock!.duration, const Duration(minutes: 240));
   });
 
   test('moving the clock backwards reopens nothing and changes nothing', () {

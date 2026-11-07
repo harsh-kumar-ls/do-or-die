@@ -1,4 +1,5 @@
 import '../domain/dungeon.dart';
+import 'codec.dart';
 import '../domain/engine.dart';
 
 /// One line of the trial log. The log is append-only: nothing in the app can
@@ -7,7 +8,7 @@ class LogEntry {
   const LogEntry(this.at, this.type, [this.data = const {}]);
 
   factory LogEntry.fromJson(Map<String, Object?> j) => LogEntry(
-    DateTime.parse(j['at'] as String),
+    instantFromJson(j['at']),
     j['type'] as String,
     Map<String, Object?>.from(j['data'] as Map? ?? const {}),
   );
@@ -17,7 +18,7 @@ class LogEntry {
   final Map<String, Object?> data;
 
   Map<String, Object?> toJson() => {
-    'at': at.toIso8601String(),
+    'at': instantToJson(at),
     'type': type,
     'data': data,
   };

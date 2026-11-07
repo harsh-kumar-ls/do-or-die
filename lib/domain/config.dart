@@ -11,7 +11,10 @@ class GameConfig {
     this.blockMinutesPerLevel = 5,
     this.blockMinutesCap = 180,
     this.baseLockMinutes = 240,
-    this.lockMinutesPerLevel = 20,
+    this.lockMinutesPerLevel = 0,
+    this.releasesPerLock = 2,
+    this.contestCooldownDays = 14,
+    this.blockRemovalDelayDays = 7,
     this.xpPerClear = 100,
     this.baseXpToNextLevel = 300,
     this.xpToNextLevelPerLevel = 100,
@@ -38,9 +41,22 @@ class GameConfig {
   final int blockMinutesPerLevel;
   final int blockMinutesCap;
 
-  // Digital penalty (every System).
+  // Digital penalty (every System). The lock is a fixed length at a time
+  // the user chose (iteration 1): it no longer grows with level, so long-term
+  // success is never punished harder.
   final int baseLockMinutes;
   final int lockMinutesPerLevel;
+
+  /// Short releases allowed per lock. The emergency exit is separate and
+  /// always available.
+  final int releasesPerLock;
+
+  /// One contested verdict is allowed in any this-many days.
+  final int contestCooldownDays;
+
+  /// Removing an app from the lock list takes effect after this many days,
+  /// so the list can't be emptied to dodge a lock or a screen-time cap.
+  final int blockRemovalDelayDays;
 
   // Progression. Placeholder values; tune after the first week of the trial.
   final int xpPerClear;

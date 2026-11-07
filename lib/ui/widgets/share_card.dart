@@ -72,9 +72,12 @@ class ShareCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text('DO OR DIE', style: Hud.head(10, _hi, spacing: .5)),
+                    Text(
+                      'DO OR DIE',
+                      style: Hud.headExact(10, _hi, spacing: .5),
+                    ),
                     const Spacer(),
-                    Text(range, style: Hud.mono(7.5, _dim, spacing: .2)),
+                    Text(range, style: Hud.monoExact(7.5, _dim, spacing: .2)),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -83,12 +86,12 @@ class ShareCard extends StatelessWidget {
                   alignment: Alignment.centerLeft,
                   child: Text(
                     '[ 30-DAY REPORT ]',
-                    style: Hud.head(22, _hi, spacing: .22).copyWith(
+                    style: Hud.headExact(22, _hi, spacing: .22).copyWith(
                       shadows: const [Shadow(color: _sys, blurRadius: 10)],
                     ),
                   ),
                 ),
-                Text(sysName, style: Hud.mono(7.5, _dim, spacing: .3)),
+                Text(sysName, style: Hud.monoExact(7.5, _dim, spacing: .3)),
                 const SizedBox(height: 10),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -134,11 +137,15 @@ class ShareCard extends StatelessWidget {
                             children: [
                               Text(
                                 '${r.clearRate}%',
-                                style: Hud.head(20, Colors.white, spacing: 0),
+                                style: Hud.headExact(
+                                  20,
+                                  Colors.white,
+                                  spacing: 0,
+                                ),
                               ),
                               Text(
                                 'CLEAR RATE',
-                                style: Hud.mono(5.5, _dim, spacing: .25),
+                                style: Hud.monoExact(5.5, _dim, spacing: .25),
                               ),
                             ],
                           ),
@@ -152,7 +159,7 @@ class ShareCard extends StatelessWidget {
                         children: [
                           Text(
                             'THEN → NOW',
-                            style: Hud.mono(6, _dim, spacing: .3),
+                            style: Hud.monoExact(6, _dim, spacing: .3),
                           ),
                           for (final t in r.targets.take(3))
                             Container(
@@ -171,16 +178,16 @@ class ShareCard extends StatelessWidget {
                                       t.label,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: Hud.mono(8.5, _text),
+                                      style: Hud.monoExact(8.5, _text),
                                     ),
                                   ),
                                   Text(
                                     '${t.before} ',
-                                    style: Hud.mono(7, _dim),
+                                    style: Hud.monoExact(7, _dim),
                                   ),
                                   Text(
                                     '${t.after}${t.unit.isEmpty ? '' : ' ${t.unit}'}',
-                                    style: Hud.mono(
+                                    style: Hud.monoExact(
                                       8.5,
                                       Colors.white,
                                       weight: FontWeight.w700,
@@ -235,7 +242,7 @@ class ShareCard extends StatelessWidget {
                   child: Text(
                     r.headline,
                     textAlign: TextAlign.center,
-                    style: Hud.head(
+                    style: Hud.headExact(
                       10.5,
                       _text,
                       spacing: .03,
@@ -247,14 +254,14 @@ class ShareCard extends StatelessWidget {
                   children: [
                     Text(
                       'ISSUED BY THE SYSTEM',
-                      style: Hud.mono(6, _dim, spacing: .3),
+                      style: Hud.monoExact(6, _dim, spacing: .3),
                     ),
                     const Spacer(),
                     Text(
                       start == now
                           ? 'RANK ${now.name.toUpperCase()}'
                           : 'RANK ${start.name.toUpperCase()} → ${now.name.toUpperCase()}',
-                      style: Hud.mono(6, _dim, spacing: .3),
+                      style: Hud.monoExact(6, _dim, spacing: .3),
                     ),
                   ],
                 ),
@@ -272,7 +279,7 @@ class ShareCard extends StatelessWidget {
       children: [
         Container(width: 5, height: 5, color: c),
         const SizedBox(width: 4),
-        Text(label, style: Hud.mono(6, _dim, spacing: .25)),
+        Text(label, style: Hud.monoExact(6, _dim, spacing: .25)),
       ],
     ),
   );
@@ -288,11 +295,11 @@ class ShareCard extends StatelessWidget {
           ),
           child: Column(
             children: [
-              Text(value, style: Hud.head(13, Colors.white, spacing: 0)),
+              Text(value, style: Hud.headExact(13, Colors.white, spacing: 0)),
               const SizedBox(height: 2),
               FittedBox(
                 fit: BoxFit.scaleDown,
-                child: Text(label, style: Hud.mono(5, _dim, spacing: .25)),
+                child: Text(label, style: Hud.monoExact(5, _dim, spacing: .25)),
               ),
             ],
           ),

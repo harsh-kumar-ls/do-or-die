@@ -40,11 +40,82 @@ void main() {
     });
   });
 
-  group('lock length by level', () {
-    test('4 hours at level 1, +20 minutes per level', () {
+  group('lock length', () {
+    test('a fixed 4 hours: success never makes the lock longer', () {
       expect(calc.lockMinutesForLevel(1), 240);
-      expect(calc.lockMinutesForLevel(2), 260);
-      expect(calc.lockMinutesForLevel(10), 420);
+      expect(calc.lockMinutesForLevel(10), 240);
+      expect(calc.lockMinutesForLevel(40), 240);
+    });
+  });
+
+  group('the lock starts at the chosen time', () {
+    const scheduler = LockScheduler();
+    const day = DayKey(2026, 10, 20);
+    const sleep = SleepWindow(); // 23:00-07:00
+    LockWindow? at(int startMinute, {int minutes = 240, DateTime? notBefore}) =>
+        scheduler.schedule(
+          day: day,
+          durationMinutes: minutes,
+          sleep: sleep,
+          random: Random(1),
+          notBefore: notBefore,
+          startMinute: startMinute,
+        );
+
+    test('18:00 gives 18:00-22:00', () {
+      final w = at(18 * 60)!;
+      expect(w.start, day.at(18 * 60));
+      expect(w.end, day.at(22 * 60));
+      expect(w.clamped, isFalse);
+    });
+
+    test('too close to bedtime: moved earlier to fit before 23:00', () {
+      final w = at(21 * 60)!;
+      expect(w.start, day.at(19 * 60));
+      expect(w.end, day.at(23 * 60));
+    });
+
+    test('a time inside the rest period moves to wake-up', () {
+      final w = at(3 * 60)!;
+      expect(w.start, day.at(7 * 60));
+    });
+
+    test('a late verdict shortens the lock but never moves its end', () {
+      final w = at(18 * 60, notBefore: day.at(19 * 60 + 30))!;
+      expect(w.start, day.at(19 * 60 + 30));
+      expect(w.end, day.at(22 * 60));
+    });
+
+    test('a verdict after the window has passed: no lock', () {
+      expect(at(18 * 60, notBefore: day.at(22 * 60 + 5)), isNull);
+    });
+
+    test('a lock longer than the waking day is clamped to it', () {
+      final w = at(18 * 60, minutes: 20 * 60)!;
+      expect(w.start, day.at(7 * 60));
+      expect(w.end, day.at(23 * 60));
+      expect(w.clamped, isTrue);
+    });
+  });
+
+  group('emergency exit', () {
+    const day = DayKey(2026, 10, 20);
+    final lock = LockWindow(
+      day: day,
+      start: day.at(18 * 60),
+      end: day.at(22 * 60),
+    );
+
+    test('ends the lock at the exit time', () {
+      final out = lock.exitAt(day.at(19 * 60));
+      expect(out.effectiveEnd, day.at(19 * 60));
+      expect(out.isActiveAt(day.at(19 * 60 + 1)), isFalse);
+      expect(out.isActiveAt(day.at(18 * 60 + 30)), isTrue);
+    });
+
+    test('before the lock starts, it never starts', () {
+      final out = lock.exitAt(day.at(9 * 60));
+      expect(out.isActiveAt(day.at(18 * 60)), isFalse);
     });
   });
 

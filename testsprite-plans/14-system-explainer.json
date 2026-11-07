@@ -33,10 +33,6 @@
     },
     {
       "type": "action",
-      "description": "On the 'CHOOSE YOUR SYSTEM' screen, click the small diamond button named 'Show the Focus System' under the card, then wait 1 second"
-    },
-    {
-      "type": "action",
       "description": "If the front card shows 'TAP TO INSPECT', click it once (the button named 'Focus System') and wait 1 second"
     },
     {

@@ -138,13 +138,16 @@ class SystemProgress {
 
   Rank? rankOf(SystemKind k) => ranks[k];
 
-  /// A System can be chosen only before the first choice, or once the
-  /// current one is complete.
+  /// No System is running: none chosen yet, or the current one is
+  /// complete (the quest screen then asks for the next one).
   bool get canChooseSystem => active == null || completed.contains(active);
 
+  /// Chooses [kind]: the first System, the next one after completing one,
+  /// or a switch (iteration 1: switching is allowed). Ranks never go down:
+  /// a System trained before keeps its higher rank.
   SystemProgress choose(SystemKind kind, Rank placement) {
-    if (!canChooseSystem) {
-      throw StateError('The current System must be completed first.');
+    if (kind == active && !completed.contains(kind)) {
+      throw StateError('That System is already active.');
     }
     if (completed.contains(kind)) {
       throw StateError('That System is already complete.');
@@ -154,9 +157,13 @@ class SystemProgress {
         'Placement can start at ${highestPlacement.name.toUpperCase()} at most.',
       );
     }
+    final before = ranks[kind];
+    final rank = before != null && before.index > placement.index
+        ? before
+        : placement;
     return SystemProgress(
       active: kind,
-      ranks: {...ranks, kind: placement},
+      ranks: {...ranks, kind: rank},
       completed: completed,
       reductions: const [], // a new System starts with full quests
     );

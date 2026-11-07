@@ -55,16 +55,17 @@ A daily quest you cannot skip. Fail it, and the System locks your apps.
 
 > Do or Die turns self-discipline into a strict daily quest.
 >
-> Choose one System: Fitness, Personality or Focus. A short placement test sets your starting rank, from E to C. Every day the System issues a quest for your rank: walks, push-ups and squats; reading, journaling and talking to people; phone-free blocks and social-media limits.
+> Start with the Focus System: limits on the apps you choose, phone-free blocks, and a lock you set in advance. Add the Fitness or Personality pack if you want; you can switch at any time. A short placement test sets your starting rank, from E to C. Every day the System issues a quest for your rank.
 >
-> Clear it before midnight and you earn XP. Fail it and the Penalty Zone follows: the apps you chose lock for hours at a time you are not told, and you owe a penalty that fits your System. Anything unpaid expires at midnight and is logged; nothing carries over.
+> Clear it before midnight and you earn XP. Fail it and the Penalty Zone follows: the apps you chose lock for 4 hours the next day, at a time you picked, and Focus and Personality add a short penalty (a phone-free block, or reading and a reflection). Fitness never uses exercise as a punishment. Anything unpaid expires at midnight and is logged; nothing carries over.
 >
 > Clear 21 of 30 days and a Gate opens. Enter it for a three-day Dungeon that ends in a Rank Trial. Clear it to rank up. Fail it, and the Dungeon Penalty doubles the lock.
 >
 > Built to be fair:
 > - Calls, messages, maps, settings, and banking and payment apps are never locked.
 > - Locks never start during your rest period.
-> - A 15-minute release always exists, and every one is counted.
+> - Each lock allows two 15-minute releases, and an emergency exit always ends it. Both are logged.
+> - Judged wrongly? One verdict in any 14 days can be contested.
 > - The first three days are a dry run: penalties are shown, not applied.
 >
 > Private by design: no account, no ads, no internet access. Everything stays on your phone.
@@ -90,8 +91,8 @@ A daily quest you cannot skip. Fail it, and the System locks your apps.
 
 | Permission | Declaration |
 |---|---|
-| Foreground service, special use | Required form. Text: "The foreground service watches which app is open while a user-chosen lock or phone-free block is active, so the lock can be enforced. It runs only while the habit trial is active and shows a permanent notification." Play may ask for a short video of a lock in action. |
-| Usage access (`PACKAGE_USAGE_STATS`) | No form, but Play expects in-app disclosure before the user grants it. The Awakening's lock step explains why it is needed. |
+| Foreground service, special use | Required form. Text: "The foreground service watches which app is open while a lock the user set up, a phone-free block the user started, or a pending daily verdict needs it, so the user's own lock can be enforced. It stops when none is pending; exact alarms wake it at midnight and just before a scheduled lock. The user can end any lock at once with the in-app emergency exit." Video: show the lock time in Settings, a failed day, the lock screen over a chosen app, and the emergency exit. |
+| Usage access (`PACKAGE_USAGE_STATS`) | No form. The in-app prominent disclosure (what is read, why, that it stays on the phone, ACCEPT / NOT NOW) appears before Android's Usage access page, in the Awakening and in System Check. The privacy policy is also in the app (Status → Settings). |
 | Display over other apps | No form. |
 | Exact alarms (`SCHEDULE_EXACT_ALARM`) | User-granted on Android 14+. [Likely] no declaration for internal testing; if Play asks, the use is deadline warnings for the daily quest. |
 

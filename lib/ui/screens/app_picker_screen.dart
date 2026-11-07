@@ -140,7 +140,7 @@ class _AppRow extends StatelessWidget {
     return Semantics(
       container: true,
       toggled: on,
-      label: '${app.label}${pending ? ', unlocks tomorrow' : ''}',
+      label: '${app.label}${pending ? ', unlocks in 7 days' : ''}',
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
@@ -168,7 +168,7 @@ class _AppRow extends StatelessWidget {
                       ),
                       if (pending)
                         Text(
-                          'UNLOCKS TOMORROW',
+                          'UNLOCKS IN 7 DAYS',
                           style: Hud.mono(9, Hud.warn, spacing: .12),
                         ),
                     ],
@@ -236,14 +236,25 @@ class AppPickerScreen extends StatelessWidget {
                       child: SystemWindow(
                         expand: true,
                         title: '[ LOCK TARGETS ]',
-                        subtitle: 'Adding an app locks it from now. Removing one takes effect tomorrow.',
+                        subtitle: 'Adding an app locks it from now. Removing one takes effect in 7 days; at least one app stays.',
                         child: AppPickerList(
                           blocker: blocker,
                           selected: model.service.blockedToday,
                           pending: model.pendingUnblocks,
-                          onChanged: (pkg, lock) => lock
-                              ? model.addBlockedApp(pkg)
-                              : model.removeBlockedApp(pkg),
+                          onChanged: (pkg, lock) async {
+                            if (lock) {
+                              await model.addBlockedApp(pkg);
+                            } else if (!await model.removeBlockedApp(pkg) &&
+                                context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'At least one app must stay on the lock list.',
+                                  ),
+                                ),
+                              );
+                            }
+                          },
                         ),
                       ),
                     ),

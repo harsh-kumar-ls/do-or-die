@@ -115,11 +115,15 @@ class Hud {
   static const headFont = 'ChakraPetch';
   static const monoFont = 'JetBrainsMono';
 
+  /// The smallest text the HUD draws, in logical pixels. Smaller sizes asked
+  /// for by a style are raised to this (legibility; audit iteration 1).
+  static const minText = 11.0;
+
   static TextStyle head(double size, Color color, {double spacing = .26}) =>
       TextStyle(
         fontFamily: headFont,
         fontWeight: FontWeight.w700,
-        fontSize: size,
+        fontSize: size < minText ? minText : size,
         letterSpacing: size * spacing,
         color: color,
       );
@@ -131,12 +135,32 @@ class Hud {
     double spacing = .04,
   }) => TextStyle(
     fontFamily: monoFont,
-    fontSize: size,
+    fontSize: size < minText ? minText : size,
     fontWeight: weight,
     letterSpacing: size * spacing,
     color: color,
     fontFeatures: const [FontFeature.tabularFigures()],
   );
+
+  /// For fixed-size images (the share card): exactly [size], no floor,
+  /// because the image is drawn at a scale of its own.
+  static TextStyle headExact(
+    double size,
+    Color color, {
+    double spacing = .26,
+  }) => head(size, color, spacing: spacing).copyWith(fontSize: size);
+
+  static TextStyle monoExact(
+    double size,
+    Color color, {
+    FontWeight weight = FontWeight.w400,
+    double spacing = .04,
+  }) => mono(
+    size,
+    color,
+    weight: weight,
+    spacing: spacing,
+  ).copyWith(fontSize: size);
 
   static ThemeData theme(HudPalette p) => ThemeData(
     brightness: Brightness.dark,

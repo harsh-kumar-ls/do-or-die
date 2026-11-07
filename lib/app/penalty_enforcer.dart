@@ -20,6 +20,23 @@ class PenaltyEnforcer {
   bool _sentNoWindow = false;
   String? _sentJudgeDue;
 
+  /// Forgets what was sent, so the next [sync] pushes everything again (after
+  /// a reset, or anything else that changed the phone's state behind it).
+  void invalidate() {
+    _sentPackages = null;
+    _sentWindow = null;
+    _sentFocus = null;
+    _sentNoFocus = false;
+    _sentNoWindow = false;
+    _sentJudgeDue = null;
+  }
+
+  /// Clears the phone's blocker for good (no game any more).
+  Future<void> reset() async {
+    invalidate();
+    await blocker.reset();
+  }
+
   Future<void> sync(GameService game) async {
     final packages = game.blockedToday;
     if (_sentPackages == null ||
@@ -30,14 +47,16 @@ class PenaltyEnforcer {
     }
 
     final lock = game.state.lock;
-    if (lock != null && lock.end.isAfter(clock.now())) {
+    if (lock != null &&
+        !lock.cancelled &&
+        lock.effectiveEnd.isAfter(clock.now())) {
       // The day after a failed Dungeon floor gets its own block screen.
       final mode = game.systems?.dungeonPenaltyDay == lock.day
           ? LockMode.dungeon
           : LockMode.penalty;
       final window = (
         lock.start,
-        lock.end,
+        lock.effectiveEnd,
         lock.releasedUntil,
         lock.releases,
         mode,
@@ -45,7 +64,7 @@ class PenaltyEnforcer {
       if (_sentWindow != window) {
         await blocker.setLockWindow(
           lock.start,
-          lock.end,
+          lock.effectiveEnd,
           releasedUntil: lock.releasedUntil,
           releases: lock.releases,
           mode: mode,

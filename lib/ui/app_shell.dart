@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -10,6 +11,7 @@ import 'screens/onboarding_screen.dart';
 import 'screens/penalty_screen.dart';
 import 'screens/quest_screen.dart';
 import 'screens/report_screen.dart';
+import 'screens/settings_screen.dart';
 import 'screens/status_screen.dart';
 import 'screens/system_check_screen.dart';
 import 'theme.dart';
@@ -51,6 +53,57 @@ class _AppShellState extends State<AppShell> {
           : Cue.penalty,
     );
     setState(() => _tab = t);
+  }
+
+  /// The System choice: the next System once one is complete, or a switch
+  /// (the active and completed Systems are hidden).
+  void _chooseSystem(BuildContext context, GameModel m) {
+    final progress = m.systems!.progress;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (ctx) => HudScope(
+          palette: HudPalette.system,
+          child: Scaffold(
+            body: HudBackground(
+              child: OnboardingScreen(
+                blocker: widget.blocker,
+                nextSystemOnly: true,
+                completed: {
+                  ...progress.completed,
+                  if (progress.active != null) progress.active!,
+                },
+                onDone: (r) async {
+                  await m.chooseSystem(r.system, r.placement, r.answers);
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Diagnostics can start and stop locks, so it is never a way out of a
+  /// real penalty; the enforcer re-sends everything afterwards.
+  void _openDiagnostics(BuildContext context, GameModel m) {
+    if (m.service.penaltyInEffect) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Diagnostics is unavailable while a penalty is in effect.',
+          ),
+        ),
+      );
+      return;
+    }
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute(
+            builder: (_) => BlockerSpikeScreen(blocker: widget.blocker),
+          ),
+        )
+        .then((_) => m.resyncBlocker());
   }
 
   @override
@@ -125,58 +178,24 @@ class _AppShellState extends State<AppShell> {
                                           ),
                                         ),
                                     onChooseSystem: () =>
+                                        _chooseSystem(context, m),
+                                    onOpenSettings: () =>
                                         Navigator.of(context).push(
                                           MaterialPageRoute(
-                                            builder: (ctx) => HudScope(
-                                              palette: HudPalette.system,
-                                              child: Scaffold(
-                                                body: HudBackground(
-                                                  child: OnboardingScreen(
-                                                    blocker: widget.blocker,
-                                                    nextSystemOnly: true,
-                                                    completed: m
-                                                        .systems!
-                                                        .progress
-                                                        .completed,
-                                                    onDone: (r) async {
-                                                      await m.chooseSystem(
-                                                        r.system,
-                                                        r.placement,
-                                                        r.answers,
-                                                      );
-                                                      if (ctx.mounted) {
-                                                        Navigator.of(ctx).pop();
-                                                      }
-                                                    },
-                                                  ),
-                                                ),
-                                              ),
+                                            builder: (ctx) => SettingsScreen(
+                                              model: m,
+                                              onSwitchSystem: () =>
+                                                  _chooseSystem(ctx, m),
+                                              onOpenDiagnostics: () =>
+                                                  _openDiagnostics(ctx, m),
                                             ),
                                           ),
                                         ),
-                                    onOpenDiagnostics: () {
-                                      // Diagnostics can start and stop locks,
-                                      // so it must never be a way out of a
-                                      // real penalty.
-                                      if (m.service.penaltyInEffect) {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                              const SnackBar(
-                                                content: Text(
-                                                  'Diagnostics is unavailable while a penalty is in effect.',
-                                                ),
-                                              ),
-                                            );
-                                        return;
-                                      }
-                                      Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) => BlockerSpikeScreen(
-                                            blocker: widget.blocker,
-                                          ),
-                                        ),
-                                      );
-                                    },
+                                    // Debug builds only: diagnostics can
+                                    // start and stop locks.
+                                    onOpenDiagnostics: kDebugMode
+                                        ? () => _openDiagnostics(context, m)
+                                        : null,
                                   ),
                                   _Tab.penalty => PenaltyScreen(
                                     model: m,

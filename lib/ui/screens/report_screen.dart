@@ -628,6 +628,18 @@ class _Honesty extends StatelessWidget {
         r.releases > 0,
       ),
       (
+        'EMERGENCY EXITS',
+        '${r.emergencyExits}',
+        'locks ended early',
+        r.emergencyExits > 0,
+      ),
+      (
+        'CONTESTED VERDICTS',
+        '${r.contests}',
+        'one allowed per 14 days',
+        r.contests > 0,
+      ),
+      (
         'BLOCKER OUTAGES',
         '${r.watcherOutages}',
         'the lock was down',

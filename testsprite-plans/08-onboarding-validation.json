@@ -21,15 +21,15 @@
     },
     {
       "type": "assertion",
-      "description": "The 'CHOOSE YOUR SYSTEM' screen shows the FITNESS card in front, three diamond buttons under it, and a button reading 'CHOOSE FITNESS SYSTEM'"
+      "description": "The 'CHOOSE YOUR SYSTEM' screen shows the FOCUS card in front, three diamond buttons under it, and a button reading 'CHOOSE FOCUS SYSTEM'"
     },
     {
       "type": "action",
-      "description": "On the 'CHOOSE YOUR SYSTEM' screen, click the small diamond button named 'Show the Focus System' under the card, then wait 1 second"
+      "description": "On the 'CHOOSE YOUR SYSTEM' screen, click the small diamond button named 'Show the Fitness System' under the card, then wait 1 second"
     },
     {
       "type": "assertion",
-      "description": "The FOCUS card is now in front and the button reads 'CHOOSE FOCUS SYSTEM'; no 'PLACEMENT TEST' screen has been shown"
+      "description": "The FITNESS card is now in front and the button reads 'CHOOSE FITNESS SYSTEM'; no 'PLACEMENT TEST' screen has been shown"
     },
     {
       "type": "action",

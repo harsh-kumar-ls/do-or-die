@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import '../../app/game_service.dart';
 import '../../domain/day.dart';
 import '../../domain/penalty.dart';
 import '../../platform/blocker.dart';
@@ -94,6 +95,14 @@ class PenaltyScreen extends StatelessWidget {
                     if (model.lockActive || model.lockReleased) ...[
                       const SizedBox(height: 12),
                       _Release(model: model),
+                    ],
+                    if (model.lockActive ||
+                        model.lockReleased ||
+                        model.lockPending)
+                      _EmergencyExit(model: model),
+                    if (model.service.contestableDay != null) ...[
+                      const SizedBox(height: 12),
+                      _Contest(model: model),
                     ],
                     if (owes) ...[
                       const SizedBox(height: 12),
@@ -345,10 +354,10 @@ class _LockPanelState extends State<_LockPanel> {
     final String cap;
     var dimBig = false;
     if (m.lockActive) {
-      big = hms(lock!.end.difference(now));
+      big = hms(lock!.effectiveEnd.difference(now));
       cap = 'UNTIL ACCESS IS RESTORED';
     } else if (m.lockReleased) {
-      big = hms(lock!.end.difference(now));
+      big = hms(lock!.effectiveEnd.difference(now));
       final r = m.releaseEndsAt!.difference(now);
       cap =
           'RELEASED · LOCK RESUMES IN ${r.inMinutes.toString().padLeft(2, '0')}:${(r.inSeconds % 60).toString().padLeft(2, '0')}';
@@ -359,7 +368,7 @@ class _LockPanelState extends State<_LockPanel> {
       cap = 'THE LOCK WILL BEGIN WITHOUT WARNING';
       dimBig = true;
     } else if (lock != null &&
-        !now.isBefore(lock.end) &&
+        !now.isBefore(lock.effectiveEnd) &&
         DayKey.fromDateTime(lock.start) == m.service.today) {
       // Only on the day the lock ran; the record stays in state afterwards.
       big = '00:00:00';
@@ -503,6 +512,8 @@ class _Release extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = HudScope.of(context);
     final used = model.releasesUsed;
+    final left = model.service.releasesLeft;
+    final total = used + left;
     final active = model.lockReleased;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -511,6 +522,11 @@ class _Release extends StatelessWidget {
           Opacity(
             opacity: .45,
             child: CutButton('RELEASE ACTIVE', onPressed: null),
+          )
+        else if (left == 0)
+          Opacity(
+            opacity: .45,
+            child: CutButton('NO RELEASES LEFT', onPressed: null),
           )
         else
           ChargeButton(
@@ -524,7 +540,8 @@ class _Release extends StatelessWidget {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
-                      'Release ${model.releasesUsed} logged. Apps open for 15 minutes.',
+                      'Release ${model.releasesUsed} of $total logged. '
+                      'Apps open for 15 minutes.',
                     ),
                   ),
                 );
@@ -534,20 +551,20 @@ class _Release extends StatelessWidget {
         const SizedBox(height: 8),
         Row(
           children: [
-            Text('RELEASES USED', style: Hud.mono(10, p.dim, spacing: .14)),
+            Text('RELEASES LEFT', style: Hud.mono(11, p.dim, spacing: .14)),
             const SizedBox(width: 10),
             Expanded(
               child: Wrap(
                 spacing: 4,
                 children: [
-                  for (var k = 0; k < max(6, used); k++)
+                  for (var k = 0; k < total; k++)
                     Container(
                       width: 8,
                       height: 14,
                       decoration: BoxDecoration(
-                        color: k < used ? Hud.warn : Colors.transparent,
+                        color: k < left ? Hud.warn : Colors.transparent,
                         border: Border.all(
-                          color: k < used
+                          color: k < left
                               ? Hud.warn
                               : p.sys.withValues(alpha: .25),
                         ),
@@ -557,10 +574,174 @@ class _Release extends StatelessWidget {
               ),
             ),
             Text(
-              '$used',
-              style: Hud.mono(10, Hud.warn, weight: FontWeight.w700),
+              '$left / $total',
+              style: Hud.mono(11, Hud.warn, weight: FontWeight.w700),
             ),
           ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Asks for a written reason; returns it, or null when cancelled.
+Future<String?> askReason(
+  BuildContext context, {
+  required String title,
+  required String body,
+  required String confirm,
+  int minLength = 0,
+}) => showDialog<String>(
+  context: context,
+  builder: (c) => _ReasonDialog(
+    title: title,
+    body: body,
+    confirm: confirm,
+    minLength: minLength,
+  ),
+);
+
+class _ReasonDialog extends StatefulWidget {
+  const _ReasonDialog({
+    required this.title,
+    required this.body,
+    required this.confirm,
+    required this.minLength,
+  });
+  final String title;
+  final String body;
+  final String confirm;
+  final int minLength;
+
+  @override
+  State<_ReasonDialog> createState() => _ReasonDialogState();
+}
+
+class _ReasonDialogState extends State<_ReasonDialog> {
+  final _text = TextEditingController();
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ok = _text.text.trim().length >= widget.minLength;
+    return AlertDialog(
+      title: Text(widget.title),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(widget.body),
+          const SizedBox(height: 12),
+          TextField(
+            key: const ValueKey('reason'),
+            controller: _text,
+            maxLines: 3,
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              hintText: widget.minLength > 0
+                  ? 'Reason (at least ${widget.minLength} characters)'
+                  : 'Reason (optional)',
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('CANCEL'),
+        ),
+        TextButton(
+          onPressed: ok
+              ? () => Navigator.of(context).pop(_text.text.trim())
+              : null,
+          child: Text(widget.confirm),
+        ),
+      ],
+    );
+  }
+}
+
+/// The emergency exit: always available while a lock is pending or running.
+/// It ends the lock now, and is logged with its reason and shown in the
+/// report.
+class _EmergencyExit extends StatelessWidget {
+  const _EmergencyExit({required this.model});
+  final GameModel model;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    return TextButton(
+      onPressed: () async {
+        final reason = await askReason(
+          context,
+          title: 'Emergency exit',
+          body:
+              'Ends the lock now. For real emergencies: it is logged and '
+              'shown in your report.',
+          confirm: 'END THE LOCK',
+        );
+        if (reason == null) return;
+        final ok = await model.emergencyExit(reason);
+        if (ok && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Lock ended. Emergency exit logged.')),
+          );
+        }
+      },
+      child: Text('EMERGENCY EXIT', style: Hud.mono(12, p.dim, spacing: .16)),
+    );
+  }
+}
+
+/// Contest a wrongful verdict: one in any 14 days, with a written reason.
+class _Contest extends StatelessWidget {
+  const _Contest({required this.model});
+  final GameModel model;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Judged wrongly? (the phone died, a bug, travel, a limit the '
+          'phone could not measure) One verdict in any 14 days can be '
+          'contested. The lock and the debt are cancelled; the failure '
+          'stays on record.',
+          style: Hud.mono(12, p.dim).copyWith(height: 1.5),
+        ),
+        const SizedBox(height: 8),
+        CutButton(
+          'CONTEST THIS VERDICT',
+          onPressed: () async {
+            final reason = await askReason(
+              context,
+              title: 'Contest the verdict',
+              body: 'Say what went wrong. This is kept in your log.',
+              confirm: 'CONTEST',
+              minLength: GameService.contestReasonMin,
+            );
+            if (reason == null) return;
+            final ok = await model.contestVerdict(reason);
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    ok
+                        ? 'Verdict contested. Lock and debt cancelled.'
+                        : 'The verdict could not be contested.',
+                  ),
+                ),
+              );
+            }
+          },
         ),
       ],
     );
@@ -637,6 +818,8 @@ class _DebtPanel extends StatelessWidget {
         }
       case PenaltyKind.focus:
         add(_BlockDebt(model: model, debt: debt));
+      case PenaltyKind.none:
+        break;
     }
     return Panel(
       padding: const EdgeInsets.all(14),

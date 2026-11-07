@@ -11,17 +11,15 @@ import 'log_entry.dart';
 class RunningTimer {
   const RunningTimer(this.taskId, this.startedAt);
 
-  factory RunningTimer.fromJson(Map<String, Object?> j) => RunningTimer(
-    j['taskId'] as String,
-    DateTime.parse(j['startedAt'] as String),
-  );
+  factory RunningTimer.fromJson(Map<String, Object?> j) =>
+      RunningTimer(j['taskId'] as String, instantFromJson(j['startedAt']));
 
   final String taskId;
   final DateTime startedAt;
 
   Map<String, Object?> toJson() => {
     'taskId': taskId,
-    'startedAt': startedAt.toIso8601String(),
+    'startedAt': instantToJson(startedAt),
   };
 }
 
@@ -37,6 +35,8 @@ class SavedGame {
     this.timer,
     this.liveFrom,
     this.systems,
+    this.lockStartMinute,
+    this.zoneOffsetMinutes,
   });
 
   factory SavedGame.fromJson(Map<String, Object?> j) => SavedGame(
@@ -58,6 +58,8 @@ class SavedGame {
     systems: j['systems'] == null
         ? null
         : systemsFromJson((j['systems'] as Map).cast<String, Object?>()),
+    lockStartMinute: j['lockStartMinute'] as int?,
+    zoneOffsetMinutes: j['zoneOffsetMinutes'] as int?,
   );
 
   static const schemaVersion = 1;
@@ -83,6 +85,14 @@ class SavedGame {
   /// Systems existed: those keep their own written objectives.
   final SystemsState? systems;
 
+  /// Minutes after midnight when a penalty lock starts (the user's choice).
+  /// Null in games from before the choice existed: their start is random.
+  final int? lockStartMinute;
+
+  /// The UTC offset, in minutes, of the zone the open day was issued in.
+  /// A time-zone change can't move that day's deadline later.
+  final int? zoneOffsetMinutes;
+
   /// Whether a failure on [day] brings a real penalty.
   bool isEnforced(DayKey day) => liveFrom == null || !day.isBefore(liveFrom!);
 
@@ -97,6 +107,8 @@ class SavedGame {
     'timer': timer?.toJson(),
     'liveFrom': liveFrom == null ? null : dayToJson(liveFrom!),
     'systems': systems == null ? null : systemsToJson(systems!),
+    'lockStartMinute': lockStartMinute,
+    'zoneOffsetMinutes': zoneOffsetMinutes,
   };
 
   /// Returns a copy. [newLogEntries] are appended; existing entries can't be
@@ -109,6 +121,8 @@ class SavedGame {
     SleepWindow? sleep,
     RunningTimer? Function()? timer,
     SystemsState? systems,
+    int? lockStartMinute,
+    int? zoneOffsetMinutes,
     List<LogEntry> newLogEntries = const [],
   }) => SavedGame(
     state: state ?? this.state,
@@ -119,6 +133,8 @@ class SavedGame {
     timer: timer != null ? timer() : this.timer,
     liveFrom: liveFrom,
     systems: systems ?? this.systems,
+    lockStartMinute: lockStartMinute ?? this.lockStartMinute,
+    zoneOffsetMinutes: zoneOffsetMinutes ?? this.zoneOffsetMinutes,
     log: newLogEntries.isEmpty
         ? log
         : List.unmodifiable([...log, ...newLogEntries]),

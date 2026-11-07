@@ -177,6 +177,7 @@ class QuestEngine {
     int Function(DayKey day) xpPercent = _hundred,
     PenaltyKind Function(DayKey day) penaltyKind = _exercise,
     (int, int)? Function(DayKey day)? exerciseFor,
+    int? lockStartMinute,
   }) {
     final events = <GameEvent>[];
     var s = state;
@@ -195,6 +196,7 @@ class QuestEngine {
         xpPercent(day),
         penaltyKind(day),
         exerciseFor?.call(day),
+        lockStartMinute,
         events,
       );
     }
@@ -219,6 +221,7 @@ class QuestEngine {
     int xpPercent,
     PenaltyKind kind,
     (int, int)? exercise,
+    int? lockStartMinute,
     List<GameEvent> events,
   ) {
     final failedIds = [
@@ -293,6 +296,7 @@ class QuestEngine {
         sleep: sleep,
         random: random,
         notBefore: now,
+        startMinute: lockStartMinute,
       );
       events.add(
         window == null

@@ -45,8 +45,8 @@ Everything else is secondary.
 3. If **any** task fails on day D, the penalty applies on the **next day (D+1)**. One penalty per failed day, however many tasks failed.
 4. ~~**Physical:** `50 + 5 × (level − 1)` push-ups, due by the end of D+1.~~ **Changed 2026-11-07 (audit P0, safety):** the exercise penalty is the push-ups and squats of the user's own daily quest for that day, due by the end of D+1. It never scales with level and never doubles. A game without a System owes 10 push-ups and 15 squats.
 5. ~~**Push-up cap: 150**, then squats.~~ Superseded by rule 4 (2026-11-07).
-6. **Digital:** Instagram, YouTube and BGMI are locked for `4 hours + 20 minutes × (level − 1)` on D+1. Level 1 is 4h, level 10 is 7h. The lock does **not** last the whole day.
-7. **The lock starts at a random time on D+1, not announced in advance** (the twist). It must never start or run during sleep:
+6. **Digital:** the chosen apps are locked for **4 hours** on D+1. **Changed 2026-11-07 (iteration 1):** the length no longer grows with level.
+7. ~~**The lock starts at a random time on D+1, not announced in advance.**~~ **Changed 2026-11-07 (iteration 1, user decision):** the lock starts at a time the user chose (default 18:00, changed in Settings), moved inside waking hours if needed; a late verdict shortens it but never moves its end. Each lock allows 2 releases of 15 minutes plus an always-available, logged emergency exit; one verdict in any 14 days can be contested. It must never start or run during sleep:
    - The user sets a sleep window (default 23:00–07:00). The user can change it, effective from the next day.
    - The start time is picked at random so the whole lock fits inside waking hours.
    - If the lock is longer than the waking window (very high levels), it is clamped to the waking window. Logged.

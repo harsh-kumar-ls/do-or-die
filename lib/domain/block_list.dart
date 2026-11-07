@@ -91,8 +91,9 @@ class BlockList {
     return BlockList._(List.unmodifiable(next));
   }
 
-  BlockList remove(DayKey today, String package) {
-    final from = today.addDays(1);
+  /// Removes [package] from [delayDays] days after [today] (1 = tomorrow).
+  BlockList remove(DayKey today, String package, {int delayDays = 1}) {
+    final from = today.addDays(delayDays);
     final kept = versions.where((v) => v.effectiveFrom.isBefore(from));
     return BlockList._(
       List.unmodifiable([

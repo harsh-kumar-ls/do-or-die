@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app/game_service.dart';
@@ -10,6 +11,7 @@ import 'app/trusted_clock.dart';
 import 'data/game_store.dart';
 import 'platform/blocker.dart';
 import 'platform/notifier.dart';
+import 'platform/share_file.dart';
 import 'platform/time_source.dart';
 import 'platform/usage_meter.dart';
 import 'ui/app_shell.dart';
@@ -82,13 +84,33 @@ Future<void> main() async {
     // and replaced by an Awakening. One with a penalty still in effect is kept
     // until that penalty is over, so the update is never a way out of one.
     if (service != null && service.needsMigration) {
-      if (await service.abandon(reason: 'migrated_to_systems')) service = null;
+      if (await service.abandon(reason: 'migrated_to_systems')) {
+        // The old game is gone: nothing may keep blocking for it.
+        await platform.blocker.reset();
+        service = null;
+      }
     }
   } catch (e, st) {
-    // Never fall through to a fresh start: that could wipe a game (and a
-    // penalty). Say what went wrong instead of hanging on a black screen.
+    // Never fall through to a fresh start silently: that could wipe a game
+    // (and a penalty). Say what went wrong, and let the user export the save
+    // and, deliberately, start again.
     debugPrint('Could not load the saved game: $e\n$st');
-    runApp(StartupErrorApp(error: '$e'));
+    runApp(
+      StartupErrorApp(
+        error: '$e',
+        onExport: () async {
+          final raw = await store.raw();
+          if (raw != null) {
+            await shareTextFile(raw, name: 'do-or-die-save.json');
+          }
+        },
+        onReset: () async {
+          await store.setAsideUnreadable();
+          await platform.blocker.reset();
+          await SystemNavigator.pop();
+        },
+      ),
+    );
     return;
   }
   runApp(DoOrDieApp(store: store, initial: service, platform: platform));
@@ -154,11 +176,13 @@ class _DoOrDieAppState extends State<DoOrDieApp> {
     await model.requestNotifications();
   }
 
-  /// The game was archived and removed: back to the Awakening.
-  void _abandoned() {
+  /// The game was archived and removed: back to the Awakening. The phone's
+  /// blocker is cleared, so no lock or verdict redirect outlives the game.
+  Future<void> _abandoned() async {
     final old = _model;
     setState(() => _model = null);
     old?.dispose();
+    await _enforcer.reset();
   }
 
   @override
@@ -190,9 +214,21 @@ class _DoOrDieAppState extends State<DoOrDieApp> {
 
 /// Shown when the saved game can't be read at start.
 class StartupErrorApp extends StatelessWidget {
-  const StartupErrorApp({super.key, required this.error});
+  const StartupErrorApp({
+    super.key,
+    required this.error,
+    this.onExport,
+    this.onReset,
+  });
 
   final String error;
+
+  /// Shares the unreadable save as a file.
+  final Future<void> Function()? onExport;
+
+  /// Sets the unreadable save aside (kept, never deleted), clears the
+  /// phone's blocker and closes the app; the next start is a new Awakening.
+  final Future<void> Function()? onReset;
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -219,12 +255,59 @@ class StartupErrorApp extends StatelessWidget {
               const SizedBox(height: 16),
               SelectableText(
                 error,
-                style: Hud.mono(10, HudPalette.penalty.dim),
+                style: Hud.mono(11, HudPalette.penalty.dim),
               ),
+              const SizedBox(height: 24),
+              if (onExport != null)
+                OutlinedButton(
+                  onPressed: onExport,
+                  child: const Text('EXPORT SAVED DATA'),
+                ),
+              if (onReset != null) ...[
+                const SizedBox(height: 12),
+                _ResetButton(onReset: onReset!),
+              ],
             ],
           ),
         ),
       ),
     ),
+  );
+}
+
+/// Starting again needs a confirmation: the unreadable save is kept aside,
+/// but the current game can't be continued afterwards.
+class _ResetButton extends StatelessWidget {
+  const _ResetButton({required this.onReset});
+
+  final Future<void> Function() onReset;
+
+  @override
+  Widget build(BuildContext context) => TextButton(
+    onPressed: () async {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('Start again?'),
+          content: const Text(
+            'The unreadable save is kept on this phone and can still be '
+            'exported. A new Awakening starts the next time the app opens. '
+            'Any lock from the old game is cleared.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(c).pop(false),
+              child: const Text('CANCEL'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(c).pop(true),
+              child: const Text('START AGAIN'),
+            ),
+          ],
+        ),
+      );
+      if (ok == true) await onReset();
+    },
+    child: const Text('START AGAIN'),
   );
 }

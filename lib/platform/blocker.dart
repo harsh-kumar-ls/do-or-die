@@ -67,6 +67,9 @@ class SystemStatus {
     this.watcherRunning = false,
     this.batteryExempt = false,
     this.autoTime = true,
+    this.autoTimeZone = true,
+    this.exactAlarms = true,
+    this.watcherNeeded = false,
     this.lastHeartbeatAt,
   });
 
@@ -77,13 +80,17 @@ class SystemStatus {
     watcherRunning: m['watcherRunning'] as bool? ?? false,
     batteryExempt: m['batteryExempt'] as bool? ?? false,
     autoTime: m['autoTime'] as bool? ?? true,
+    autoTimeZone: m['autoTimeZone'] as bool? ?? true,
+    exactAlarms: m['exactAlarms'] as bool? ?? true,
+    watcherNeeded: m['watcherNeeded'] as bool? ?? false,
     lastHeartbeatAt: switch (m['lastHeartbeatAt']) {
       final int ms when ms > 0 => DateTime.fromMillisecondsSinceEpoch(ms),
       _ => null,
     },
   );
 
-  /// Locks can be enforced: both permissions granted and the watcher running.
+  /// Locks can be enforced: both permissions granted, and the watcher
+  /// running whenever it is needed (it sleeps between exact alarms).
   final bool serviceEnabled;
 
   /// "Usage access": the watcher can see which app is in front.
@@ -100,6 +107,16 @@ class SystemStatus {
 
   /// Automatic date and time is on.
   final bool autoTime;
+
+  /// Automatic time zone is on.
+  final bool autoTimeZone;
+
+  /// Exact alarms are allowed, so the watcher can sleep and be woken on
+  /// time; without them it runs all the time.
+  final bool exactAlarms;
+
+  /// The watcher has to be running right now.
+  final bool watcherNeeded;
 
   /// When the watcher last reported in (every 10 s while it runs), so the
   /// length of an outage can be measured. Null if it never ran.
@@ -180,6 +197,10 @@ abstract class AppBlocker {
   /// Starts the watcher if its permissions are granted (it stops on a force
   /// stop). Returns whether locks can be enforced afterwards.
   Future<bool> startWatcher();
+
+  /// No game any more: clears every lock, block, app and pending verdict on
+  /// the phone and stops the watcher, so nothing keeps blocking.
+  Future<void> reset();
 }
 
 /// Web and other platforms: no app blocking yet.
@@ -237,6 +258,9 @@ class NoopAppBlocker implements AppBlocker {
 
   @override
   Future<bool> startWatcher() async => false;
+
+  @override
+  Future<void> reset() async {}
 }
 
 class AndroidAppBlocker implements AppBlocker {
@@ -327,4 +351,7 @@ class AndroidAppBlocker implements AppBlocker {
   @override
   Future<bool> startWatcher() async =>
       await _channel.invokeMethod<bool>('startWatcher') ?? false;
+
+  @override
+  Future<void> reset() => _channel.invokeMethod('reset');
 }

@@ -38,6 +38,22 @@ class PrefsGameStore implements GameStore {
   @override
   Future<void> clear() => _prefs.remove(_key);
 
+  /// The saved game exactly as stored, for export when it can't be read.
+  Future<String?> raw() => _prefs.getString(_key);
+
+  /// Keeps an unreadable save under its own key (never deleted) and removes
+  /// it from the current slot, so a new game can start.
+  Future<void> setAsideUnreadable() async {
+    final raw = await _prefs.getString(_key);
+    if (raw != null) {
+      await _prefs.setString(
+        'doordie.unreadable.${DateTime.now().millisecondsSinceEpoch}',
+        raw,
+      );
+    }
+    await _prefs.remove(_key);
+  }
+
   /// Each archive gets its own key; nothing is ever overwritten.
   @override
   Future<void> archive(SavedGame game) => _prefs.setString(

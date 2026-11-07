@@ -38,7 +38,7 @@ CONFIRM_APPS = act("Click 'CONFIRM TARGETS' on the 'LOCK TARGETS' screen (the we
 
 def show(system):
     """Brings a System's card to the front of the carousel."""
-    if system == "FITNESS":
+    if system == "FOCUS":  # the core System is in front first
         return []
     return [act(f"On the 'CHOOSE YOUR SYSTEM' screen, click the small diamond button named 'Show the {system.title()} System' under the card, then wait 1 second")]
 
@@ -156,9 +156,9 @@ PLANS = {
         [
             LOAD,
             *CONTACT,
-            check("The 'CHOOSE YOUR SYSTEM' screen shows the FITNESS card in front, three diamond buttons under it, and a button reading 'CHOOSE FITNESS SYSTEM'"),
-            *show("FOCUS"),
-            check("The FOCUS card is now in front and the button reads 'CHOOSE FOCUS SYSTEM'; no 'PLACEMENT TEST' screen has been shown"),
+            check("The 'CHOOSE YOUR SYSTEM' screen shows the FOCUS card in front, three diamond buttons under it, and a button reading 'CHOOSE FOCUS SYSTEM'"),
+            *show("FITNESS"),
+            check("The FITNESS card is now in front and the button reads 'CHOOSE FITNESS SYSTEM'; no 'PLACEMENT TEST' screen has been shown"),
             *show("PERSONALITY"),
             check("The button now reads 'CHOOSE PERSONALITY SYSTEM'"),
         ],

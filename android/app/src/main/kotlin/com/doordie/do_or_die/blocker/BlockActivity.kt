@@ -43,7 +43,7 @@ class BlockActivity : Activity() {
             }
             val penalty = BlockerState.isPenaltyLocked(ctx)
             if (penalty) {
-                countdown.text = format(BlockerState.lockEndsAt(ctx) - TrustedTime.nowMillis())
+                countdown.text = format(BlockerState.lockEndsAt(ctx) - TrustedTime.nowMillis(ctx))
                 countdown.setTextSize(TypedValue.COMPLEX_UNIT_SP, 52f)
             } else {
                 countdown.text = "BLOCK RUNNING"

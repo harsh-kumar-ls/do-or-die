@@ -21,6 +21,10 @@
     },
     {
       "type": "action",
+      "description": "On the 'CHOOSE YOUR SYSTEM' screen, click the small diamond button named 'Show the Fitness System' under the card, then wait 1 second"
+    },
+    {
+      "type": "action",
       "description": "Click 'CHOOSE FITNESS SYSTEM'"
     },
     {

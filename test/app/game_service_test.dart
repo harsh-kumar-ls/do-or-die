@@ -135,26 +135,43 @@ void main() {
     expect(g.game.log.any((e) => e.type == 'plan_edited'), isTrue);
   });
 
-  test('removing a blocked app applies tomorrow; adding applies now', () async {
+  test(
+    'removing a blocked app applies after 7 days; adding applies now',
+    () async {
+      final g = await startGame();
+      expect(await g.removeBlockedApp('com.pubg.imobile'), isTrue);
+      await g.addBlockedApp('com.twitter.android');
+      expect(g.blockedToday, contains('com.pubg.imobile'));
+      expect(g.blockedToday, contains('com.twitter.android'));
+      clock.set(DateTime(2026, 10, 25, 9));
+      expect(g.blockedToday, contains('com.pubg.imobile'), reason: 'day 6');
+      clock.set(DateTime(2026, 10, 26, 9));
+      expect(g.blockedToday, isNot(contains('com.pubg.imobile')));
+    },
+  );
+
+  test('the last app on the lock list cannot be removed', () async {
     final g = await startGame();
-    await g.removeBlockedApp('com.pubg.imobile');
-    await g.addBlockedApp('com.twitter.android');
-    expect(g.blockedToday, contains('com.pubg.imobile'));
-    expect(g.blockedToday, contains('com.twitter.android'));
-    clock.set(DateTime(2026, 10, 20, 9));
-    expect(g.blockedToday, isNot(contains('com.pubg.imobile')));
+    final apps = g.blockedToday.toList();
+    for (final a in apps.skip(1)) {
+      expect(await g.removeBlockedApp(a), isTrue);
+    }
+    expect(await g.removeBlockedApp(apps.first), isFalse);
+    clock.set(DateTime(2026, 11, 1, 9));
+    expect(g.blockedToday, {apps.first});
   });
 
-  test('settings, stats and emergency stops survive a restart', () async {
+  test('settings survive a restart and are logged', () async {
     final g = await startGame();
     await g.setSleepWindow(
       const SleepWindow(startMinute: 60, endMinute: 9 * 60),
     );
-    await g.recordEmergencyStop();
+    await g.setLockStart(20 * 60);
     final again = await reload();
     expect(again.game.sleep.startMinute, 60);
+    expect(again.lockStartMinute, 20 * 60);
     expect(
-      again.game.log.where((e) => e.type == 'emergency_stop'),
+      again.game.log.where((e) => e.type == 'lock_start_changed'),
       hasLength(1),
     );
   });
@@ -183,7 +200,7 @@ void main() {
     clock.set(DateTime(2026, 10, 21, 9));
     await g.tick();
     snapshots.add(g.game.log.map(key).toList());
-    await g.recordEmergencyStop();
+    await g.setLockStart(19 * 60);
     snapshots.add(g.game.log.map(key).toList());
 
     for (var i = 1; i < snapshots.length; i++) {
@@ -199,7 +216,7 @@ void main() {
   test('export contains every log entry in JSON and CSV', () async {
     final g = await startGame();
     await g.addProgress('read', 12);
-    await g.recordEmergencyStop();
+    await g.setLockStart(19 * 60);
     final json = jsonDecode(g.exportLogJson()) as List;
     expect(json, hasLength(g.game.log.length));
     final csv = g.exportLogCsv().split('\n');

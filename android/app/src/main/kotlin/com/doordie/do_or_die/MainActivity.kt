@@ -14,6 +14,7 @@ import android.provider.Telephony
 import android.telecom.TelecomManager
 import com.doordie.do_or_die.blocker.BlockerState
 import com.doordie.do_or_die.blocker.Permissions
+import com.doordie.do_or_die.blocker.WakeScheduler
 import com.doordie.do_or_die.blocker.WatcherService
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -26,8 +27,9 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        // Opening the app always (re)starts the watcher if it's allowed to run.
-        WatcherService.startIfAllowed(this)
+        // Opening the app starts the watcher if it is needed now, or
+        // schedules its wake-ups.
+        WatcherService.sync(this)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "doordie/blocker")
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -37,6 +39,7 @@ class MainActivity : FlutterActivity() {
                     "setBlockedPackages" -> {
                         val packages = call.argument<List<String>>("packages").orEmpty().toSet()
                         BlockerState.setBlockedPackages(this, packages)
+                        WatcherService.sync(this)
                         result.success(null)
                     }
                     "setLockWindow" -> {
@@ -46,14 +49,17 @@ class MainActivity : FlutterActivity() {
                         val releases = call.argument<Number>("releases")?.toInt() ?: 0
                         val mode = call.argument<String>("mode") ?: "penalty"
                         BlockerState.setLockWindow(this, start, end, releasedUntil, releases, mode)
+                        WatcherService.sync(this)
                         result.success(null)
                     }
                     "clearLockWindow" -> {
                         BlockerState.clearLockWindow(this)
+                        WatcherService.sync(this)
                         result.success(null)
                     }
                     "setJudgeDueFrom" -> {
                         BlockerState.setJudgeDueFrom(this, call.argument<String>("day"))
+                        WatcherService.sync(this)
                         result.success(null)
                     }
                     "installedApps" -> thread {
@@ -74,6 +80,9 @@ class MainActivity : FlutterActivity() {
                             "watcherRunning" to WatcherService.running,
                             "batteryExempt" to isBatteryExempt(),
                             "autoTime" to TrustedTime.autoTimeEnabled(this),
+                            "autoTimeZone" to TrustedTime.autoTimeZoneEnabled(this),
+                            "exactAlarms" to WakeScheduler.canScheduleExact(this),
+                            "watcherNeeded" to WatcherService.needed(this),
                             "lastHeartbeatAt" to BlockerState.lastHeartbeat(this),
                         ),
                     )
@@ -84,8 +93,14 @@ class MainActivity : FlutterActivity() {
                         startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
                         result.success(null)
                     }
+                    "reset" -> {
+                        BlockerState.reset(this)
+                        WakeScheduler.cancel(this)
+                        stopService(Intent(this, WatcherService::class.java))
+                        result.success(null)
+                    }
                     "startWatcher" -> {
-                        WatcherService.startIfAllowed(this)
+                        WatcherService.sync(this)
                         // Give the service a moment to report itself running.
                         main.postDelayed({ result.success(watcherReady()) }, 400)
                     }
@@ -108,6 +123,7 @@ class MainActivity : FlutterActivity() {
                             call.argument<Number>("startsAt")?.toLong() ?: 0L,
                             call.argument<Number>("endsAt")?.toLong() ?: 0L,
                         )
+                        WatcherService.sync(this)
                         result.success(null)
                     }
                     "minutesUsed" -> thread {
@@ -144,9 +160,13 @@ class MainActivity : FlutterActivity() {
         (getSystemService(Context.POWER_SERVICE) as PowerManager)
             .isIgnoringBatteryOptimizations(packageName)
 
-    /** Both permissions granted and the watcher alive: locks can be enforced. */
+    /**
+     * Locks can be enforced: both permissions granted, and the watcher alive
+     * whenever it is needed (it sleeps between alarms otherwise).
+     */
     private fun watcherReady(): Boolean =
-        Permissions.usageAccess(this) && Permissions.overlay(this) && WatcherService.running
+        Permissions.usageAccess(this) && Permissions.overlay(this) &&
+            (WatcherService.running || !WatcherService.needed(this))
 
     /** Launchable apps with label and a small PNG icon, minus protected ones. */
     private fun installedApps(): List<Map<String, Any>> {

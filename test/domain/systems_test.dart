@@ -107,12 +107,26 @@ void main() {
     });
 
     test(
-      'no switching: a second System is refused until the first is complete',
+      'switching to another System is allowed; the active one is refused',
       () {
         final p = const SystemProgress().choose(SystemKind.focus, Rank.e);
-        expect(() => p.choose(SystemKind.fitness, Rank.e), throwsStateError);
+        expect(() => p.choose(SystemKind.focus, Rank.e), throwsStateError);
+        final q = p.choose(SystemKind.fitness, Rank.d);
+        expect(q.active, SystemKind.fitness);
+        expect(q.rankOf(SystemKind.focus), Rank.e, reason: 'ranks are kept');
       },
     );
+
+    test('switching back never lowers a rank earned before', () {
+      final p = const SystemProgress(
+        active: SystemKind.fitness,
+        ranks: {SystemKind.focus: Rank.b, SystemKind.fitness: Rank.e},
+      );
+      expect(
+        p.choose(SystemKind.focus, Rank.e).rankOf(SystemKind.focus),
+        Rank.b,
+      );
+    });
 
     test('placement can start at E, D or C, never higher', () {
       for (final ok in [Rank.e, Rank.d, Rank.c]) {

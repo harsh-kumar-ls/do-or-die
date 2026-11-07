@@ -9,7 +9,7 @@ import java.util.Locale
 
 /**
  * Enforcement state pushed from the app, persisted so it survives the app
- * being killed and the phone rebooting. Read by the accessibility service.
+ * being killed and the phone rebooting. Read by the watcher service.
  */
 object BlockerState {
     private const val PREFS = "doordie_blocker"
@@ -54,7 +54,7 @@ object BlockerState {
 
     /** Inside the penalty window and not in a short release. */
     fun isPenaltyLocked(ctx: Context): Boolean {
-        val now = TrustedTime.nowMillis()
+        val now = TrustedTime.nowMillis(ctx)
         val inWindow = now >= lockStartsAt(ctx) && now < lockEndsAt(ctx)
         return inWindow && now >= releasedUntil(ctx)
     }
@@ -62,7 +62,7 @@ object BlockerState {
     /** A phone-free block the user started is running. */
     fun isFocusLocked(ctx: Context): Boolean {
         val p = prefs(ctx)
-        val now = TrustedTime.nowMillis()
+        val now = TrustedTime.nowMillis(ctx)
         return now >= p.getLong(KEY_FOCUS_STARTS_AT, 0L) && now < p.getLong(KEY_FOCUS_ENDS_AT, 0L)
     }
 
@@ -115,7 +115,7 @@ object BlockerState {
 
     /** Starts a lock now, for the diagnostics screen. */
     fun startLock(ctx: Context, minutes: Int) {
-        val now = TrustedTime.nowMillis()
+        val now = TrustedTime.nowMillis(ctx)
         setLockWindow(ctx, now, now + minutes * 60_000L)
     }
 
@@ -139,13 +139,28 @@ object BlockerState {
 
     fun needsJudgement(ctx: Context): Boolean {
         val due = prefs(ctx).getString(KEY_JUDGE_DUE_FROM, null) ?: return false
-        if (!ISO_DAY.matches(due)) return false
-        // yyyy-MM-dd strings sort in date order.
-        val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(TrustedTime.nowMillis()))
-        return due < today
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(TrustedTime.nowMillis(ctx)))
+        return UsageLogic.dayBefore(due, today)
     }
 
-    private val ISO_DAY = Regex("""\d{4}-\d{2}-\d{2}""")
+    /**
+     * No game any more (abandoned, migrated, or an unreadable save was
+     * reset): forget every lock, block, app and pending verdict, so nothing
+     * keeps redirecting or blocking. Diagnostic counters are kept.
+     */
+    fun reset(ctx: Context) {
+        prefs(ctx).edit()
+            .remove(KEY_PACKAGES)
+            .remove(KEY_JUDGE_DUE_FROM)
+            .putString(KEY_MODE, "penalty")
+            .putLong(KEY_LOCK_STARTS_AT, 0L)
+            .putLong(KEY_LOCK_ENDS_AT, 0L)
+            .putLong(KEY_RELEASED_UNTIL, 0L)
+            .putInt(KEY_RELEASES, 0)
+            .putLong(KEY_FOCUS_STARTS_AT, 0L)
+            .putLong(KEY_FOCUS_ENDS_AT, 0L)
+            .commit()
+    }
 
     fun recordServiceConnected(ctx: Context) {
         prefs(ctx).edit().putLong(KEY_LAST_CONNECTED_AT, System.currentTimeMillis()).apply()

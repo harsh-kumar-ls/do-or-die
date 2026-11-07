@@ -7,6 +7,14 @@ import '../domain/progression.dart';
 import '../domain/systems.dart';
 import '../domain/tasks.dart';
 
+/// An instant as UTC ISO-8601 (with "Z"), so a time-zone change can't move
+/// it. Reading accepts older saves without an offset (read as local time).
+String instantToJson(DateTime t) => t.toUtc().toIso8601String();
+
+/// Reads an instant written by [instantToJson] (or an older local one) and
+/// returns it in local time.
+DateTime instantFromJson(Object? v) => DateTime.parse(v as String).toLocal();
+
 /// Hand-written JSON conversion for everything that is saved. Kept explicit
 /// so a saved file stays readable and stable across app versions.
 
@@ -111,25 +119,29 @@ Map<String, Object?>? lockToJson(LockWindow? w) => w == null
     ? null
     : {
         'day': dayToJson(w.day),
-        'start': w.start.toIso8601String(),
-        'end': w.end.toIso8601String(),
+        'start': instantToJson(w.start),
+        'end': instantToJson(w.end),
         'clamped': w.clamped,
-        'releasedUntil': w.releasedUntil?.toIso8601String(),
+        'releasedUntil': w.releasedUntil == null
+            ? null
+            : instantToJson(w.releasedUntil!),
         'releases': w.releases,
+        'exitedAt': w.exitedAt == null ? null : instantToJson(w.exitedAt!),
       };
 
 LockWindow? lockFromJson(Map<String, Object?>? j) => j == null
     ? null
     : LockWindow(
         day: dayFromJson(j['day']),
-        start: DateTime.parse(j['start'] as String),
-        end: DateTime.parse(j['end'] as String),
+        start: instantFromJson(j['start']),
+        end: instantFromJson(j['end']),
         clamped: j['clamped'] as bool,
         // Absent in saves made before releases existed.
         releasedUntil: j['releasedUntil'] == null
             ? null
-            : DateTime.parse(j['releasedUntil'] as String),
+            : instantFromJson(j['releasedUntil']),
         releases: (j['releases'] as int?) ?? 0,
+        exitedAt: j['exitedAt'] == null ? null : instantFromJson(j['exitedAt']),
       );
 
 Map<String, Object?> stateToJson(GameState s) => {
@@ -191,7 +203,7 @@ Map<String, Object?> systemsToJson(SystemsState s) => {
       ? null
       : {
           'from': s.gate!.from.name,
-          'openedAt': s.gate!.openedAt.toIso8601String(),
+          'openedAt': instantToJson(s.gate!.openedAt),
         },
   'dungeon': s.dungeon == null
       ? null
@@ -253,7 +265,7 @@ SystemsState systemsFromJson(Map<String, Object?> j) {
         ? null
         : Gate(
             Rank.values.byName(gate['from'] as String),
-            DateTime.parse(gate['openedAt'] as String),
+            instantFromJson(gate['openedAt']),
           ),
     dungeon: dungeon == null
         ? null

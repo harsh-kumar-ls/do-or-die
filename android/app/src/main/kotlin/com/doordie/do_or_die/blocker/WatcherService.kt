@@ -5,8 +5,6 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.app.usage.UsageEvents
-import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
@@ -18,11 +16,18 @@ import android.os.SystemClock
 import android.util.Log
 import com.doordie.do_or_die.MainActivity
 import com.doordie.do_or_die.R
+import com.doordie.do_or_die.TrustedTime
 
 /**
  * Watches which app is in front (via usage access) and shows the Penalty
  * Zone over the user's chosen apps while a lock is active. If a day ended
  * without a verdict, opening a chosen app sends the user to Do or Die first.
+ *
+ * It runs only while it is needed (a lock or phone-free block, a verdict
+ * due, or a lock about to start) and otherwise stops, after scheduling exact
+ * alarms that wake it at midnight and just before the next lock. Without the
+ * exact-alarm permission it keeps running, so enforcement never depends on
+ * a wake-up that can't happen.
  *
  * Replaces the accessibility service: payment and banking apps refuse to run
  * while any accessibility service is on, so this blocker uses none.
@@ -33,18 +38,27 @@ class WatcherService : Service() {
     private var foregroundPackage: String? = null
     private var lastActionAt = 0L
     private var lastHeartbeatAt = 0L
+    private var wasBusy = false
 
     private val loop = object : Runnable {
         override fun run() {
-            val busy = BlockerState.isLocked(this@WatcherService) ||
-                BlockerState.needsJudgement(this@WatcherService)
-            if (busy) check()
+            val ctx = this@WatcherService
+            val busy = BlockerState.isLocked(ctx) || BlockerState.needsJudgement(ctx)
+            if (busy) check(firstBusyTick = !wasBusy)
+            wasBusy = busy
             val now = SystemClock.elapsedRealtime()
             if (now - lastHeartbeatAt >= HEARTBEAT_MS) {
                 lastHeartbeatAt = now
-                BlockerState.recordHeartbeat(this@WatcherService)
+                BlockerState.recordHeartbeat(ctx)
             }
-            // Fast while it matters, slow otherwise (cheap: no query when idle).
+            if (!needed(ctx)) {
+                // Nothing to watch: wake up again by exact alarm, not by polling.
+                if (WakeScheduler.schedule(ctx)) {
+                    Log.i(TAG, "watcher idle; stopping until the next alarm")
+                    stopSelf()
+                    return
+                }
+            }
             handler.postDelayed(this, if (busy) FAST_MS else IDLE_MS)
         }
     }
@@ -70,18 +84,27 @@ class WatcherService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    /** Reads app-switch events since the last check and acts on the latest. */
-    private fun check() {
-        val usm = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+    /**
+     * Reads app-switch events since the last check and acts on the latest.
+     * On the first busy check (a lock just started, the watcher just woke)
+     * it looks back [LOOKBACK_MS], so an app already open when a lock begins
+     * is caught at once rather than when the user next switches apps.
+     */
+    private fun check(firstBusyTick: Boolean) {
         val now = System.currentTimeMillis()
-        val from = if (lastEventQueryAt == 0L) now - 10_000 else lastEventQueryAt
+        val from = if (firstBusyTick || lastEventQueryAt == 0L) now - LOOKBACK_MS else lastEventQueryAt
         lastEventQueryAt = now
-        val events = usm.queryEvents(from, now)
-        val e = UsageEvents.Event()
-        while (events.hasNextEvent()) {
-            events.getNextEvent(e)
-            if (e.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
-                foregroundPackage = e.packageName
+        val events = UsageMeter.events(this, from, now)
+        if (firstBusyTick) {
+            foregroundPackage = UsageLogic.foreground(events)
+        } else {
+            // Only a newly resumed app (or the screen going off) changes it.
+            for (e in events) {
+                when (e.kind) {
+                    UsageLogic.Kind.RESUMED -> foregroundPackage = e.pkg
+                    UsageLogic.Kind.SCREEN_OFF -> foregroundPackage = null
+                    else -> {}
+                }
             }
         }
         val pkg = foregroundPackage ?: return
@@ -116,7 +139,7 @@ class WatcherService : Service() {
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
             NotificationChannel(CHANNEL, "Penalty Zone watcher", NotificationManager.IMPORTANCE_MIN).apply {
-                description = "Keeps the Penalty Zone ready. Android requires this notice."
+                description = "Shown only while a lock, a phone-free block or a verdict is pending."
                 setShowBadge(false)
             },
         )
@@ -148,11 +171,22 @@ class WatcherService : Service() {
         private const val IDLE_MS = 5_000L
         private const val DEBOUNCE_MS = 1500L
         private const val HEARTBEAT_MS = 10_000L
+        private const val LOOKBACK_MS = 60 * 60_000L
 
         /** True while the service is alive in this process. */
         @Volatile
         var running = false
             private set
+
+        /** Whether the watcher has to be running right now. */
+        fun needed(ctx: Context): Boolean = UsageLogic.watcherNeeded(
+            locked = BlockerState.isLocked(ctx),
+            needsJudgement = BlockerState.needsJudgement(ctx),
+            now = TrustedTime.nowMillis(ctx),
+            lockStartsAt = BlockerState.lockStartsAt(ctx),
+            lockEndsAt = BlockerState.lockEndsAt(ctx),
+            exactAlarms = WakeScheduler.canScheduleExact(ctx),
+        ) || BlockerState.isFocusLocked(ctx)
 
         /** Starts the watcher if both permissions it needs are granted. */
         fun startIfAllowed(ctx: Context): Boolean {
@@ -163,6 +197,18 @@ class WatcherService : Service() {
             } catch (e: Exception) {
                 Log.w(TAG, "could not start watcher: $e")
                 false
+            }
+        }
+
+        /**
+         * After the app pushes new state, at boot and on an alarm: start the
+         * watcher if it is needed now, otherwise schedule its wake-ups.
+         */
+        fun sync(ctx: Context) {
+            if (needed(ctx)) {
+                startIfAllowed(ctx)
+            } else if (!WakeScheduler.schedule(ctx)) {
+                startIfAllowed(ctx)
             }
         }
     }

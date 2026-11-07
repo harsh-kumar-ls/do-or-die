@@ -45,6 +45,10 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Locks apps the user chose, during a self-imposed penalty they set up" />
         </service>
+        <!-- Exact alarms that wake the watcher at midnight and before a lock. -->
+        <receiver
+            android:name=".blocker.WakeReceiver"
+            android:exported="false" />
         <receiver
             android:name=".blocker.BootReceiver"
             android:exported="false">

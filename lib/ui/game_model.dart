@@ -201,6 +201,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       !s.serviceEnabled,
       !s.batteryExempt,
       !s.autoTime,
+      !s.autoTimeZone,
       notificationsBlocked,
       lateNotices,
     ].where((bad) => bad).length;
@@ -350,7 +351,9 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
   /// deliberately not shown.
   bool get lockPending {
     final lock = state.lock;
-    if (lock == null || lock.day != service.today) return false;
+    if (lock == null || lock.day != service.today || lock.cancelled) {
+      return false;
+    }
     return now.isBefore(lock.start);
   }
 
@@ -438,19 +441,33 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  /// Pushes everything to the phone's blocker again (after diagnostics or
+  /// anything else that changed it behind the enforcer's back).
+  Future<void> resyncBlocker() async {
+    enforcer?.invalidate();
+    await _sync();
+  }
+
+  Future<void> setSleepWindow(SleepWindow sleep) =>
+      _run(() => service.setSleepWindow(sleep));
+
+  Future<void> setLockStart(int minute) =>
+      _run(() => service.setLockStart(minute));
+
   Future<void> addBlockedApp(String package) =>
       _run(() => service.addBlockedApp(package));
 
-  Future<void> removeBlockedApp(String package) =>
-      _run(() => service.removeBlockedApp(package));
+  /// False when refused: the last app can't leave the lock list.
+  Future<bool> removeBlockedApp(String package) async {
+    var ok = false;
+    await _run(() async => ok = await service.removeBlockedApp(package));
+    return ok;
+  }
 
   /// Apps that will no longer be locked from tomorrow.
-  Set<String> get pendingUnblocks {
-    final tomorrow = service.today.addDays(1);
-    return service.blockedToday.difference(
-      service.game.blockList.packagesOn(tomorrow),
-    );
-  }
+  Set<String> get pendingUnblocks => service.blockedToday.difference(
+    service.game.blockList.packagesOn(service.removalEffectiveFrom),
+  );
 
   /// Takes a 15-minute release from the running lock. Returns false if the
   /// lock isn't in force right now.
@@ -458,6 +475,20 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     var released = false;
     await _run(() async => released = await service.releaseLock());
     return released;
+  }
+
+  /// Ends the lock now (always available; logged with [reason]).
+  Future<bool> emergencyExit(String reason) async {
+    var ok = false;
+    await _run(() async => ok = await service.emergencyExit(reason: reason));
+    return ok;
+  }
+
+  /// Contests yesterday's failed verdict (one in any 14 days).
+  Future<bool> contestVerdict(String reason) async {
+    var ok = false;
+    await _run(() async => ok = await service.contestVerdict(reason));
+    return ok;
   }
 
   /// Inside today's lock window, but in a short release.
@@ -486,14 +517,14 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       );
     }
     final lock = state.lock;
-    final lockLeft = lock != null && lock.end.isAfter(now);
+    final lockLeft = lock != null && lock.effectiveEnd.isAfter(now);
     final owes = parts.isNotEmpty;
     if (owes && lockLeft) {
       return "Finish today's ${parts.single} and wait for today's lock to end to unlock restart.";
     }
     if (owes) return "Finish today's ${parts.single} to unlock restart.";
     if (lockLeft && lock.inWindowAt(now)) {
-      return "Restart unlocks when today's lock ends at ${_hm(lock.end)}.";
+      return "Restart unlocks when today's lock ends at ${_hm(lock.effectiveEnd)}.";
     }
     return "Restart unlocks after today's lock ends.";
   }

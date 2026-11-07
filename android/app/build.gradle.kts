@@ -53,6 +53,10 @@ android {
         }
     }
 
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
+
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName(if (useUploadKey) "upload" else "debug")
@@ -77,4 +81,6 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // Plain JVM tests for the blocker's pure logic (src/test).
+    testImplementation("junit:junit:4.13.2")
 }

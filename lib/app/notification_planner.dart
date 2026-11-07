@@ -142,7 +142,7 @@ class NotificationPlanner {
 
     // The moment a scheduled lock begins; never earlier.
     final lock = g.state.lock;
-    if (lock != null) {
+    if (lock != null && lock.exitedAt == null) {
       add(
         NoticeId.lockEngaged,
         lock.start,

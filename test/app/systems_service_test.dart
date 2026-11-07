@@ -10,7 +10,6 @@ import 'package:do_or_die/domain/dungeon.dart';
 import 'package:do_or_die/domain/engine.dart';
 import 'package:do_or_die/domain/progression.dart';
 import 'package:do_or_die/domain/penalty_kind.dart';
-import 'package:do_or_die/domain/system_catalogue.dart';
 import 'package:do_or_die/domain/systems.dart';
 import 'package:do_or_die/domain/tasks.dart';
 import 'package:do_or_die/platform/blocker.dart';
@@ -218,9 +217,8 @@ void main() {
       final level = g.state.level;
       final p = g.engine.penalties;
       await nextDay(g); // floor 1 not cleared
-      final debt = g.state.debt!;
-      // Rank E daily quest: 10 push-ups and 15 squats. Never doubled.
-      expect((debt.primaryOwed, debt.secondaryOwed), (10, 15));
+      // Fitness owes no exercise, ever: the Dungeon Penalty is the lock.
+      expect(g.state.debt, isNull);
       final lock = g.state.lock!;
       expect(
         lock.end.difference(lock.start).inMinutes,
@@ -246,13 +244,18 @@ void main() {
     test('a normal failed day keeps the normal penalty and mode', () async {
       final g = await awaken(SystemKind.fitness);
       await nextDay(g);
-      expect(
-        (g.state.debt!.primaryOwed, g.state.debt!.secondaryOwed),
-        (10, 15),
-      );
+      expect(g.state.debt, isNull, reason: 'Fitness: the lock only');
+      expect(g.state.lock, isNotNull);
       final blocker = FakeBlocker();
       await PenaltyEnforcer(blocker, clock: clock).sync(g);
       expect(blocker.mode, LockMode.penalty);
+    });
+
+    test('switching System is refused during a Dungeon', () async {
+      final g = await atGate();
+      await clearToday(g);
+      await g.enterGate();
+      expect(await g.chooseSystem(SystemKind.focus, Rank.e), isFalse);
     });
 
     test('restart is refused during a Dungeon', () async {
@@ -407,11 +410,16 @@ void main() {
     });
   });
 
-  group('choosing the next System', () {
-    test('is refused until the current one is complete', () async {
+  group('switching Systems', () {
+    test('is allowed; the new quest starts tomorrow and is logged', () async {
       final g = await awaken(SystemKind.fitness);
-      expect(await g.chooseSystem(SystemKind.focus, Rank.e), isFalse);
-      expect(g.systems!.active, SystemKind.fitness);
+      expect(await g.chooseSystem(SystemKind.fitness, Rank.e), isFalse);
+      expect(await g.chooseSystem(SystemKind.focus, Rank.e), isTrue);
+      expect(g.systems!.active, SystemKind.focus);
+      expect(g.game.log.last.type, 'system_switched');
+      expect(g.game.log.last.data['from'], 'fitness');
+      await nextDay(g);
+      expect(g.todaysTasks.map((t) => t.id), contains('morning'));
     });
   });
 
@@ -492,33 +500,15 @@ void main() {
       expect(await g.confirmCap('social'), isFalse);
     });
 
-    test("the Fitness penalty follows the rank's own daily quest", () async {
-      final g = await awaken(SystemKind.fitness, placement: Rank.d);
-      await nextDay(g);
-      // Rank D daily quest: 20 push-ups and 30 squats.
-      expect(
-        (g.state.debt!.primaryOwed, g.state.debt!.secondaryOwed),
-        (20, 30),
-      );
-    });
-
-    test(
-      'the reduction valve lowers the Fitness penalty with the quest',
-      () async {
-        final g = await awaken(SystemKind.fitness, placement: Rank.d);
-        await g.setReduction(20);
-        await nextDay(g); // day 1 failed at full quest
-        await nextDay(g); // day 2 failed at -20%
-        expect(
-          (g.state.debt!.primaryOwed, g.state.debt!.secondaryOwed),
-          (16, 24),
-        );
-      },
-    );
-
-    test('rank S Fitness has no push-ups in its quest, so it owes none', () {
-      final quest = fitnessSystem.at(Rank.s).daily;
-      expect(exerciseVolume(quest), (0, 0));
+    test('Fitness never owes exercise as a penalty, at any rank', () async {
+      for (final rank in [Rank.e, Rank.d, Rank.c]) {
+        store = MemoryGameStore();
+        clock.set(day1.at(9 * 60));
+        final g = await awaken(SystemKind.fitness, placement: rank);
+        await nextDay(g);
+        expect(g.state.debt, isNull);
+        expect(g.state.lock, isNotNull, reason: 'the lock still applies');
+      }
     });
 
     test(
@@ -596,14 +586,11 @@ void main() {
   });
 
   group('penalties follow the System', () {
-    test('Fitness owes push-ups and squats from its own daily quest', () async {
+    test('Fitness owes no exercise: the lock is its whole penalty', () async {
       final g = await awaken(SystemKind.fitness);
-      await nextDay(g);
-      expect(g.state.debt!.kind, PenaltyKind.exercise);
-      expect(
-        (g.state.debt!.primaryOwed, g.state.debt!.secondaryOwed),
-        (10, 15),
-      );
+      final events = await nextDay(g);
+      expect(g.state.debt, isNull);
+      expect(events.whereType<PenaltyIssued>().single.kind, PenaltyKind.none);
     });
 
     test(

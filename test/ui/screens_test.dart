@@ -241,11 +241,15 @@ void main() {
     expect(restarted, isTrue);
   });
 
-  testUi('while push-ups are owed, restart says what blocks it', (
+  testUi('while a penalty is owed, restart says what blocks it', (
     tester,
   ) async {
     final clock = FixedClock(DateTime(2026, 10, 19, 10));
-    final model = await pumpShell(tester, clock: clock);
+    final model = await pumpShell(
+      tester,
+      clock: clock,
+      system: SystemKind.personality,
+    );
     clock.set(DateTime(2026, 10, 20, 6, 30));
     await model.tick();
     await acknowledgeAll(tester);
@@ -351,11 +355,8 @@ void main() {
         // Fail day 1; day 2 is a Penalty Zone with a lock.
         clock.set(g.today.addDays(1).at(9 * 60));
         await g.tick();
-        final debt = g.state.debt!;
-        await g.recordPenalty(
-          primary: debt.primaryOwed,
-          secondary: debt.secondaryOwed,
-        );
+        // Fitness owes no exercise: the lock is the whole penalty.
+        expect(g.state.debt, isNull);
         clock.set(g.state.lock!.end.add(const Duration(minutes: 1)));
         await g.tick();
       },
@@ -428,6 +429,8 @@ void main() {
     await pumpShell(
       tester,
       clock: clock,
+      // Personality owes reading, so the doubled debt panel shows.
+      system: SystemKind.personality,
       prepare: (g) async {
         await clearDays(g, clock, 21);
         await g.enterGate();
@@ -441,6 +444,12 @@ void main() {
     expect(find.text('DUNGEON PENALTY ACTIVE'), findsOneWidget);
     await openTab(tester, 'PENALTY');
     expect(find.text('[ DUNGEON PENALTY ]'), findsOneWidget);
+    // Below the lock panel, the emergency exit and the contest option.
+    await tester.dragUntilVisible(
+      find.text('[ DUNGEON DEBT · ×2 ]'),
+      find.text('[ DUNGEON PENALTY ]'),
+      const Offset(0, -200),
+    );
     expect(find.text('[ DUNGEON DEBT · ×2 ]'), findsOneWidget);
   });
 
@@ -549,14 +558,15 @@ void main() {
     await pumpOnboarding(tester, (_) {});
     await makeContact(tester);
     expect(find.text('CHOOSE YOUR SYSTEM'), findsOneWidget);
-    expect(find.text('CHOOSE FITNESS SYSTEM'), findsOneWidget);
+    // Focus is the core System, so it comes first.
+    expect(find.text('CHOOSE FOCUS SYSTEM'), findsOneWidget);
     await tester.tap(find.text('TAP TO INSPECT').first);
     await pumpFor(tester, 600);
-    expect(find.text('[ FITNESS · BRIEF ]'), findsOneWidget);
+    expect(find.text('[ FOCUS · BRIEF ]'), findsOneWidget);
     expect(find.text('WHERE YOU START'), findsOneWidget);
-    await tester.tap(find.bySemanticsLabel('Show the Personality System'));
+    await tester.tap(find.bySemanticsLabel('Show the Fitness System'));
     await pumpFor(tester, 600);
-    expect(find.text('CHOOSE PERSONALITY SYSTEM'), findsOneWidget);
+    expect(find.text('CHOOSE FITNESS SYSTEM'), findsOneWidget);
   });
 
   testUi('the Awakening places a strong candidate at C, never higher', (
@@ -565,6 +575,8 @@ void main() {
     OnboardingResult? result;
     await pumpOnboarding(tester, (r) => result = r);
     await makeContact(tester);
+    await tester.tap(find.bySemanticsLabel('Show the Fitness System'));
+    await pumpFor(tester, 600);
     await tapText(tester, 'CHOOSE FITNESS SYSTEM');
     // The System entry plays, then the placement test follows.
     await pumpFor(tester, 1500);
@@ -616,7 +628,10 @@ void main() {
     );
     await pumpFor(tester, 300);
     expect(find.text('FITNESS'), findsNothing);
-    expect(find.text('CHOOSE PERSONALITY SYSTEM'), findsOneWidget);
-    expect(find.bySemanticsLabel('Show the Focus System'), findsOneWidget);
+    expect(find.text('CHOOSE FOCUS SYSTEM'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('Show the Personality System'),
+      findsOneWidget,
+    );
   });
 }

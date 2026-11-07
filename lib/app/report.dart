@@ -38,6 +38,8 @@ class TrialReport {
     required this.stats,
     required this.level,
     required this.releases,
+    this.emergencyExits = 0,
+    this.contests = 0,
     required this.penaltyZones,
     required this.dungeonPenalties,
     required this.watcherOutages,
@@ -148,6 +150,8 @@ class TrialReport {
       stats: g.state.stats,
       level: g.state.level,
       releases: of('lock_released').length,
+      emergencyExits: of('emergency_exit').length,
+      contests: of('verdict_contested').length,
       // Ordinary Penalty Zones only; Dungeon Penalties are counted apart.
       penaltyZones:
           of('penalty_issued')
@@ -195,6 +199,12 @@ class TrialReport {
   final int level;
 
   final int releases;
+
+  /// Locks ended with the emergency exit.
+  final int emergencyExits;
+
+  /// Verdicts contested.
+  final int contests;
   final int penaltyZones;
   final int dungeonPenalties;
   final int watcherOutages;
@@ -233,6 +243,10 @@ class TrialReport {
       headline,
       if (releases > 0)
         '$releases release${releases == 1 ? '' : 's'} taken. They were counted.',
+      if (emergencyExits > 0)
+        '$emergencyExits emergency exit${emergencyExits == 1 ? '' : 's'}. Each one is on record.',
+      if (contests > 0)
+        '$contests verdict${contests == 1 ? '' : 's'} contested.',
     ];
     if (rank == Rank.s) {
       lines.add('Rank S. Hold it.');

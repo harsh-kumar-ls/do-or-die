@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../platform/blocker.dart';
 import '../game_model.dart';
 import '../theme.dart';
+import '../widgets/usage_disclosure.dart';
 import '../widgets/hud_background.dart';
 import '../widgets/hud_controls.dart';
 import '../widgets/system_window.dart';
@@ -91,7 +92,11 @@ class _SystemCheckScreenState extends State<SystemCheckScreen>
             'choose "Allow restricted settings", then allow this again.',
         s?.usageAccess,
         'ALLOW',
-        widget.blocker.requestUsageAccess,
+        () async {
+          if (await showUsageDisclosure(context)) {
+            await widget.blocker.requestUsageAccess();
+          }
+        },
       ),
       _Check(
         'DISPLAY OVER APPS',
@@ -102,9 +107,11 @@ class _SystemCheckScreenState extends State<SystemCheckScreen>
         widget.blocker.requestOverlay,
       ),
       _Check(
-        'WATCHER RUNNING',
-        'A force stop stops it; opening Do or Die starts it again.',
-        s?.watcherRunning,
+        'WATCHER READY',
+        'Runs only while a lock, a phone-free block or a verdict is pending, '
+            'and sleeps otherwise. A force stop stops it; opening Do or Die '
+            'starts it again.',
+        s?.serviceEnabled,
         'START',
         () async {
           await widget.blocker.startWatcher();
@@ -120,7 +127,8 @@ class _SystemCheckScreenState extends State<SystemCheckScreen>
       ),
       _Check(
         'ON-TIME ALERTS',
-        '"Alarms & reminders". Without it, notices can be an hour late.',
+        '"Alarms & reminders". Without it, notices can be an hour late and '
+            'the watcher has to run all day instead of waking for each lock.',
         android ? !m.lateNotices && !m.notificationsBlocked : null,
         'ALLOW',
         m.requestExactTiming,
@@ -136,6 +144,14 @@ class _SystemCheckScreenState extends State<SystemCheckScreen>
         'AUTOMATIC TIME',
         "The System can't trust a clock you set by hand.",
         s?.autoTime,
+        'FIX',
+        m.openDateSettings,
+      ),
+      _Check(
+        'AUTOMATIC TIME ZONE',
+        'A time zone set by hand could move the deadline. The System keeps '
+            "each day in the zone it began, and logs every change.",
+        s?.autoTimeZone,
         'FIX',
         m.openDateSettings,
       ),

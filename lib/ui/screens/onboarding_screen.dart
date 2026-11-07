@@ -4,6 +4,8 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../app/game_service.dart';
+
 import '../../data/codec.dart';
 import '../../domain/penalty.dart';
 import '../../domain/penalty_kind.dart';
@@ -15,6 +17,7 @@ import '../../domain/tasks.dart';
 import '../../platform/blocker.dart';
 import '../fx.dart';
 import '../theme.dart';
+import '../widgets/usage_disclosure.dart';
 import '../widgets/awakening_art.dart';
 import '../widgets/system_sigil.dart';
 import '../widgets/system_entry.dart';
@@ -150,7 +153,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       ),
       _Step.system => _SystemStep(
         choices: [
-          for (final k in SystemKind.values)
+          // Focus is the core System; Fitness and Personality are packs.
+          for (final k in const [
+            SystemKind.focus,
+            SystemKind.fitness,
+            SystemKind.personality,
+          ])
             if (!widget.completed.contains(k)) k,
         ],
         chosen: _system,
@@ -380,7 +388,7 @@ class _ContactStep extends StatefulWidget {
 
 class _ContactStepState extends State<_ContactStep>
     with TickerProviderStateMixin {
-  static const _message = 'You have met the conditions to become a Player.';
+  static const _message = 'A System has chosen you. Accept, or walk away.';
 
   late final _converge = AnimationController(
     vsync: this,
@@ -941,8 +949,9 @@ class _FlipCard extends StatelessWidget {
                 style: Hud.mono(13, p.text).copyWith(height: 1.55),
               ),
               const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              Wrap(
+                alignment: WrapAlignment.center,
+                runSpacing: 6,
                 children: [
                   for (final s in spec.stats)
                     Container(
@@ -1804,10 +1813,13 @@ class _AppsStepState extends State<_AppsStep> with WidgetsBindingObserver {
   }
 
   Future<void> _grant() async {
-    setState(() => _asked = true);
     if (_status?.usageAccess != true) {
+      // Play's prominent disclosure, with an explicit choice, comes first.
+      if (!await showUsageDisclosure(context)) return;
+      setState(() => _asked = true);
       await widget.blocker.requestUsageAccess();
     } else if (_status?.overlay != true) {
+      setState(() => _asked = true);
       await widget.blocker.requestOverlay();
     }
   }
@@ -2201,7 +2213,7 @@ class _TermsStepState extends State<_TermsStep> {
     ),
     ('Failure opens the Penalty Zone the next day.', true),
     (
-      'Your ${widget.lockTargets} lock target${widget.lockTargets == 1 ? '' : 's'} close for 4 hours (+20 minutes per level), at a time the System does not disclose.',
+      'Your ${widget.lockTargets} lock target${widget.lockTargets == 1 ? '' : 's'} close for 4 hours from ${_hm(GameService.defaultLockStart)} the next day. Change the time in Settings. A late verdict shortens a lock; it never runs later.',
       true,
     ),
     (
@@ -2209,7 +2221,15 @@ class _TermsStepState extends State<_TermsStep> {
       false,
     ),
     (
-      'Calls, messages, maps, banking apps and settings are never locked. A 15-minute release always exists; every one is counted.',
+      'Calls, messages, maps, banking apps and settings are never locked. Each lock allows 2 releases of 15 minutes, and an emergency exit always ends it. Both are logged and shown in your report.',
+      false,
+    ),
+    (
+      'Judged wrongly? One verdict in any 14 days can be contested, with a reason. The lock and debt are cancelled; the failure stays on record.',
+      false,
+    ),
+    (
+      'Removing an app from the lock list takes effect after 7 days, and at least one app stays on it. Locks cover the apps themselves, not their websites in a browser.',
       false,
     ),
     (
@@ -2539,6 +2559,7 @@ String penaltyTerms(PenaltyKind kind) => switch (kind) {
   PenaltyKind.exercise => 'the push-ups and squats from your own daily quest, done again (never more, never doubled)',
   PenaltyKind.reading => '20 pages of reading (+2 per level, up to 60) and a written reflection on why the quest failed',
   PenaltyKind.focus => 'a 60-minute phone-free block (+5 minutes per level, up to 3 hours), run in the app with your chosen apps locked',
+  PenaltyKind.none => 'the app lock only; exercise is never a punishment',
 };
 
 /// A System's penalty in a few words, for the System cards.
@@ -2546,6 +2567,7 @@ String penaltyShort(PenaltyKind kind) => switch (kind) {
   PenaltyKind.exercise => "the day's push-ups and squats again",
   PenaltyKind.reading => '20 pages and a written reflection',
   PenaltyKind.focus => 'a 60-minute phone-free block',
+  PenaltyKind.none => 'the app lock only',
 };
 
 /// A rank letter in its rank colour on the hexagonal badge.

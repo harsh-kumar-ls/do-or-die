@@ -11,6 +11,16 @@ import 'package:flutter_test/flutter_test.dart';
 /// Records every call so tests can check exactly what reached the phone.
 class FakeBlocker extends NoopAppBlocker {
   final calls = <String>[];
+
+  @override
+  Future<void> reset() async {
+    calls.add('reset');
+    packages = {};
+    window = null;
+    focus = null;
+    judgeDue = null;
+  }
+
   Set<String> packages = {};
   (DateTime, DateTime)? window;
   DateTime? releasedUntil;
@@ -120,23 +130,40 @@ void main() {
     expect(blocker.calls.length, before);
   });
 
+  test('adding an app is pushed immediately; removing waits 7 days', () async {
+    final g = await start();
+    await enforcer.sync(g);
+
+    await g.addBlockedApp('com.pubg.imobile');
+    await enforcer.sync(g);
+    expect(blocker.packages, contains('com.pubg.imobile'));
+
+    await g.removeBlockedApp(yt);
+    await enforcer.sync(g);
+    expect(blocker.packages, contains(yt), reason: 'still locked today');
+
+    clock.set(DateTime(2026, 10, 26, 9));
+    await enforcer.sync(g);
+    expect(blocker.packages, isNot(contains(yt)));
+  });
+
   test(
-    'adding an app is pushed immediately; removing waits for tomorrow',
+    'reset clears the phone; the next sync sends everything again',
     () async {
       final g = await start();
+      clock.set(DateTime(2026, 10, 20, 6)); // Monday failed: a lock today
+      await g.tick();
       await enforcer.sync(g);
-
-      await g.addBlockedApp('com.pubg.imobile');
+      expect(blocker.window, isNotNull);
+      await enforcer.reset();
+      expect(blocker.calls.last, 'reset');
+      expect(blocker.packages, isEmpty);
+      expect(blocker.judgeDue, isNull);
+      // Something cleared the phone behind the enforcer's back (diagnostics):
+      // after invalidate, the lock is restored on the next sync.
       await enforcer.sync(g);
-      expect(blocker.packages, contains('com.pubg.imobile'));
-
-      await g.removeBlockedApp(yt);
-      await enforcer.sync(g);
-      expect(blocker.packages, contains(yt), reason: 'still locked today');
-
-      clock.set(DateTime(2026, 10, 20, 9));
-      await enforcer.sync(g);
-      expect(blocker.packages, isNot(contains(yt)));
+      expect(blocker.window, isNotNull);
+      expect(blocker.packages, isNotEmpty);
     },
   );
 
@@ -171,21 +198,53 @@ void main() {
     expect(g.isLockActive(), isTrue);
   });
 
-  test('releases can be taken again and again, each one counted', () async {
+  test('two releases per lock, each counted; a third is refused', () async {
     final g = await start();
     clock.set(DateTime(2026, 10, 20, 6));
     await g.tick();
     var t = g.state.lock!.start.add(const Duration(minutes: 1));
-    for (var n = 1; n <= 3; n++) {
+    for (var n = 1; n <= 2; n++) {
       clock.set(t);
       expect(await g.releaseLock(), isTrue);
       t = t.add(const Duration(minutes: 20)); // release over, lock back on
     }
+    clock.set(t);
+    expect(g.releasesLeft, 0);
+    expect(await g.releaseLock(), isFalse);
+    expect(g.isLockActive(), isTrue);
     await enforcer.sync(g);
-    expect(g.state.lock!.releases, 3);
-    expect(blocker.releases, 3);
-    expect(g.game.log.where((e) => e.type == 'lock_released'), hasLength(3));
+    expect(g.state.lock!.releases, 2);
+    expect(blocker.releases, 2);
+    expect(g.game.log.where((e) => e.type == 'lock_released'), hasLength(2));
   });
+
+  test(
+    'the emergency exit always ends the lock, is pushed and logged',
+    () async {
+      final g = await start();
+      clock.set(DateTime(2026, 10, 20, 6));
+      await g.tick();
+      final lock = g.state.lock!;
+      clock.set(lock.start.add(const Duration(minutes: 30)));
+      await g.releaseLock();
+      clock.advance(const Duration(minutes: 20));
+      await g.releaseLock();
+      clock.advance(const Duration(minutes: 20));
+      expect(g.releasesLeft, 0);
+      expect(await g.emergencyExit(reason: 'Family emergency'), isTrue);
+      expect(g.isLockActive(), isFalse);
+      await enforcer.sync(g);
+      expect(
+        blocker.window,
+        isNull,
+        reason: 'the phone is told the lock ended',
+      );
+      final entry = g.game.log.lastWhere((e) => e.type == 'emergency_exit');
+      expect(entry.data['reason'], 'Family emergency');
+      expect(g.emergencyExits, 1);
+      expect(await g.emergencyExit(), isFalse, reason: 'nothing left to end');
+    },
+  );
 
   test(
     'no release while already released, or when no lock is running',

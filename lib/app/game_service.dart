@@ -43,7 +43,23 @@ class GameService {
 
   SavedGame get game => _game;
   GameState get state => _game.state;
-  DayKey get today => DayKey.fromDateTime(_clock.now());
+  DayKey get today => _dayOf(_clock.now());
+
+  /// The game's date for [now]. Normally the local date; after a move to a
+  /// zone further west it stays on the zone the open day was issued in, so
+  /// changing the time zone can never push a deadline later. (Moving east
+  /// ends the day early; a wrongful verdict from travel can be contested.)
+  DayKey _dayOf(DateTime now) => dayIn(now, _game.zoneOffsetMinutes);
+
+  /// [now]'s date, but never earlier than its date in [offsetMinutes].
+  static DayKey dayIn(DateTime now, int? offsetMinutes) {
+    final local = DayKey.fromDateTime(now);
+    if (offsetMinutes == null) return local;
+    final pinned = DayKey.fromDateTime(
+      now.toUtc().add(Duration(minutes: offsetMinutes)),
+    );
+    return pinned.isAfter(local) ? pinned : local;
+  }
 
   /// The current time on the game's clock (network-corrected on Android).
   DateTime get now => _clock.now();
@@ -110,6 +126,7 @@ class GameService {
       blockList: BlockList.initial(day, blockedPackages),
       sleep: sleep,
       liveFrom: liveFrom,
+      zoneOffsetMinutes: now.timeZoneOffset.inMinutes,
       log: List.unmodifiable([
         LogEntry(now, 'game_started', {
           'day': day.toString(),
@@ -140,6 +157,7 @@ class GameService {
     required Set<String> blockedPackages,
     SleepWindow sleep = const SleepWindow(),
     int dryRunDays = 3,
+    int lockStartMinute = defaultLockStart,
     Map<String, Object?> placementAnswers = const {},
     Clock clock = const SystemClock(),
     Random? random,
@@ -159,6 +177,8 @@ class GameService {
       sleep: sleep,
       liveFrom: liveFrom,
       systems: systems,
+      lockStartMinute: lockStartMinute,
+      zoneOffsetMinutes: now.timeZoneOffset.inMinutes,
       log: List.unmodifiable([
         LogEntry(now, 'awakened', {
           'day': day.toString(),
@@ -167,6 +187,7 @@ class GameService {
           'answers': placementAnswers,
           'blocked': blockedPackages.toList()..sort(),
           'sleep': {'start': sleep.startMinute, 'end': sleep.endMinute},
+          'lockStart': lockStartMinute,
           'liveFrom': liveFrom?.toString(),
         }),
       ]),
@@ -182,6 +203,10 @@ class GameService {
     );
   }
 
+  /// The default lock start for a new game: 18:00, the evening hours when
+  /// most short-video and social-app use happens.
+  static const defaultLockStart = 18 * 60;
+
   /// Day of the trial, starting at 1 on the day the game began.
   int get trialDay => state.startDay.daysUntil(today) + 1;
 
@@ -196,7 +221,8 @@ class GameService {
     final debt = state.debt;
     final owes = debt != null && debt.dueDay == today && !debt.isPaid;
     final lock = state.lock;
-    final locked = lock != null && lock.end.isAfter(now);
+    final locked =
+        lock != null && !lock.cancelled && lock.effectiveEnd.isAfter(now);
     return owes || locked;
   }
 
@@ -276,7 +302,7 @@ class GameService {
 
   Future<List<GameEvent>> _tick() async {
     final now = _clock.now();
-    final today = DayKey.fromDateTime(now);
+    final today = _dayOf(now);
     // A timer left running past midnight counts only up to midnight, and
     // must be credited before that day is judged.
     // So does one still running at a Dungeon floor's deadline.
@@ -317,11 +343,7 @@ class GameService {
             : 100,
         // Each System's own penalty; older games stay on exercise.
         penaltyKind: (_) => penaltyKindFor(sys?.active),
-        // Exercise owed is the push-ups and squats of the user's own daily
-        // quest for that day (valve applied, never a Dungeon's boost).
-        exerciseFor: (d) => sys?.active == null
-            ? null
-            : exerciseVolume(sys!.progress.dailyQuest(catalogue, d)),
+        lockStartMinute: g.lockStartMinute,
       );
       var state = result.state;
       events.addAll(result.events);
@@ -347,17 +369,7 @@ class GameService {
           log.add(LogEntry.fromSystemEvent(now, e));
         }
       }
-      g = SavedGame(
-        state: state,
-        plan: g.plan,
-        progress: g.progress,
-        blockList: g.blockList,
-        sleep: g.sleep,
-        log: g.log,
-        timer: g.timer,
-        liveFrom: g.liveFrom,
-        systems: nextSys,
-      );
+      g = g.copyWith(state: state, systems: nextSys);
     }
     // A Dungeon whose floors all lie in already-judged days (only possible
     // after clock changes) is closed, so it can't block Gates for good.
@@ -373,6 +385,23 @@ class GameService {
         _systemEvents.addAll(expired);
         log.addAll([for (final e in expired) LogEntry.fromSystemEvent(now, e)]);
       }
+    }
+    // The open day keeps the zone it was issued in until it is judged; the
+    // next day follows the phone's current zone (logged when it changed).
+    final offset = now.timeZoneOffset.inMinutes;
+    if (g.zoneOffsetMinutes != offset &&
+        (g.zoneOffsetMinutes == null ||
+            g.state.nextDayToClose != _game.state.nextDayToClose)) {
+      g = g.copyWith(
+        zoneOffsetMinutes: offset,
+        newLogEntries: [
+          if (g.zoneOffsetMinutes != null)
+            LogEntry(now, 'zone_changed', {
+              'fromMinutes': g.zoneOffsetMinutes,
+              'toMinutes': offset,
+            }),
+        ],
+      );
     }
     // Issue today's quest: it is fixed from now until today is judged.
     final current = g.systems;
@@ -542,8 +571,10 @@ class GameService {
     return p.settingOn(d) > 0 && p.reductionOn(d) == 0;
   }
 
-  /// Chooses the next System once the current one is complete. Its quests
-  /// start today. Returns false when choosing isn't allowed.
+  /// Chooses the next System, or switches to another one. Its quests start
+  /// tomorrow. Refused (false) during a Dungeon, for the active System, and
+  /// for a completed one. A switch closes any open Gate and restarts the
+  /// 21-of-30 count; ranks are kept.
   Future<bool> chooseSystem(
     SystemKind kind,
     Rank placement, {
@@ -556,8 +587,12 @@ class GameService {
     Map<String, Object?> answers = const {},
   }) async {
     final sys = _game.systems;
-    if (sys == null || !sys.progress.canChooseSystem) return false;
+    if (sys == null || dungeonInProgress) return false;
     if (sys.progress.completed.contains(kind)) return false;
+    if (kind == sys.active && !sys.progress.completed.contains(kind)) {
+      return false;
+    }
+    final switching = !sys.progress.canChooseSystem;
     if (placement.index > highestPlacement.index) return false;
     // The new quest starts tomorrow, so it is never judged on a day the
     // user had no chance to do it.
@@ -566,8 +601,9 @@ class GameService {
       _game.copyWith(
         systems: next,
         newLogEntries: [
-          LogEntry(now, 'system_chosen', {
+          LogEntry(now, switching ? 'system_switched' : 'system_chosen', {
             'day': today.toString(),
+            if (switching) 'from': sys.active!.name,
             'system': kind.name,
             'placement': placement.name,
             'answers': answers,
@@ -942,13 +978,27 @@ class GameService {
     ),
   );
 
-  Future<void> removeBlockedApp(String package) => _serial(
-    () => _changeBlockList(
-      _game.blockList.remove(today, package),
-      'block_app_removed',
-      {'package': package, 'effectiveFrom': today.addDays(1).toString()},
-    ),
-  );
+  /// Removes an app from the lock list after
+  /// [GameConfig.blockRemovalDelayDays] days. Refused (false) if it would
+  /// leave nothing to lock: the lock and screen-time caps need a target.
+  Future<bool> removeBlockedApp(String package) =>
+      _serial(() => _removeBlockedApp(package));
+
+  Future<bool> _removeBlockedApp(String package) async {
+    final delay = engine.config.blockRemovalDelayDays;
+    final next = _game.blockList.remove(today, package, delayDays: delay);
+    final from = today.addDays(delay);
+    if (next.packagesOn(from).isEmpty) return false;
+    await _changeBlockList(next, 'block_app_removed', {
+      'package': package,
+      'effectiveFrom': from.toString(),
+    });
+    return true;
+  }
+
+  /// The day a removal made today would take effect.
+  DayKey get removalEffectiveFrom =>
+      today.addDays(engine.config.blockRemovalDelayDays);
 
   Future<void> _changeBlockList(
     BlockList next,
@@ -998,12 +1048,126 @@ class GameService {
     );
   }
 
-  /// Logged whenever the user uses the escape from a lock.
-  Future<void> recordEmergencyStop() => _serial(_recordEmergencyStop);
+  /// Releases left in the current lock.
+  int get releasesLeft =>
+      max(0, engine.config.releasesPerLock - (_game.state.lock?.releases ?? 0));
 
-  Future<void> _recordEmergencyStop() async {
+  /// Ends the running (or scheduled) lock now. Always available, for real
+  /// emergencies: it is logged with its reason and shown in the report.
+  /// Returns false when no lock is left to end.
+  Future<bool> emergencyExit({String reason = ''}) =>
+      _serial(() => _emergencyExit(reason));
+
+  Future<bool> _emergencyExit(String reason) async {
+    final now = _clock.now();
+    final lock = _game.state.lock;
+    if (lock == null || lock.cancelled || !lock.effectiveEnd.isAfter(now)) {
+      return false;
+    }
     await _commit(
-      _game.copyWith(newLogEntries: [LogEntry(_clock.now(), 'emergency_stop')]),
+      _game.copyWith(
+        state: _game.state.copyWith(lock: () => lock.exitAt(now)),
+        newLogEntries: [
+          LogEntry(now, 'emergency_exit', {
+            'day': lock.day.toString(),
+            'reason': reason.trim(),
+            'lockMinutesRemaining': lock.effectiveEnd.difference(now).inMinutes,
+          }),
+        ],
+      ),
+    );
+    return true;
+  }
+
+  /// Emergency exits taken in this game.
+  int get emergencyExits =>
+      _game.log.where((e) => e.type == 'emergency_exit').length;
+
+  /// Shortest reason accepted when contesting a verdict.
+  static const contestReasonMin = 10;
+
+  /// The failed day whose penalty applies today, if its verdict can still
+  /// be contested: today is the day after it, and no verdict was contested
+  /// in the last [GameConfig.contestCooldownDays] days.
+  DayKey? get contestableDay {
+    final judged = _game.state.lastClosedDay;
+    if (judged == null || judged.addDays(1) != today) return null;
+    final failed = _game.log.any(
+      (e) => e.type == 'quest_failed' && e.data['day'] == judged.toString(),
+    );
+    if (!failed || !penaltyInEffect) return null;
+    if (_game.log.any(
+      (e) =>
+          e.type == 'verdict_contested' && e.data['day'] == judged.toString(),
+    )) {
+      return null;
+    }
+    return contestCooldownUntil == null ? judged : null;
+  }
+
+  /// When the next contest becomes available, if one was used recently.
+  DayKey? get contestCooldownUntil {
+    final last = _game.log
+        .where((e) => e.type == 'verdict_contested')
+        .map((e) => DayKey.fromDateTime(e.at))
+        .fold<DayKey?>(null, (a, d) => a == null || d.isAfter(a) ? d : a);
+    if (last == null) return null;
+    final until = last.addDays(engine.config.contestCooldownDays);
+    return today.isBefore(until) ? until : null;
+  }
+
+  /// Contests yesterday's failed verdict (phone died, a bug, a cap that
+  /// couldn't be measured, travel). The lock ends and the debt is cancelled;
+  /// the failure itself stays on record and still counts as not cleared.
+  /// One per [GameConfig.contestCooldownDays] days, with a written reason.
+  Future<bool> contestVerdict(String reason) =>
+      _serial(() => _contestVerdict(reason));
+
+  Future<bool> _contestVerdict(String reason) async {
+    await _tick();
+    final day = contestableDay;
+    if (day == null || reason.trim().length < contestReasonMin) return false;
+    final now = _clock.now();
+    final lock = _game.state.lock;
+    final debt = _game.state.debt;
+    await _commit(
+      _game.copyWith(
+        state: _game.state.copyWith(
+          lock: () => lock?.exitAt(now),
+          debt: () => debt != null && debt.dueDay == today ? null : debt,
+        ),
+        newLogEntries: [
+          LogEntry(now, 'verdict_contested', {
+            'day': day.toString(),
+            'reason': reason.trim(),
+          }),
+        ],
+      ),
+    );
+    return true;
+  }
+
+  /// Verdicts contested in this game.
+  int get contestsUsed =>
+      _game.log.where((e) => e.type == 'verdict_contested').length;
+
+  /// When a penalty lock starts (minutes after midnight).
+  int get lockStartMinute => _game.lockStartMinute ?? defaultLockStart;
+
+  /// Sets the lock start for locks scheduled from now on; a lock already
+  /// scheduled keeps its time. Logged.
+  Future<void> setLockStart(int minute) => _serial(() => _setLockStart(minute));
+
+  Future<void> _setLockStart(int minute) async {
+    final m = minute.clamp(0, 24 * 60 - 1);
+    if (m == _game.lockStartMinute) return;
+    await _commit(
+      _game.copyWith(
+        lockStartMinute: m,
+        newLogEntries: [
+          LogEntry(_clock.now(), 'lock_start_changed', {'minute': m}),
+        ],
+      ),
     );
   }
 
@@ -1039,7 +1203,7 @@ class GameService {
             'duringLock':
                 lock != null &&
                 lock.start.isBefore(now) &&
-                lock.end.isAfter(from),
+                lock.effectiveEnd.isAfter(from),
           }),
         ],
       ),
@@ -1063,6 +1227,7 @@ class GameService {
     final now = _clock.now();
     final lock = _game.state.lock;
     if (lock == null || !lock.isActiveAt(now)) return false;
+    if (lock.releases >= engine.config.releasesPerLock) return false;
     final released = lock.releaseAt(now, releaseLength);
     await _commit(
       _game.copyWith(
@@ -1072,7 +1237,7 @@ class GameService {
             'day': lock.day.toString(),
             'release': released.releases,
             'until': released.releasedUntil!.toIso8601String(),
-            'lockMinutesRemaining': lock.end.difference(now).inMinutes,
+            'lockMinutesRemaining': lock.effectiveEnd.difference(now).inMinutes,
           }),
         ],
       ),
