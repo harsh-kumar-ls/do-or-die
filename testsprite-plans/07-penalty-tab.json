@@ -25,7 +25,7 @@
     },
     {
       "type": "action",
-      "description": "Wait 4 seconds while the System entry plays (the avatar is drawn in and '[ ... SYSTEM ]' and 'BOUND.' appear)"
+      "description": "Wait 4 seconds while the System entry plays (the System emblem is drawn in and '[ ... SYSTEM ]' and 'BOUND.' appear)"
     },
     {
       "type": "action",

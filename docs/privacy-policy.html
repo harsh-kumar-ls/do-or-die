@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Do or Die: Privacy Policy</title>
+<style>
+  body { margin: 0; background: #05070D; color: #DBE7FF; font: 16px/1.6 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 40px 20px 80px; }
+  h1 { font-size: 28px; letter-spacing: .04em; }
+  h2 { font-size: 19px; margin-top: 32px; color: #A9DCFF; }
+  table { border-collapse: collapse; width: 100%; margin-top: 8px; }
+  th, td { text-align: left; vertical-align: top; padding: 8px; border-bottom: 1px solid #1c2840; }
+  th { color: #7D8BA8; font-weight: 600; }
+  code { color: #A9DCFF; }
+  a { color: #4FB3FF; }
+  .dim { color: #7D8BA8; }
+</style>
+</head>
+<body>
+<main>
+<h1>Do or Die: Privacy Policy</h1>
+<p class="dim">Effective 7 November 2026.</p>
+
+<h2>Summary</h2>
+<p>Do or Die does not collect, transmit, sell or share any personal data. Everything the app records stays on your phone. The app does not request internet access, has no accounts, no analytics, no advertising and no third-party SDKs that send data.</p>
+
+<h2>What the app stores on your phone</h2>
+<ul>
+  <li>Your chosen System, rank, level, XP and daily quest progress.</li>
+  <li>A log of quest results, penalties, lock releases and blocker outages, used for the in-app 30-day report.</li>
+  <li>The apps you chose to lock, your rest period, and app settings.</li>
+</ul>
+<p>This data is stored in the app's private storage. It is deleted when you uninstall the app or clear its data in Android Settings. The app can export your log as a file only when you ask it to; sharing that file, or the report image, happens only through Android's share sheet at your request.</p>
+
+<h2>Permissions and why they are used</h2>
+<table>
+  <tr><th>Permission</th><th>Why</th></tr>
+  <tr><td>Usage access (<code>PACKAGE_USAGE_STATS</code>)</td><td>To see which app is in front, so a locked app can be covered during a penalty, and to measure screen-time objectives. Read on the device only; never stored outside the app or sent anywhere.</td></tr>
+  <tr><td>Display over other apps (<code>SYSTEM_ALERT_WINDOW</code>)</td><td>To show the Penalty Zone screen over an app you chose to lock.</td></tr>
+  <tr><td>Foreground service (<code>FOREGROUND_SERVICE</code>, <code>FOREGROUND_SERVICE_SPECIAL_USE</code>)</td><td>Keeps the lock watcher running while a lock or phone-free block is active. Android shows a permanent notification while it runs.</td></tr>
+  <tr><td>Notifications (<code>POST_NOTIFICATIONS</code>)</td><td>Quest warnings, penalty notices and reminders.</td></tr>
+  <tr><td>Exact alarms (<code>SCHEDULE_EXACT_ALARM</code>)</td><td>So deadline warnings arrive on time. Optional; without it, notices may be delayed.</td></tr>
+  <tr><td>Run at startup (<code>RECEIVE_BOOT_COMPLETED</code>)</td><td>Restores scheduled notices and the lock watcher after a restart.</td></tr>
+</table>
+<p>The list of installed apps is read on the device only so you can choose which apps to lock. Phone, messages, maps, settings, and banking and payment apps can never be locked.</p>
+
+<h2>Children</h2>
+<p>Do or Die is not directed at children under 13 and does not knowingly collect any data from anyone.</p>
+
+<h2>Changes</h2>
+<p>If this policy changes, the new version will be published at this address with a new effective date.</p>
+
+<h2>Contact</h2>
+<p>Questions about this policy: open an issue at <a href="https://github.com/harsh-kumar-ls/do-or-die/issues">github.com/harsh-kumar-ls/do-or-die/issues</a>.</p>
+</main>
+</body>
+</html>

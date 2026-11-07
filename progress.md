@@ -19,7 +19,7 @@ The detailed records stay where they are. This file summarises them and points t
 
 | | |
 |---|---|
-| **Version** | 0.8.0 (build 12), installed on the phone 2026-11-06 and launched cleanly |
+| **Version** | 0.9.0 (build 13), Play internal-testing candidate (`dist/DoOrDie-0.9.0.aab`); the same code is on the phone |
 | **Phone** | Personal Android test phone |
 | **Current run** | Personality System, rank E. Day 1 was 2026-10-31; days 1–3 were a dry run, so penalties are live from 2026-11-03 (default 3-day dry run; confirm on Status) |
 | **Tests** | 201 automated tests pass; format and analyze clean; TestSprite 14/14 on the web build |
@@ -96,7 +96,8 @@ Changes from the first live days:
 | 0.6.0 | Report share image, 6-day reduction limit, banking and UPI apps never lockable, verdict line for records that rest on your word |
 | 0.7.0 | The Player: an original animated avatar on Quest, Status and the System cards; System entry sequence; new app icon |
 | 0.7.1 | "Lock served" caption, System name fits on Status, outages measured by a watcher heartbeat (restarts no longer counted) |
-| 0.8.0 | The Player redone as an original anime-style 3D character (Blender), in five colour forms; new launcher icon |
+| 0.8.0 | An anime-style 3D character (later removed) |
+| 0.9.0 | Character removed; animated System sigil; emblem icon and Play assets; release signing; Play-restricted battery permission removed; privacy policy; release kit |
 
 ---
 

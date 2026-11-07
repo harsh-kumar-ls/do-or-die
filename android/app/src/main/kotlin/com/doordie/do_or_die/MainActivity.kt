@@ -78,12 +78,10 @@ class MainActivity : FlutterActivity() {
                         ),
                     )
                     "requestBatteryExemption" -> {
-                        startActivity(
-                            Intent(
-                                Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                                Uri.parse("package:$packageName"),
-                            ),
-                        )
+                        // Opens the battery optimisation list. The direct
+                        // per-app request needs a permission Google Play
+                        // restricts to a few app types, so it isn't used.
+                        startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
                         result.success(null)
                     }
                     "startWatcher" -> {

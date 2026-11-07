@@ -1,8 +1,20 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+// Release signing: the upload key named in android/key.properties (kept out
+// of git; the keystore itself lives outside the repository). Set
+// DOD_DEBUG_SIGN=1 to sign a release build with the debug key instead, so it
+// can update a development install on a test phone without wiping its data.
+val keyProperties = Properties().apply {
+    val file = rootProject.file("key.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+val useUploadKey = keyProperties.isNotEmpty() && System.getenv("DOD_DEBUG_SIGN") != "1"
 
 android {
     namespace = "com.doordie.do_or_die"
@@ -17,7 +29,6 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.doordie.do_or_die"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
@@ -31,11 +42,20 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (useUploadKey) {
+            create("upload") {
+                keyAlias = keyProperties["keyAlias"] as String
+                keyPassword = keyProperties["keyPassword"] as String
+                storeFile = file(keyProperties["storeFile"] as String)
+                storePassword = keyProperties["storePassword"] as String
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (useUploadKey) "upload" else "debug")
             // No code shrinking: plugins such as shared_preferences are called
             // from Dart through JNI, which R8 can't see, so it removed code they
             // need and the app hung on a black screen at start (0.2.0).

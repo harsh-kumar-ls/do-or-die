@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import '../../domain/day.dart';
 import '../../domain/penalty.dart';
 import '../../platform/blocker.dart';
 import '../game_model.dart';
@@ -345,7 +346,10 @@ class _LockPanelState extends State<_LockPanel> {
       big = '${two()}:${two()}:${two()}';
       cap = 'THE LOCK WILL BEGIN WITHOUT WARNING';
       dimBig = true;
-    } else if (lock != null && !now.isBefore(lock.end)) {
+    } else if (lock != null &&
+        !now.isBefore(lock.end) &&
+        DayKey.fromDateTime(lock.start) == m.service.today) {
+      // Only on the day the lock ran; the record stays in state afterwards.
       big = '00:00:00';
       cap = 'LOCK SERVED · ACCESS RESTORED';
       dimBig = true;

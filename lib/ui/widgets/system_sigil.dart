@@ -3,38 +3,30 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../domain/progression.dart';
 import '../../domain/systems.dart';
 import '../game_model.dart';
 import '../theme.dart';
+import 'awakening_art.dart';
 
-/// How the Player is drawn: which System's colours, the glow colour, and an
+/// How the sigil is drawn: which System's emblem, the glow colour, and an
 /// optional tint (red in a Penalty Zone).
-///
-/// The art is an original anime-style character rendered in Blender
-/// (design/avatars/player3d/player.blend): one render per System and one
-/// each for the Penalty Zone and the Dungeon Penalty.
-class AvatarLook {
-  const AvatarLook({
+class SigilLook {
+  const SigilLook({
     required this.glow,
-    this.gear,
+    this.system,
     this.tint,
     this.glitch = false,
   });
 
   final Color glow;
-  final SystemKind? gear;
+
+  /// The System whose emblem is shown; the app emblem when null.
+  final SystemKind? system;
   final Color? tint;
 
   /// A short glitch twice per loop (Penalty Zone).
   final bool glitch;
-
-  /// The render to show.
-  String get asset {
-    final name = tint != null
-        ? (tint == dungeonRed ? 'dungeon' : 'penalty')
-        : (gear ?? SystemKind.fitness).name;
-    return 'assets/avatars/anime/$name.webp';
-  }
 }
 
 const dungeonRed = Color(0xFFD7263D);
@@ -48,51 +40,56 @@ Color systemAura(SystemKind k) => switch (k) {
 };
 
 /// A System's look on its card and entry screen.
-AvatarLook systemLook(SystemKind k) => AvatarLook(glow: systemAura(k), gear: k);
+SigilLook systemLook(SystemKind k) => SigilLook(glow: systemAura(k), system: k);
 
-/// The Player today: the active System's gear; red and glitching in a
-/// Penalty Zone, crimson in a Dungeon Penalty, gold on a Dungeon floor,
+/// The Player's sigil today: the active System's emblem; red and glitching
+/// in a Penalty Zone, crimson in a Dungeon Penalty, gold on a Dungeon floor,
 /// otherwise the System's colour.
-AvatarLook playerLook(GameModel m) {
-  final gear = m.systems?.progress.active;
+SigilLook playerLook(GameModel m) {
+  final system = m.systems?.progress.active;
   if (m.inPenalty) {
     final red = m.dungeonPenalty ? dungeonRed : penaltyRed;
-    return AvatarLook(glow: red, gear: gear, tint: red, glitch: true);
+    return SigilLook(glow: red, system: system, tint: red, glitch: true);
   }
-  if (m.floorToday > 0) return AvatarLook(glow: Hud.gold, gear: gear);
-  return AvatarLook(
-    glow: gear == null ? Hud.rankColor(m.rank) : systemAura(gear),
-    gear: gear,
+  if (m.floorToday > 0) return SigilLook(glow: Hud.gold, system: system);
+  return SigilLook(
+    glow: system == null ? Hud.rankColor(m.rank) : systemAura(system),
+    system: system,
   );
 }
 
-/// A living avatar: it breathes, its glow pulses, an aura and rising motes
-/// sit behind it, it leans toward a dragging finger and springs back, and a
-/// tap flares the glow and calls [onTap].
+/// The active System's emblem, alive: it breathes, its glow pulses, an aura
+/// and rising motes sit behind it, it leans toward a dragging finger and
+/// springs back, and a tap flares the glow and calls [onTap]. With [rank]
+/// set, the rank hexagon sits on its lower right.
 ///
 /// Motion stops when the platform asks for reduced animations.
-class PlayerAvatar extends StatefulWidget {
-  const PlayerAvatar({
+class SystemSigil extends StatefulWidget {
+  const SystemSigil({
     super.key,
     required this.look,
+    this.rank,
     this.onTap,
-    this.semanticLabel = 'Player avatar',
+    this.semanticLabel = 'System sigil',
     this.interactive = true,
   });
 
-  final AvatarLook look;
+  final SigilLook look;
+
+  /// Shown as a small hexagon badge when set.
+  final Rank? rank;
   final VoidCallback? onTap;
   final String semanticLabel;
 
   /// False inside something that handles its own taps and swipes (a flip
-  /// card in a carousel): the avatar then only animates.
+  /// card in a carousel): the sigil then only animates.
   final bool interactive;
 
   @override
-  State<PlayerAvatar> createState() => _PlayerAvatarState();
+  State<SystemSigil> createState() => _SystemSigilState();
 }
 
-class _PlayerAvatarState extends State<PlayerAvatar>
+class _SystemSigilState extends State<SystemSigil>
     with TickerProviderStateMixin {
   // One slow loop drives breathing, the glow pulse, motes and glitches.
   late final _loop = AnimationController(
@@ -186,6 +183,11 @@ class _PlayerAvatarState extends State<PlayerAvatar>
                 final glitch =
                     look.glitch &&
                     ((t > .31 && t < .335) || (t > .78 && t < .80));
+                final emblem = CustomPaint(
+                  painter: look.system == null
+                      ? EmblemPainter(glow: 1 + .6 * breath + flare)
+                      : SystemEmblemPainter(look.system!, t * 6),
+                );
                 return Stack(
                   fit: StackFit.expand,
                   children: [
@@ -203,48 +205,49 @@ class _PlayerAvatarState extends State<PlayerAvatar>
                         ..setEntry(3, 2, .0015)
                         ..translateByDouble(
                           glitch ? (t * 997 % 1 - .5) * 10 : 0,
-                          -3 * breath,
+                          -2 * breath,
                           0,
                           1,
                         )
                         ..rotateY(tilt.dx * .55)
                         ..rotateX(-tilt.dy * .35)
                         ..scaleByDouble(
-                          1 + .012 * breath,
-                          1 + .012 * breath,
+                          1 + .02 * breath + .06 * flare,
+                          1 + .02 * breath + .06 * flare,
                           1,
                           1,
                         ),
-                      child: ShaderMask(
-                        blendMode: BlendMode.dstIn,
-                        shaderCallback: (r) => const LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.white,
-                            Colors.white,
-                            Colors.transparent,
-                          ],
-                          stops: [0, .8, 1],
-                        ).createShader(r),
-                        child: ColorFiltered(
-                          colorFilter: ColorFilter.mode(
-                            glitch
-                                ? look.glow.withValues(alpha: .45)
-                                : Colors.white.withValues(alpha: .28 * flare),
-                            BlendMode.srcATop,
-                          ),
-                          child: Image.asset(
-                            look.asset,
-                            fit: BoxFit.cover,
-                            alignment: const Alignment(0, -.25),
-                            filterQuality: FilterQuality.medium,
-                            gaplessPlayback: true,
-                            excludeFromSemantics: true,
+                      child: Padding(
+                        padding: EdgeInsets.all(size.shortestSide * .08),
+                        child: look.tint == null
+                            ? emblem
+                            : ColorFiltered(
+                                colorFilter: ColorFilter.mode(
+                                  look.tint!,
+                                  BlendMode.srcATop,
+                                ),
+                                child: Opacity(
+                                  opacity: glitch ? .6 : 1,
+                                  child: emblem,
+                                ),
+                              ),
+                      ),
+                    ),
+                    if (widget.rank != null)
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        width: size.shortestSide * .32,
+                        height: size.shortestSide * .34,
+                        child: IgnorePointer(
+                          child: Semantics(
+                            label: 'Rank ${widget.rank!.name.toUpperCase()}',
+                            child: CustomPaint(
+                              painter: RankHexPainter(widget.rank!),
+                            ),
                           ),
                         ),
                       ),
-                    ),
                     if (!MediaQuery.disableAnimationsOf(context))
                       IgnorePointer(
                         child: CustomPaint(
@@ -262,7 +265,7 @@ class _PlayerAvatarState extends State<PlayerAvatar>
   }
 }
 
-/// A soft glow behind the head that breathes and flares on tap, with a
+/// A soft glow behind the emblem that breathes and flares on tap, with a
 /// thin broken ring turning slowly.
 class _AuraPainter extends CustomPainter {
   _AuraPainter({
@@ -279,8 +282,8 @@ class _AuraPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final c = Offset(size.width / 2, size.height * .40);
-    final r = size.shortestSide * (.44 + .04 * breath + .12 * flare);
+    final c = size.center(Offset.zero);
+    final r = size.shortestSide * (.48 + .04 * breath + .1 * flare);
     canvas.drawCircle(
       c,
       r,
@@ -297,8 +300,8 @@ class _AuraPainter extends CustomPainter {
     final ring = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1
-      ..color = color.withValues(alpha: .22 + .2 * flare);
-    final rr = size.shortestSide * .42;
+      ..color = color.withValues(alpha: .25 + .2 * flare);
+    final rr = size.shortestSide * .47;
     for (var i = 0; i < 3; i++) {
       canvas.drawArc(
         Rect.fromCircle(center: c, radius: rr),
@@ -315,7 +318,7 @@ class _AuraPainter extends CustomPainter {
       o.t != t || o.flare != flare || o.color != color;
 }
 
-/// Small motes drifting upward past the figure.
+/// Small motes drifting upward past the emblem.
 class _MotesPainter extends CustomPainter {
   _MotesPainter({required this.color, required this.t});
 
@@ -325,15 +328,15 @@ class _MotesPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final p = Paint();
-    for (var i = 0; i < 14; i++) {
+    for (var i = 0; i < 12; i++) {
       final seed = (i * 0.618034) % 1;
       final phase = (t * (0.8 + seed * .6) + seed) % 1;
       final x =
-          size.width * (.08 + .84 * ((i * 0.381966) % 1)) +
-          sin((phase + seed) * 2 * pi) * 6;
+          size.width * (.1 + .8 * ((i * 0.381966) % 1)) +
+          sin((phase + seed) * 2 * pi) * 5;
       final y = size.height * (1 - phase);
       p.color = color.withValues(alpha: .5 * sin(phase * pi));
-      canvas.drawCircle(Offset(x, y), 1 + 1.4 * seed, p);
+      canvas.drawCircle(Offset(x, y), 1 + 1.2 * seed, p);
     }
   }
 

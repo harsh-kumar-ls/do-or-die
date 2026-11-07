@@ -49,7 +49,7 @@ def awakening(system="FITNESS", answers=None):
     steps = [LOAD, *CONTACT,
         *show(system),
         act(f"Click 'CHOOSE {system} SYSTEM'"),
-        act("Wait 4 seconds while the System entry plays (the avatar is drawn in and '[ ... SYSTEM ]' and 'BOUND.' appear)"),
+        act("Wait 4 seconds while the System entry plays (the System emblem is drawn in and '[ ... SYSTEM ]' and 'BOUND.' appear)"),
     ]
     for question, value in answers or []:
         # Type with the keyboard: Flutter web ignores a value set directly
@@ -125,7 +125,7 @@ PLANS = {
         "Status: the System rank, Gate progress and five attributes are shown",
         awakening() + [
             act("Click 'STATUS' in the bottom bar"),
-            check("The '[ STATUS ]' screen shows the Player avatar with a rank badge named 'Rank E', 'RANK E · PLAYER' and 'FITNESS SYSTEM', 'LEVEL' with value '1', and a ring reading '0 / 21' and 'CLEARED' with 'NEXT GATE · 0 / 21' under it"),
+            check("The '[ STATUS ]' screen shows the System sigil with a rank badge named 'Rank E', 'RANK E · PLAYER' and 'FITNESS SYSTEM', 'LEVEL' with value '1', and a ring reading '0 / 21' and 'CLEARED' with 'NEXT GATE · 0 / 21' under it"),
             check("An 'ATTRIBUTES' panel shows five columns labelled 'STR', 'VIT', 'INT', 'CHA' and 'DIS', and the text 'NO POINTS'"),
         ],
     ),

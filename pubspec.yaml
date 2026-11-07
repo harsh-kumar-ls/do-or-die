@@ -1,7 +1,7 @@
 name: do_or_die
 description: "A new Flutter project."
 publish_to: 'none'
-version: 0.8.0+12
+version: 0.9.0+13
 
 environment:
   sdk: ^3.13.5
@@ -29,7 +29,6 @@ flutter:
   # Original sound effects, synthesized by tools/gen_sfx.py.
   assets:
     - assets/sfx/
-    - assets/avatars/anime/
 
   # Both fonts are SIL Open Font License 1.1; licences in assets/fonts.
   fonts:
@@ -45,15 +44,15 @@ flutter:
       fonts:
         - asset: assets/fonts/JetBrainsMono.ttf
 
-# Launcher icon: the Player (rendered from design/avatars/player3d/player.blend).
+# Launcher icon: the System emblem (built by tools/build_brand.py).
 flutter_launcher_icons:
   android: true
   ios: false
-  image_path: design/avatars/logo/icon.png
+  image_path: design/brand/icon.png
   adaptive_icon_background: "#05070D"
-  adaptive_icon_foreground: design/avatars/logo/foreground.png
+  adaptive_icon_foreground: design/brand/foreground.png
   web:
     generate: true
-    image_path: design/avatars/logo/icon.png
+    image_path: design/brand/icon.png
     background_color: "#05070D"
     theme_color: "#05070D"

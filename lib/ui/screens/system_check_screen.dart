@@ -127,9 +127,9 @@ class _SystemCheckScreenState extends State<SystemCheckScreen>
       ),
       _Check(
         'BATTERY EXEMPTION',
-        'Stops the phone from putting the blocker and alarms to sleep.',
+        'Stops the phone from putting the blocker and alarms to sleep. In the list, choose Do or Die and set it to not optimise.',
         s?.batteryExempt,
-        'EXEMPT',
+        'OPEN',
         widget.blocker.requestBatteryExemption,
       ),
       _Check(

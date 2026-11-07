@@ -342,6 +342,39 @@ void main() {
     expect(find.text('[ QUEST CLEARED ]'), findsNothing);
   });
 
+  testUi('a served lock is reported only on the day it ran', (tester) async {
+    final clock = FixedClock(DateTime(2026, 10, 19, 9));
+    final model = await pumpShell(
+      tester,
+      clock: clock,
+      prepare: (g) async {
+        // Fail day 1; day 2 is a Penalty Zone with a lock.
+        clock.set(g.today.addDays(1).at(9 * 60));
+        await g.tick();
+        final debt = g.state.debt!;
+        await g.recordPenalty(
+          primary: debt.primaryOwed,
+          secondary: debt.secondaryOwed,
+        );
+        clock.set(g.state.lock!.end.add(const Duration(minutes: 1)));
+        await g.tick();
+      },
+    );
+    await acknowledgeAll(tester);
+    await openTab(tester, 'PENALTY');
+    expect(find.text('LOCK SERVED · ACCESS RESTORED'), findsOneWidget);
+    // Day 3: the old lock is still on record, but it is not today's.
+    for (final t in model.service.todaysTasks) {
+      await model.service.setProgress(t.id, t.goal);
+    }
+    clock.set(model.service.today.addDays(1).at(9 * 60));
+    await model.tick();
+    await acknowledgeAll(tester);
+    await openTab(tester, 'PENALTY');
+    expect(find.text('LOCK SERVED · ACCESS RESTORED'), findsNothing);
+    expect(find.text('NO LOCK TODAY'), findsOneWidget);
+  });
+
   testUi('status and penalty tabs open', (tester) async {
     await pumpShell(tester);
     await openTab(tester, 'STATUS');
@@ -432,7 +465,7 @@ void main() {
     expect(find.text('Cleared 100%. Nothing to add.'), findsOneWidget);
   });
 
-  testUi('tapping the Player avatar asks the System for the next line', (
+  testUi('tapping the System sigil asks the System for the next line', (
     tester,
   ) async {
     final clock = FixedClock(DateTime(2026, 10, 19, 9));
@@ -440,7 +473,7 @@ void main() {
     await acknowledgeAll(tester);
     expect(find.textContaining('objectives remain'), findsOneWidget);
     await tester.tap(
-      find.bySemanticsLabel('Player avatar. Tap for the next System line'),
+      find.bySemanticsLabel('System sigil. Tap for the next System line'),
     );
     await pumpFor(tester, 500);
     expect(find.text('No streak. Begin one today.'), findsOneWidget);

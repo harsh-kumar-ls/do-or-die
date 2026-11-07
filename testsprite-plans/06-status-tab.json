@@ -25,7 +25,7 @@
     },
     {
       "type": "action",
-      "description": "Wait 4 seconds while the System entry plays (the avatar is drawn in and '[ ... SYSTEM ]' and 'BOUND.' appear)"
+      "description": "Wait 4 seconds while the System entry plays (the System emblem is drawn in and '[ ... SYSTEM ]' and 'BOUND.' appear)"
     },
     {
       "type": "action",
@@ -65,7 +65,7 @@
     },
     {
       "type": "assertion",
-      "description": "The '[ STATUS ]' screen shows the Player avatar with a rank badge named 'Rank E', 'RANK E \u00b7 PLAYER' and 'FITNESS SYSTEM', 'LEVEL' with value '1', and a ring reading '0 / 21' and 'CLEARED' with 'NEXT GATE \u00b7 0 / 21' under it"
+      "description": "The '[ STATUS ]' screen shows the System sigil with a rank badge named 'Rank E', 'RANK E \u00b7 PLAYER' and 'FITNESS SYSTEM', 'LEVEL' with value '1', and a ring reading '0 / 21' and 'CLEARED' with 'NEXT GATE \u00b7 0 / 21' under it"
     },
     {
       "type": "assertion",

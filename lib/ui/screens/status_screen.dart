@@ -8,7 +8,7 @@ import '../../domain/systems.dart' show maxReducedDays, reductionWindowDays;
 import '../game_model.dart';
 import '../theme.dart';
 import '../widgets/hud_kit.dart';
-import '../widgets/player_avatar.dart';
+import '../widgets/system_sigil.dart';
 import '../widgets/system_frame.dart';
 
 /// Status, built from design/claude-design/status.html: rank hero, core
@@ -94,16 +94,7 @@ class StatusScreen extends StatelessWidget {
             width: 124,
             child: Stack(
               fit: StackFit.expand,
-              children: [
-                PlayerAvatar(look: look),
-                Positioned(
-                  right: 0,
-                  bottom: 4,
-                  child: IgnorePointer(
-                    child: RankHexSmall(rank: model.rank, width: 40),
-                  ),
-                ),
-              ],
+              children: [SystemSigil(look: look, rank: model.rank)],
             ),
           ),
           const SizedBox(width: 14),

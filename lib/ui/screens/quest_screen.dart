@@ -9,7 +9,7 @@ import '../game_model.dart';
 import '../theme.dart';
 import '../widgets/hud_controls.dart';
 import '../widgets/hud_kit.dart';
-import '../widgets/player_avatar.dart';
+import '../widgets/system_sigil.dart';
 import '../widgets/system_frame.dart';
 import 'status_screen.dart';
 
@@ -1058,9 +1058,9 @@ class _PresenceState extends State<_Presence> {
         children: [
           SizedBox(
             width: 92,
-            child: PlayerAvatar(
+            child: SystemSigil(
               look: look,
-              semanticLabel: 'Player avatar. Tap for the next System line',
+              semanticLabel: 'System sigil. Tap for the next System line',
               onTap: () => setState(() => _line++),
             ),
           ),

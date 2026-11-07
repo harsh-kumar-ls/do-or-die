@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import '../../domain/system_catalogue.dart';
 import '../../domain/systems.dart';
 import '../theme.dart';
-import 'player_avatar.dart';
+import 'system_sigil.dart';
 
 /// Plays the System entry over the current screen and returns when it ends
 /// (about 2.6 s, or at the first tap).
@@ -105,7 +105,7 @@ class _SystemEntryState extends State<SystemEntry>
                             child: AspectRatio(
                               aspectRatio: 1,
                               child: ExcludeSemantics(
-                                child: PlayerAvatar(
+                                child: SystemSigil(
                                   look: systemLook(widget.kind),
                                   interactive: false,
                                 ),
