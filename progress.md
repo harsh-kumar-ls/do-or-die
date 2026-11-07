@@ -1,6 +1,6 @@
 # Do or Die — Progress
 
-One place for where the project stands: what's built, what was decided, and what comes next. Last updated 2026-11-04 (app version 0.6.0).
+One place for where the project stands: what's built, what was decided, and what comes next. Last updated 2026-11-07 (app version 0.9.0).
 
 The detailed records stay where they are. This file summarises them and points to them:
 
@@ -11,7 +11,9 @@ The detailed records stay where they are. This file summarises them and points t
 | [BUILD_LOOP.md](BUILD_LOOP.md) | How the app is built and tested, with a dated entry for every milestone and release |
 | [PRD.md](PRD.md) | The longer-term public product spec (v1 Android, v2 web, v3 iOS) |
 | [COMPETITOR_ANALYSIS.md](COMPETITOR_ANALYSIS.md) | Research on similar apps |
-| [design/](design/) | Approved visual direction, Claude Design prompts and the Claude Design prototypes |
+| [design/](design/) | Approved visual direction, Claude Design prompts and prototypes, brand images |
+| [release/PLAY_RELEASE.md](release/PLAY_RELEASE.md) | Play internal-testing kit: upload steps, store listing, Data safety, permission declarations |
+| [Privacy policy](https://harsh-kumar-ls.github.io/do-or-die/privacy-policy.html) | Public page (from `docs/`), required by Play |
 
 ---
 
@@ -19,14 +21,14 @@ The detailed records stay where they are. This file summarises them and points t
 
 | | |
 |---|---|
-| **Version** | 0.9.0 (build 13), Play internal-testing candidate (`dist/DoOrDie-0.9.0.aab`); the same code is on the phone |
-| **Phone** | Personal Android test phone |
-| **Current run** | Personality System, rank E. Day 1 was 2026-10-31; days 1–3 were a dry run, so penalties are live from 2026-11-03 (default 3-day dry run; confirm on Status) |
-| **Tests** | 201 automated tests pass; format and analyze clean; TestSprite 14/14 on the web build |
-| **Code** | Everything committed and pushed on `main` (latest commit `a8c8038`) |
-| **APKs** | `dist/DoOrDie-0.6.0.apk` (older: 0.4.0, 0.5.0, 0.5.1) |
+| **Version** | 0.9.0 (build 13): **Play internal-testing candidate, GO** |
+| **Play bundle** | `dist/DoOrDie-0.9.0.aab`, signed with the upload key (verified) |
+| **Phone** | Same code installed (`dist/DoOrDie-0.9.0-device.apk`, development-signed so the trial data is kept); no crashes, watcher running, System Check 7/7 |
+| **Current run** | Personality System, rank E, day 8 of 30, live. 2 of 21 days toward the Gate, streak 1 (best 2) |
+| **Tests** | Format and analyze clean; 205/205 automated tests; TestSprite 14/14 in one batch on the final build |
+| **Code** | Committed and pushed on `main`; tagged `v0.9.0` |
 
-**Waiting on you:** the midnight check (section 6.1) and screenshots of anything that looks wrong.
+**Waiting on you:** back up the upload key, then upload to Play internal testing (section 6.1).
 
 ---
 
@@ -97,7 +99,7 @@ Changes from the first live days:
 | 0.7.0 | The Player: an original animated avatar on Quest, Status and the System cards; System entry sequence; new app icon |
 | 0.7.1 | "Lock served" caption, System name fits on Status, outages measured by a watcher heartbeat (restarts no longer counted) |
 | 0.8.0 | An anime-style 3D character (later removed) |
-| 0.9.0 | Character removed; animated System sigil; emblem icon and Play assets; release signing; Play-restricted battery permission removed; privacy policy; release kit |
+| 0.9.0 | Character removed; animated System sigil; emblem icon and Play assets; release signing; Play-restricted battery permission removed; privacy policy; release kit; Penalty Zone fixes (no "lock served" on the next day, no app-name flash) |
 
 ---
 
@@ -120,12 +122,16 @@ Changes from the first live days:
 | 2026-10-31 | Banking and UPI apps can never be locked |
 | 2026-10-31 | Not adopted from Claude Design: finishing the penalty does not end the lock early |
 | 2026-10-31 | Publishing parked until the app has run well for a week or two |
+| 2026-11-07 | Publish a beta now: Google Play **internal testing** on the existing personal developer account |
+| 2026-11-07 | No character avatar. The animated System sigil (emblem + rank hexagon) is the app's face; a commissioned illustration can come later |
+| 2026-11-07 | Privacy policy hosted on GitHub Pages from `docs/` |
+| 2026-11-07 | Release process: manager plan, engineering, QA, then a production inspection with a go / no-go before anything ships |
 
 ---
 
 ## 5. How it's built and tested
 
-**Stack:** Flutter 3.47.7 / Dart 3.13.5, Android SDK 36, JDK 17. Packages: shared_preferences, flutter_local_notifications, flutter_soloud, flutter_animate, flutter_timezone, timezone, share_plus. Fonts: Chakra Petch and JetBrains Mono (both SIL OFL).
+**Stack:** Flutter 3.47.7 / Dart 3.13.5, Android SDK 36 (target 36), JDK 17. Packages: shared_preferences, flutter_local_notifications, flutter_soloud, flutter_animate, flutter_timezone, timezone, share_plus; dev: flutter_launcher_icons. Fonts: Chakra Petch and JetBrains Mono (both SIL OFL).
 
 **Layout**
 ```
@@ -138,7 +144,10 @@ lib/platform/  Android bridges: blocker, notifications, network time, usage mete
 lib/ui/        screens, HUD widgets, theme, sound
 android/       watcher service, block screen, usage meter, trusted time (Kotlin)
 test/          unit and widget tests
-tools/         sound generator, TestSprite plan generator, local web server
+tools/         sound generator, TestSprite plan generator, brand image builder,
+               local web server
+docs/          privacy policy (GitHub Pages)
+release/       Play release kit and store screenshots
 ```
 
 **Gates, in order:** format, analyze, unit tests, widget tests, then TestSprite (web) and a device check.
@@ -152,18 +161,21 @@ tools/         sound generator, TestSprite plan generator, local web server
 - Code shrinking stays off for release builds (it caused the 0.2.0 black screen).
 - Install updates with `adb install -r` only; a force stop turns the blocker off.
 - Launch the exact release APK on the phone before handing it over.
+- Play builds: `flutter build appbundle --release` (upload key). Phone builds: `DOD_DEBUG_SIGN=1 flutter build apk --release` (development key, so the existing install updates without losing data).
+- The upload key lives outside the repo (`~/.do-or-die/upload-keystore.jks`); its passwords are in git-ignored `android/key.properties`. Never commit either.
 
 ---
 
 ## 6. What comes next
 
-### 6.1 Now: watch the real thing run (your part)
-- [ ] At midnight, a "[ QUEST CLEARED ]" notice should appear and Status should move to the next day toward the Gate.
-- [ ] Check the Status, Penalty and System Check tabs on the phone (so far only checked in the browser).
-- [ ] Try SHARE on the report once at least one day has been judged; send a screenshot of the card.
-- [ ] When a day is failed, check the new block screen and the Penalty Zone debt panel.
-- [ ] Confirm UPI and banking apps still work during a lock.
-- [ ] Send screenshots of anything that looks wrong.
+### 6.1 Now: Play internal testing (your part)
+- [ ] Back up the upload key: `~/.do-or-die/upload-keystore.jks` and `android/key.properties` (password manager plus an offline copy).
+- [ ] Play Console: create the app, then Internal testing, upload `dist/DoOrDie-0.9.0.aab`, fill the listing and App content from `release/PLAY_RELEASE.md`.
+- [ ] Add testers by email and send them the opt-in link.
+- [ ] Line up at least 12 people for the closed test (14 continuous days) that a personal account needs before a public release.
+- [ ] Your own phone: stay on the sideloaded build during the trial; installing from Play means uninstalling first, which erases the trial data.
+
+Done since the last update: the midnight checks worked (6 Nov cleared and credited); Status, Penalty Zone and System Check verified on the phone; UPI and banking apps unaffected.
 
 ### 6.2 Device checks still open (from BUILD_LOOP.md)
 - [ ] Focus System: a phone-free block locks the chosen apps and unlocks when it ends.
@@ -186,12 +198,15 @@ tools/         sound generator, TestSprite plan generator, local web server
 - Tune XP and level thresholds after the first weeks (they are placeholders).
 - Tune quest targets per rank from real use.
 
-### 6.5 Publishing (parked)
-You'll share your findings after a week or two of real use. When that happens, the steps are:
-1. Decide go, iterate or stop, using the success measures in PROJECT.md section 6.
-2. Test with 3–5 other people; one person's results are a sample of one.
-3. Play Store: privacy policy, store listing and screenshots, a written justification for usage access and "display over other apps", a closed test with real testers, and store copy that doesn't name or hint at any existing work.
-4. Then the PRD.md roadmap: v1 Android hardening, v2 web, v3 iOS.
+### 6.5 Release path
+| Stage | Status |
+|---|---|
+| Internal testing (up to 100 invited testers) | **Ready**: bundle, listing, privacy policy, assets and answers prepared |
+| Closed test (12+ testers, 14 continuous days) | Next; required before production on a personal account |
+| Production (public) | **No-go** until the closed test ends cleanly and its feedback is handled |
+| Then | The PRD.md roadmap: v1 Android hardening, v2 web, v3 iOS |
+
+Review risks to watch: the foreground-service (special use) declaration may need a short video; the exact-alarm permission may draw a question; check that no other Play app is already named "Do or Die".
 
 ---
 

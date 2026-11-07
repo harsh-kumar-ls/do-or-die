@@ -1,18 +1,19 @@
 # Do or Die
 
-A daily-habit app run by a cold, game-style **System**. You choose one System (Fitness, Personality or Focus), take a short placement test (rank E to C), and the System writes your daily quest for your rank. Clear it and you earn XP and stat points. Fail it and you enter the **Penalty Zone**: the apps you chose are locked at an unannounced time the next day, and you owe push-ups (with squats past the cap). Unpaid reps double.
+A daily-habit app run by a cold, game-style **System**. You choose one System (Fitness, Personality or Focus), take a short placement test (rank E to C), and the System writes your daily quest for your rank. Clear it and you earn XP and stat points. Fail it and you enter the **Penalty Zone**: the apps you chose are locked at an unannounced time the next day, and you owe a penalty that fits your System: push-ups (squats past the cap) for Fitness, pages and a written reflection for Personality, a phone-free block for Focus. Anything unpaid doubles.
 
 Clear 21 of 30 days and a **Gate** opens. Enter it within 48 hours for a three-day **Dungeon**: floor 1 is the quest +25%, floor 2 is +50% and ends at 18:00, floor 3 is the Rank Trial. Clear it to rank up; fail a floor and the **Dungeon Penalty** follows (double lock, double reps, Gate shut 7 days). Ranks never go down, and a new System can be chosen only once the current one is complete (rank S held for 30 days). A 30-day report shows what happened, including every release taken. See [SYSTEMS_PRD.md](SYSTEMS_PRD.md).
 
 Inspired by the *vibe* of a "System" from game-style fiction. All art, names, sound and copy here are original.
 
-**Status:** personal 30-day trial build. Android first (Flutter); web and iOS later.
+**Status:** 0.9.0, Google Play internal-testing candidate. Android first (Flutter); web and iOS later. Where things stand: [progress.md](progress.md). Privacy policy: [harsh-kumar-ls.github.io/do-or-die/privacy-policy.html](https://harsh-kumar-ls.github.io/do-or-die/privacy-policy.html).
 
 ## Docs
 
 | File | What it is |
 |---|---|
 | [progress.md](progress.md) | Where the project stands: what is built, decided and next |
+| [release/PLAY_RELEASE.md](release/PLAY_RELEASE.md) | Google Play internal-testing release kit |
 | [PROJECT.md](PROJECT.md) | What is being built for the trial, and the penalty rules |
 | [BUILD_LOOP.md](BUILD_LOOP.md) | How it is built and tested, milestone by milestone, with current status |
 | [SYSTEMS_PRD.md](SYSTEMS_PRD.md) | Systems, ranks, Gates and Dungeons (phase 2) |
