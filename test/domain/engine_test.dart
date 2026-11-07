@@ -60,81 +60,83 @@ void main() {
     expect(r.events.whereType<QuestCleared>(), hasLength(1));
   });
 
+  test('missing one task fails the day: 10 push-ups, 15 squats and a lock on the next day', () {
+    final r = close(
+      GameState.start(monday),
+      tuesday,
+      progress: {monday: oneMissed},
+    );
+    final debt = r.state.debt!;
+    expect(debt.dueDay, tuesday);
+    expect(debt.primaryOwed, 10);
+    expect(debt.secondaryOwed, 15);
+
+    final lock = r.state.lock!;
+    expect(lock.day, tuesday);
+    expect(lock.duration, const Duration(hours: 4));
+    expect(lock.start.isBefore(tuesday.at(7 * 60)), isFalse);
+    expect(lock.end.isAfter(tuesday.at(23 * 60)), isFalse);
+
+    final failed = r.events.whereType<QuestFailed>().single;
+    expect(failed.failedTaskIds, ['study']);
+    expect(r.state.xp, 0);
+  });
+
   test(
-    'missing one task fails the day: 50 push-ups and a lock on the next day',
+    'failing all three tasks is still one penalty (per day, not per task)',
     () {
       final r = close(
         GameState.start(monday),
         tuesday,
-        progress: {monday: oneMissed},
+        progress: {monday: nothingDone},
       );
-      final debt = r.state.debt!;
-      expect(debt.dueDay, tuesday);
-      expect(debt.primaryOwed, 50);
-      expect(debt.secondaryOwed, 0);
-
-      final lock = r.state.lock!;
-      expect(lock.day, tuesday);
-      expect(lock.duration, const Duration(hours: 4));
-      expect(lock.start.isBefore(tuesday.at(7 * 60)), isFalse);
-      expect(lock.end.isAfter(tuesday.at(23 * 60)), isFalse);
-
-      final failed = r.events.whereType<QuestFailed>().single;
-      expect(failed.failedTaskIds, ['study']);
-      expect(r.state.xp, 0);
+      expect(r.state.debt!.primaryOwed, 10);
+      expect(r.state.debt!.secondaryOwed, 15);
     },
   );
 
-  test('failing all three tasks is still one penalty of 50 (per day, not per task)', () {
-    final r = close(
-      GameState.start(monday),
-      tuesday,
-      progress: {monday: nothingDone},
-    );
-    expect(r.state.debt!.primaryOwed, 50);
-  });
-
-  test('unpaid reps carry over doubled (100% interest)', () {
+  test('unpaid reps expire at midnight: nothing carries, nothing doubles', () {
     var s = close(
       GameState.start(monday),
       tuesday,
       progress: {monday: oneMissed},
     ).state;
-    s = engine.recordPenalty(s, tuesday, primary: 40);
+    s = engine.recordPenalty(s, tuesday, primary: 4);
     final r = close(
       s,
       wednesday,
       progress: {monday: oneMissed, tuesday: allDone},
     );
 
-    expect(r.state.debt!.dueDay, wednesday);
-    expect(r.state.debt!.primaryOwed, 20);
-    expect(r.events.whereType<CarriedOver>().single.primary, 20);
+    expect(r.state.debt, isNull);
+    final expired = r.events.whereType<PenaltyExpired>().single;
+    expect(expired.primary, 6);
+    expect(expired.secondary, 15);
   });
 
-  test('carry-over adds to a new penalty', () {
+  test('a new failure owes only its own penalty, never the old one', () {
     var s = close(
       GameState.start(monday),
       tuesday,
       progress: {monday: oneMissed},
     ).state;
-    s = engine.recordPenalty(s, tuesday, primary: 40);
+    s = engine.recordPenalty(s, tuesday, primary: 4);
     final r = close(
       s,
       wednesday,
       progress: {monday: oneMissed, tuesday: oneMissed},
     );
-    expect(r.state.debt!.primaryOwed, 50 + 20);
+    expect(r.state.debt!.primaryOwed, 10);
+    expect(r.state.debt!.secondaryOwed, 15);
   });
 
-  test('carry-over only, with a cleared day, does not lock apps', () {
+  test('an expired debt with a cleared day does not lock apps', () {
     var s = close(
       GameState.start(monday),
       tuesday,
       progress: {monday: oneMissed},
     ).state;
     final mondayLock = s.lock;
-    s = engine.recordPenalty(s, tuesday, primary: 40);
     final r = close(
       s,
       wednesday,
@@ -149,30 +151,46 @@ void main() {
     expect(r.state.lock!.isActiveAt(wednesday.at(12 * 60)), isFalse);
   });
 
-  test('paying the full debt leaves nothing to carry', () {
+  test('paying the full debt leaves nothing to expire', () {
     var s = close(
       GameState.start(monday),
       tuesday,
       progress: {monday: oneMissed},
     ).state;
-    s = engine.recordPenalty(s, tuesday, primary: 50);
+    s = engine.recordPenalty(s, tuesday, primary: 10, secondary: 15);
     final r = close(
       s,
       wednesday,
       progress: {monday: oneMissed, tuesday: allDone},
     );
     expect(r.state.debt, isNull);
-    expect(r.events.whereType<CarriedOver>(), isEmpty);
+    expect(r.events.whereType<PenaltyExpired>(), isEmpty);
   });
 
-  test('carry-over can exceed the 150 cap', () {
-    final s = GameState(startDay: monday, level: 21).copyWith(
-      lastClosedDay: monday,
-      debt: () =>
-          PenaltyDebt(dueDay: tuesday, primaryOwed: 150, secondaryOwed: 0),
+  test('a week of unpaid failures never owes more than one day', () {
+    var s = GameState.start(monday);
+    for (var i = 1; i <= 7; i++) {
+      s = close(s, monday.addDays(i)).state;
+      expect(s.debt!.primaryOwed, 10);
+      expect(s.debt!.secondaryOwed, 15);
+    }
+  });
+
+  test('the exercise penalty is the quest volume given for that day', () {
+    final r = engine.closeDaysBefore(
+      state: GameState.start(monday),
+      today: tuesday,
+      plan: plan,
+      progressFor: (_) => oneMissed,
+      sleep: sleep,
+      random: Random(7),
+      now: tuesday.at(0),
+      exerciseFor: (_) => (20, 30),
+      penaltyMultiplier: (_) => 2,
     );
-    final r = close(s, wednesday, progress: {tuesday: oneMissed});
-    expect(r.state.debt!.primaryOwed, 150 + 300);
+    expect(r.state.debt!.primaryOwed, 20);
+    expect(r.state.debt!.secondaryOwed, 30);
+    expect(r.state.lock!.duration, const Duration(hours: 8));
   });
 
   test('exercise only counts on the day it is due', () {
@@ -181,15 +199,15 @@ void main() {
       tuesday,
       progress: {monday: oneMissed},
     ).state;
-    expect(engine.recordPenalty(s, monday, primary: 50).debt!.primaryDone, 0);
+    expect(engine.recordPenalty(s, monday, primary: 10).debt!.primaryDone, 0);
     expect(
-      engine.recordPenalty(s, wednesday, primary: 50).debt!.primaryDone,
+      engine.recordPenalty(s, wednesday, primary: 10).debt!.primaryDone,
       0,
     );
-    expect(engine.recordPenalty(s, tuesday, primary: 50).debt!.primaryDone, 50);
+    expect(engine.recordPenalty(s, tuesday, primary: 10).debt!.primaryDone, 10);
   });
 
-  test('levelling up raises the penalty for later failures', () {
+  test('levelling up lengthens the lock but never the exercise', () {
     var s = GameState.start(monday);
     final progress = <DayKey, DayProgress>{};
     // Level 2 needs 300 XP: three cleared days.
@@ -204,7 +222,7 @@ void main() {
     expect(r.events.whereType<LevelUp>().single.newLevel, 2);
     expect(s.level, 2);
     expect(s.unspentStatPoints, 3);
-    expect(s.debt!.primaryOwed, 55);
+    expect(s.debt!.primaryOwed, 10);
     expect(s.lock!.duration, const Duration(minutes: 260));
   });
 
@@ -229,7 +247,7 @@ void main() {
     ).state;
     final again = close(s, tuesday, progress: {monday: allDone});
     expect(again.events, isEmpty);
-    expect(again.state.debt!.primaryOwed, 50);
+    expect(again.state.debt!.primaryOwed, 10);
   });
 
   test('skipped days are each judged when the app catches up', () {

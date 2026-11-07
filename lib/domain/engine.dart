@@ -85,15 +85,17 @@ class LevelUp extends GameEvent {
   final int newLevel;
 }
 
-class CarriedOver extends GameEvent {
-  const CarriedOver(
+/// A penalty left unpaid at the end of its day. It is dropped and logged:
+/// nothing carries over and nothing doubles (audit 2026-11-07, P0).
+class PenaltyExpired extends GameEvent {
+  const PenaltyExpired(
     super.day, {
     required this.primary,
     required this.secondary,
     this.kind = PenaltyKind.exercise,
   });
 
-  /// Amounts added to the next day, after interest.
+  /// What was still unpaid when the day ended.
   final int primary;
   final int secondary;
   final PenaltyKind kind;
@@ -157,8 +159,10 @@ class QuestEngine {
   /// reported, but nothing is owed and nothing is locked.
   ///
   /// [tasksFor], when given, replaces [plan] as the source of each day's
-  /// quest (System games). [penaltyMultiplier] scales a failed day's penalty
-  /// (2 on a Dungeon floor); [xpPercent] scales its XP.
+  /// quest (System games). [penaltyMultiplier] scales a failed day's lock
+  /// and its reading or focus penalty (2 on a Dungeon floor), never its
+  /// exercise; [xpPercent] scales its XP. [exerciseFor] gives the push-ups
+  /// and squats in that day's own quest, which bound the exercise penalty.
   EngineResult closeDaysBefore({
     required GameState state,
     required DayKey today,
@@ -172,6 +176,7 @@ class QuestEngine {
     int Function(DayKey day) penaltyMultiplier = _one,
     int Function(DayKey day) xpPercent = _hundred,
     PenaltyKind Function(DayKey day) penaltyKind = _exercise,
+    (int, int)? Function(DayKey day)? exerciseFor,
   }) {
     final events = <GameEvent>[];
     var s = state;
@@ -189,6 +194,7 @@ class QuestEngine {
         penaltyMultiplier(day),
         xpPercent(day),
         penaltyKind(day),
+        exerciseFor?.call(day),
         events,
       );
     }
@@ -212,6 +218,7 @@ class QuestEngine {
     int multiplier,
     int xpPercent,
     PenaltyKind kind,
+    (int, int)? exercise,
     List<GameEvent> events,
   ) {
     final failedIds = [
@@ -241,21 +248,16 @@ class QuestEngine {
       events.add(QuestFailed(day, failedIds));
     }
 
-    // Carry-over: anything unpaid on a debt due today doubles into tomorrow.
-    var carryPrimary = 0;
-    var carrySecondary = 0;
-    var carryKind = kind;
+    // A debt due on or before this day ends with it: anything unpaid is
+    // logged and dropped, never carried or doubled.
     final debt = s.debt;
     if (debt != null && !debt.dueDay.isAfter(day) && !debt.isPaid) {
-      carryPrimary = debt.primaryRemaining * config.carryOverMultiplier;
-      carrySecondary = debt.secondaryRemaining * config.carryOverMultiplier;
-      carryKind = debt.kind;
       events.add(
-        CarriedOver(
+        PenaltyExpired(
           day,
-          primary: carryPrimary,
-          secondary: carrySecondary,
-          kind: carryKind,
+          primary: debt.primaryRemaining,
+          secondary: debt.secondaryRemaining,
+          kind: debt.kind,
         ),
       );
     }
@@ -266,12 +268,13 @@ class QuestEngine {
     final tomorrow = day.addDays(1);
 
     if (!cleared) {
-      // A failed Dungeon floor multiplies the whole penalty (x2); the
-      // push-up cap still holds.
+      // A failed Dungeon floor doubles the lock and a reading or focus
+      // penalty; exercise stays at the day's own quest volume.
       final (primary, secondary) = penalties.amountsFor(
         kind,
         penaltyLevel,
         multiplier: multiplier,
+        exercise: exercise,
       );
       events.add(
         PenaltyIssued(
@@ -304,21 +307,12 @@ class QuestEngine {
       }
     }
 
-    // A carried debt of another kind (only after a new System begins) can't
-    // be added to this one; the new penalty takes its place.
-    if (newPrimary + newSecondary > 0 && carryKind != kind) {
-      carryPrimary = 0;
-      carrySecondary = 0;
-    }
-    final nextKind = newPrimary + newSecondary > 0 ? kind : carryKind;
-    final totalPrimary = newPrimary + carryPrimary;
-    final totalSecondary = newSecondary + carrySecondary;
-    final nextDebt = totalPrimary + totalSecondary > 0
+    final nextDebt = newPrimary + newSecondary > 0
         ? PenaltyDebt(
             dueDay: tomorrow,
-            kind: nextKind,
-            primaryOwed: totalPrimary,
-            secondaryOwed: totalSecondary,
+            kind: kind,
+            primaryOwed: newPrimary,
+            secondaryOwed: newSecondary,
           )
         : null;
 

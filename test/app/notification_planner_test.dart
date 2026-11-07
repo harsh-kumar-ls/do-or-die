@@ -104,7 +104,8 @@ void main() {
 
     final exercise = byId(plan, NoticeId.exercise)!;
     expect(exercise.at, DateTime(2026, 10, 20, 20));
-    expect(exercise.body, contains('50 push-ups'));
+    expect(exercise.body, contains('10 push-ups and 15 squats'));
+    expect(exercise.body, isNot(contains('double')));
 
     final lock = g.state.lock!;
     final engaged = byId(plan, NoticeId.lockEngaged)!;
@@ -115,7 +116,7 @@ void main() {
     final g = await start();
     clock.set(DateTime(2026, 10, 20, 6));
     await g.tick();
-    await g.recordPenalty(primary: 50);
+    await g.recordPenalty(primary: 10, secondary: 15);
     expect(byId(planner.plan(g, clock.now()), NoticeId.exercise), isNull);
   });
 

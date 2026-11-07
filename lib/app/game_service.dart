@@ -203,12 +203,15 @@ class GameService {
   /// Archives this game and starts a fresh trial with the same objectives,
   /// apps and sleep window. Refused while a penalty is in effect, so a
   /// restart can never be used to escape one. Returns null when refused.
-  Future<GameService?> restartTrial({int dryRunDays = 3}) async {
+  Future<GameService?> restartTrial({int dryRunDays = 3}) =>
+      _serial(() => _restartTrial(dryRunDays: dryRunDays));
+
+  Future<GameService?> _restartTrial({required int dryRunDays}) async {
     if (penaltyInEffect) return null;
     if (_game.systems != null) {
       throw StateError('A System game restarts through abandon().');
     }
-    if (_game.timer != null) await stopTimer();
+    if (_game.timer != null) await _stopTimer();
     final archived = _game.copyWith(
       newLogEntries: [LogEntry(now, 'trial_restarted')],
     );
@@ -228,12 +231,15 @@ class GameService {
 
   /// Archives this game and removes it, so the next launch begins a new
   /// Awakening. Refused (false) while a penalty or a Dungeon is in effect.
-  Future<bool> abandon({String reason = 'trial_restarted'}) async {
+  Future<bool> abandon({String reason = 'trial_restarted'}) =>
+      _serial(() => _abandon(reason));
+
+  Future<bool> _abandon(String reason) async {
     // Judge any finished day first, so a failure from just before midnight
     // can't be escaped in the seconds before the next check.
-    await tick();
+    await _tick();
     if (penaltyInEffect || dungeonInProgress) return false;
-    if (_game.timer != null) await stopTimer();
+    if (_game.timer != null) await _stopTimer();
     await _store.archive(
       _game.copyWith(newLogEntries: [LogEntry(now, reason)]),
     );
@@ -266,7 +272,9 @@ class GameService {
   ///
   /// Days are judged one at a time, oldest first, so the System's verdict on
   /// one day (a Gate opening, a rank-up) shapes the quest of the next.
-  Future<List<GameEvent>> tick() async {
+  Future<List<GameEvent>> tick() => _serial(_tick);
+
+  Future<List<GameEvent>> _tick() async {
     final now = _clock.now();
     final today = DayKey.fromDateTime(now);
     // A timer left running past midnight counts only up to midnight, and
@@ -296,7 +304,7 @@ class GameService {
         random: _random,
         now: now,
         isEnforced: g.isEnforced,
-        // A failed Dungeon floor: double lock, double reps.
+        // A failed Dungeon floor: double lock (exercise never doubles).
         penaltyMultiplier: (d) => sys != null && sys.isDungeonDay(d)
             ? DungeonRules.failMultiplier
             : 1,
@@ -309,6 +317,11 @@ class GameService {
             : 100,
         // Each System's own penalty; older games stay on exercise.
         penaltyKind: (_) => penaltyKindFor(sys?.active),
+        // Exercise owed is the push-ups and squats of the user's own daily
+        // quest for that day (valve applied, never a Dungeon's boost).
+        exerciseFor: (d) => sys?.active == null
+            ? null
+            : exerciseVolume(sys!.progress.dailyQuest(catalogue, d)),
       );
       var state = result.state;
       events.addAll(result.events);
@@ -442,7 +455,9 @@ class GameService {
   );
 
   /// Re-reads today's screen time for any cap in today's quest.
-  Future<void> measureCaps() async {
+  Future<void> measureCaps() => _serial(_measureCaps);
+
+  Future<void> _measureCaps() async {
     final next = await _withCapsMeasured(_game, today);
     if (!identical(next, _game)) await _commit(next);
   }
@@ -453,7 +468,9 @@ class GameService {
 
   /// Honour-system confirmation that a cap was kept, for phones without
   /// usage access. Ignored when the phone can measure it.
-  Future<bool> confirmCap(String taskId) async {
+  Future<bool> confirmCap(String taskId) => _serial(() => _confirmCap(taskId));
+
+  Future<bool> _confirmCap(String taskId) async {
     final task = todaysTasks.where((t) => t.id == taskId).firstOrNull;
     if (task == null || !task.isCap) return false;
     if (await canMeasureCaps()) return false;
@@ -466,8 +483,10 @@ class GameService {
 
   /// Enters the open Gate: Floor 1 is tomorrow. Returns false when no Gate
   /// is open (or it has just expired).
-  Future<bool> enterGate() async {
-    await tick();
+  Future<bool> enterGate() => _serial(_enterGate);
+
+  Future<bool> _enterGate() async {
+    await _tick();
     final sys = _game.systems;
     final entered = sys?.enter(now, firstOpenDay: _game.state.nextDayToClose);
     if (entered == null) return false;
@@ -484,7 +503,10 @@ class GameService {
 
   /// Sets the reduction valve (0-20%) from tomorrow. While it is above zero
   /// each cleared day earns half XP. Logged every time.
-  Future<void> setReduction(int percent) async {
+  Future<void> setReduction(int percent) =>
+      _serial(() => _setReduction(percent));
+
+  Future<void> _setReduction(int percent) async {
     final sys = _game.systems;
     if (sys == null || sys.active == null) return;
     final value = percent.clamp(0, maxQuestReduction);
@@ -526,6 +548,12 @@ class GameService {
     SystemKind kind,
     Rank placement, {
     Map<String, Object?> answers = const {},
+  }) => _serial(() => _chooseSystem(kind, placement, answers: answers));
+
+  Future<bool> _chooseSystem(
+    SystemKind kind,
+    Rank placement, {
+    Map<String, Object?> answers = const {},
   }) async {
     final sys = _game.systems;
     if (sys == null || !sys.progress.canChooseSystem) return false;
@@ -559,7 +587,9 @@ class GameService {
     return issued < owed;
   }
 
-  Future<void> markReportIssued() => _commit(
+  Future<void> markReportIssued() => _serial(_markReportIssued);
+
+  Future<void> _markReportIssued() => _commit(
     _game.copyWith(
       newLogEntries: [
         LogEntry(now, 'report_issued', {'day': today.toString()}),
@@ -583,8 +613,11 @@ class GameService {
   /// Sets today's progress on [taskId]. Ignored for unknown tasks, for caps
   /// (they are measured, or confirmed with [confirmCap]) and after a
   /// Dungeon floor's deadline.
-  Future<void> setProgress(String taskId, int value) async {
-    await tick();
+  Future<void> setProgress(String taskId, int value) =>
+      _serial(() => _setProgressById(taskId, value));
+
+  Future<void> _setProgressById(String taskId, int value) async {
+    await _tick();
     final task = todaysTasks.where((t) => t.id == taskId).firstOrNull;
     if (task == null || task.isCap) return;
     await _setProgress(task, value);
@@ -615,8 +648,11 @@ class GameService {
     );
   }
 
-  Future<void> addProgress(String taskId, int delta) =>
-      setProgress(taskId, (todaysProgress[taskId] ?? 0) + delta);
+  /// The current value is read inside the queue, so two quick taps both
+  /// count.
+  Future<void> addProgress(String taskId, int delta) => _serial(
+    () => _setProgressById(taskId, (todaysProgress[taskId] ?? 0) + delta),
+  );
 
   bool isTimerRunning(String taskId) => _game.timer?.taskId == taskId;
 
@@ -680,8 +716,10 @@ class GameService {
     );
   }
 
-  Future<void> startTimer(String taskId) async {
-    await tick();
+  Future<void> startTimer(String taskId) => _serial(() => _startTimer(taskId));
+
+  Future<void> _startTimer(String taskId) async {
+    await _tick();
     final task = todaysTasks.where((t) => t.id == taskId).firstOrNull;
     if (task == null) return;
     if (task.type != TaskType.timer && task.type != TaskType.phoneFree) return;
@@ -701,10 +739,12 @@ class GameService {
     await _commit(next);
   }
 
-  Future<void> stopTimer() async {
+  Future<void> stopTimer() => _serial(_stopTimer);
+
+  Future<void> _stopTimer() async {
     if (_game.timer == null) return;
     await _commit(_withTimerCredited(_clock.now()));
-    await tick();
+    await _tick();
   }
 
   /// Stops the running timer and adds its seconds to the day it started,
@@ -749,8 +789,11 @@ class GameService {
 
   /// Records penalty work done today: push-ups and squats, pages and
   /// reflections. Focus minutes are earned only with [startPenaltyBlock].
-  Future<void> recordPenalty({int primary = 0, int secondary = 0}) async {
-    await tick();
+  Future<void> recordPenalty({int primary = 0, int secondary = 0}) =>
+      _serial(() => _recordPenalty(primary, secondary));
+
+  Future<void> _recordPenalty(int primary, int secondary) async {
+    await _tick();
     final kind = _game.state.debt?.kind;
     // Focus minutes come only from a penalty block; reflections only from
     // submitReflection.
@@ -784,8 +827,11 @@ class GameService {
 
   /// Pays one reflection of a reading penalty with the user's [text], which
   /// is kept in the trial log. Refused unless it is long enough.
-  Future<bool> submitReflection(String text) async {
-    await tick();
+  Future<bool> submitReflection(String text) =>
+      _serial(() => _submitReflection(text));
+
+  Future<bool> _submitReflection(String text) async {
+    await _tick();
     final debt = _game.state.debt;
     if (debt == null ||
         debt.kind != PenaltyKind.reading ||
@@ -823,8 +869,10 @@ class GameService {
 
   /// Starts paying a Focus penalty: a phone-free block that locks the
   /// chosen apps until it is ended. Any running quest timer is stopped first.
-  Future<void> startPenaltyBlock() async {
-    await tick();
+  Future<void> startPenaltyBlock() => _serial(_startPenaltyBlock);
+
+  Future<void> _startPenaltyBlock() async {
+    await _tick();
     final debt = _game.state.debt;
     if (debt == null ||
         debt.kind != PenaltyKind.focus ||
@@ -869,7 +917,10 @@ class GameService {
   }
 
   /// Replaces the task list from tomorrow.
-  Future<void> editPlan(List<TaskDefinition> tasks) async {
+  Future<void> editPlan(List<TaskDefinition> tasks) =>
+      _serial(() => _editPlan(tasks));
+
+  Future<void> _editPlan(List<TaskDefinition> tasks) async {
     await _commit(
       _game.copyWith(
         plan: _game.plan.edit(today, tasks),
@@ -883,16 +934,20 @@ class GameService {
     );
   }
 
-  Future<void> addBlockedApp(String package) => _changeBlockList(
-    _game.blockList.add(today, package),
-    'block_app_added',
-    {'package': package, 'effectiveFrom': today.toString()},
+  Future<void> addBlockedApp(String package) => _serial(
+    () => _changeBlockList(
+      _game.blockList.add(today, package),
+      'block_app_added',
+      {'package': package, 'effectiveFrom': today.toString()},
+    ),
   );
 
-  Future<void> removeBlockedApp(String package) => _changeBlockList(
-    _game.blockList.remove(today, package),
-    'block_app_removed',
-    {'package': package, 'effectiveFrom': today.addDays(1).toString()},
+  Future<void> removeBlockedApp(String package) => _serial(
+    () => _changeBlockList(
+      _game.blockList.remove(today, package),
+      'block_app_removed',
+      {'package': package, 'effectiveFrom': today.addDays(1).toString()},
+    ),
   );
 
   Future<void> _changeBlockList(
@@ -911,7 +966,10 @@ class GameService {
 
   /// Applies to locks scheduled after this change; a lock already scheduled
   /// keeps its time.
-  Future<void> setSleepWindow(SleepWindow sleep) async {
+  Future<void> setSleepWindow(SleepWindow sleep) =>
+      _serial(() => _setSleepWindow(sleep));
+
+  Future<void> _setSleepWindow(SleepWindow sleep) async {
     await _commit(
       _game.copyWith(
         sleep: sleep,
@@ -925,7 +983,9 @@ class GameService {
     );
   }
 
-  Future<void> allocateStat(Stat stat) async {
+  Future<void> allocateStat(Stat stat) => _serial(() => _allocateStat(stat));
+
+  Future<void> _allocateStat(Stat stat) async {
     final next = engine.allocateStat(_game.state, stat);
     if (identical(next, _game.state)) return;
     await _commit(
@@ -939,7 +999,9 @@ class GameService {
   }
 
   /// Logged whenever the user uses the escape from a lock.
-  Future<void> recordEmergencyStop() async {
+  Future<void> recordEmergencyStop() => _serial(_recordEmergencyStop);
+
+  Future<void> _recordEmergencyStop() async {
     await _commit(
       _game.copyWith(newLogEntries: [LogEntry(_clock.now(), 'emergency_stop')]),
     );
@@ -950,6 +1012,13 @@ class GameService {
   /// how long it was down and whether a lock fell inside that gap. These
   /// entries can't be removed, so the day-30 review sees every one.
   Future<void> recordBlockerOffline({
+    required bool repaired,
+    DateTime? downSince,
+  }) => _serial(
+    () => _recordBlockerOffline(repaired: repaired, downSince: downSince),
+  );
+
+  Future<void> _recordBlockerOffline({
     required bool repaired,
     DateTime? downSince,
   }) async {
@@ -988,7 +1057,9 @@ class GameService {
   /// but every one is counted and shown, and none moves the lock's end.
   /// Exercise owed is untouched. Returns false (and logs nothing) unless the
   /// lock is actually in force right now.
-  Future<bool> releaseLock() async {
+  Future<bool> releaseLock() => _serial(_releaseLock);
+
+  Future<bool> _releaseLock() async {
     final now = _clock.now();
     final lock = _game.state.lock;
     if (lock == null || !lock.isActiveAt(now)) return false;
@@ -1029,6 +1100,19 @@ class GameService {
       );
     }
     return lines.join('\n');
+  }
+
+  /// Every change runs here, one at a time and in call order. Each reads
+  /// the saved game only after the change before it was committed, so two
+  /// overlapping calls (the 30-second check and a tap, say) can never drop
+  /// each other's write. Not re-entrant: queued code calls the private
+  /// versions (_tick, _stopTimer, ...), never the public ones.
+  Future<void> _queue = Future<void>.value();
+
+  Future<T> _serial<T>(Future<T> Function() op) {
+    final result = _queue.then((_) => op());
+    _queue = result.then<void>((_) {}, onError: (Object _) {});
+    return result;
   }
 
   Future<void> _commit(SavedGame next) async {

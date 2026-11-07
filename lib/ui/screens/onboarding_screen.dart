@@ -2188,6 +2188,10 @@ class _TermsStep extends StatefulWidget {
 
 class _TermsStepState extends State<_TermsStep> {
   final _scroll = ScrollController();
+
+  /// The user confirmed they are 18 or older; the terms can't be accepted
+  /// without it.
+  bool _adult = false;
   final _listKey = GlobalKey();
   final _seen = <int>{};
   late final List<(String, bool)> _lines = [
@@ -2209,7 +2213,7 @@ class _TermsStepState extends State<_TermsStep> {
       false,
     ),
     (
-      'The System penalty: ${penaltyTerms(penaltyKindFor(widget.kind))}. Anything unpaid doubles at midnight.',
+      'The System penalty: ${penaltyTerms(penaltyKindFor(widget.kind))}. Anything unpaid expires at midnight and is logged. Nothing carries over.',
       true,
     ),
     (
@@ -2217,7 +2221,7 @@ class _TermsStepState extends State<_TermsStep> {
       false,
     ),
     (
-      'Fail a Dungeon floor and the Dungeon Penalty doubles every penalty. Ranks never go down.',
+      'Fail a Dungeon floor and the Dungeon Penalty doubles the lock and any reading or phone-free penalty. Exercise never exceeds your daily quest. Ranks never go down.',
       true,
     ),
     (
@@ -2228,6 +2232,9 @@ class _TermsStepState extends State<_TermsStep> {
       'The first 3 days are a dry run: failures are shown, never enforced.',
       false,
     ),
+    (healthNotice, false),
+    (stopRule, true),
+    ('For adults 18 and over only.', false),
     ('The System does not negotiate.', false),
   ];
   late final _keys = [for (final _ in _lines) GlobalKey()];
@@ -2365,10 +2372,15 @@ class _TermsStepState extends State<_TermsStep> {
           style: Hud.mono(10, p.dim, spacing: .16),
         ),
         const SizedBox(height: 10),
+        _AgeConfirm(
+          checked: _adult,
+          onChanged: (v) => setState(() => _adult = v),
+        ),
+        const SizedBox(height: 10),
         ChargeButton(
           label: 'HOLD TO ACCEPT',
           danger: true,
-          enabled: all,
+          enabled: all && _adult,
           onConfirmed: () {
             Fx.instance.play(Cue.penalty);
             widget.onAccepted();
@@ -2451,6 +2463,55 @@ class _Registered extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // Shared helpers used elsewhere in the app
 
+/// "I am 18 or older": required before the terms can be accepted.
+class _AgeConfirm extends StatelessWidget {
+  const _AgeConfirm({required this.checked, required this.onChanged});
+
+  final bool checked;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = HudScope.of(context);
+    return MergeSemantics(
+      child: Semantics(
+        checked: checked,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            HapticFeedback.selectionClick();
+            onChanged(!checked);
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: p.sys, width: 1.5),
+                    color: checked ? p.sys.withValues(alpha: .25) : null,
+                  ),
+                  child: checked
+                      ? Icon(Icons.check, size: 16, color: p.hi)
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'I AM 18 OR OLDER',
+                  style: Hud.mono(13, p.text, spacing: .12),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// A task's target in words: "12 min", "1.5 km", "max 60 min", "once".
 String questTarget(TaskDefinition t) => switch (t.type) {
   TaskType.checkbox => 'once',
@@ -2460,16 +2521,29 @@ String questTarget(TaskDefinition t) => switch (t.type) {
   TaskType.screenCap => 'max ${t.target} min',
 };
 
+/// Shown in the terms for every System (Play health-app guidance and the
+/// audit's P0 safety fix).
+const healthNotice =
+    'Do or Die is not a medical device and does not diagnose, treat, cure or '
+    'prevent any medical condition. If you have a health condition or an '
+    'injury, or are pregnant, ask a healthcare professional before any '
+    'exercise quest.';
+
+/// The stop rule: no quest or penalty overrides the body.
+const stopRule =
+    'Stop at once if any exercise causes pain, dizziness, chest pain or '
+    'shortness of breath. No quest or penalty is worth an injury.';
+
 /// What a System's penalty costs at level 1, in words.
 String penaltyTerms(PenaltyKind kind) => switch (kind) {
-  PenaltyKind.exercise => '50 push-ups (+5 per level, capped at 150; squats are added beyond the cap)',
+  PenaltyKind.exercise => 'the push-ups and squats from your own daily quest, done again (never more, never doubled)',
   PenaltyKind.reading => '20 pages of reading (+2 per level, up to 60) and a written reflection on why the quest failed',
   PenaltyKind.focus => 'a 60-minute phone-free block (+5 minutes per level, up to 3 hours), run in the app with your chosen apps locked',
 };
 
 /// A System's penalty in a few words, for the System cards.
 String penaltyShort(PenaltyKind kind) => switch (kind) {
-  PenaltyKind.exercise => '50 push-ups',
+  PenaltyKind.exercise => "the day's push-ups and squats again",
   PenaltyKind.reading => '20 pages and a written reflection',
   PenaltyKind.focus => 'a 60-minute phone-free block',
 };

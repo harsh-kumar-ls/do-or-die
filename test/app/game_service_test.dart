@@ -82,7 +82,8 @@ void main() {
     final again = await reload();
 
     final debt = again.state.debt!;
-    expect(debt.primaryOwed, 50);
+    expect(debt.primaryOwed, 10);
+    expect(debt.secondaryOwed, 15);
     expect(debt.dueDay, const DayKey(2026, 10, 20));
     expect(again.state.lock!.day, const DayKey(2026, 10, 20));
     final types = again.game.log.map((e) => e.type).toList();
@@ -105,11 +106,11 @@ void main() {
     final g = await startGame();
     clock.set(DateTime(2026, 10, 20, 9)); // Monday failed
     await g.tick();
-    await g.recordPenalty(primary: 40);
+    await g.recordPenalty(primary: 4);
     final entry = g.game.log.lastWhere((e) => e.type == 'penalty_work');
     expect(entry.data['kind'], 'exercise');
-    expect(entry.data['primary'], 40);
-    expect(entry.data['primaryRemaining'], 10);
+    expect(entry.data['primary'], 4);
+    expect(entry.data['primaryRemaining'], 6);
   });
 
   test('exercise with no debt due does nothing and logs nothing', () async {

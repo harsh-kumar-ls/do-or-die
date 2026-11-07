@@ -75,7 +75,7 @@ class PenaltyScreen extends StatelessWidget {
                       !any
                           ? 'No penalty is in effect.'
                           : dungeon
-                          ? 'The Dungeon was not cleared. Double lock, double penalty.'
+                          ? 'The Dungeon was not cleared. The lock is doubled.'
                           : failedDay == null
                           ? 'A penalty is in effect today.'
                           : 'Daily quest failed · ${dayLabel(DateTime(failedDay.year, failedDay.month, failedDay.day))}',
@@ -658,7 +658,7 @@ class _DebtPanel extends StatelessWidget {
           Text(
             debt.isPaid
                 ? 'Debt cleared. ${dungeon ? 'The Dungeon Penalty' : 'The Penalty Zone'} ends when the lock expires.'
-                : 'Clear the debt today. Anything unpaid doubles at midnight.',
+                : 'Clear the debt today. Anything unpaid expires at midnight and is logged.',
             textAlign: TextAlign.center,
             style: Hud.mono(
               11,

@@ -8,8 +8,9 @@ import 'package:do_or_die/domain/clock.dart';
 import 'package:do_or_die/domain/day.dart';
 import 'package:do_or_die/domain/dungeon.dart';
 import 'package:do_or_die/domain/engine.dart';
-import 'package:do_or_die/domain/penalty.dart';
 import 'package:do_or_die/domain/progression.dart';
+import 'package:do_or_die/domain/penalty_kind.dart';
+import 'package:do_or_die/domain/system_catalogue.dart';
 import 'package:do_or_die/domain/systems.dart';
 import 'package:do_or_die/domain/tasks.dart';
 import 'package:do_or_die/platform/blocker.dart';
@@ -209,30 +210,28 @@ void main() {
       },
     );
 
-    test(
-      'failing a floor: Dungeon Penalty next day, double lock and reps',
-      () async {
-        final g = await atGate();
-        await clearToday(g);
-        await nextDay(g); // floor 1 today
-        final level = g.state.level;
-        final p = g.engine.penalties;
-        await nextDay(g); // floor 1 not cleared
-        final debt = g.state.debt!;
-        expect(debt.primaryOwed, p.pushupsForLevel(level) * 2);
-        expect(debt.secondaryOwed, p.squatsForLevel(level) * 2);
-        final lock = g.state.lock!;
-        expect(
-          lock.end.difference(lock.start).inMinutes,
-          lessThanOrEqualTo(p.lockMinutesForLevel(level) * 2),
-        );
-        expect(g.systems!.dungeon, isNull);
-        expect(g.systems!.dungeonPenaltyDay, g.today);
-        expect(g.dungeonPenaltyToday, isTrue);
-        expect(g.systems!.rank, Rank.e, reason: 'no rank loss');
-        expect(g.takeSystemEvents().whereType<DungeonFailed>(), hasLength(1));
-      },
-    );
+    test('failing a floor: Dungeon Penalty next day, double lock, exercise '
+        'never above the daily quest', () async {
+      final g = await atGate();
+      await clearToday(g);
+      await nextDay(g); // floor 1 today
+      final level = g.state.level;
+      final p = g.engine.penalties;
+      await nextDay(g); // floor 1 not cleared
+      final debt = g.state.debt!;
+      // Rank E daily quest: 10 push-ups and 15 squats. Never doubled.
+      expect((debt.primaryOwed, debt.secondaryOwed), (10, 15));
+      final lock = g.state.lock!;
+      expect(
+        lock.end.difference(lock.start).inMinutes,
+        lessThanOrEqualTo(p.lockMinutesForLevel(level) * 2),
+      );
+      expect(g.systems!.dungeon, isNull);
+      expect(g.systems!.dungeonPenaltyDay, g.today);
+      expect(g.dungeonPenaltyToday, isTrue);
+      expect(g.systems!.rank, Rank.e, reason: 'no rank loss');
+      expect(g.takeSystemEvents().whereType<DungeonFailed>(), hasLength(1));
+    });
 
     test('the Dungeon Penalty reaches the phone in its own mode', () async {
       final g = await atGate();
@@ -246,11 +245,10 @@ void main() {
 
     test('a normal failed day keeps the normal penalty and mode', () async {
       final g = await awaken(SystemKind.fitness);
-      final level = g.state.level;
       await nextDay(g);
       expect(
-        g.state.debt!.primaryOwed,
-        g.engine.penalties.pushupsForLevel(level),
+        (g.state.debt!.primaryOwed, g.state.debt!.secondaryOwed),
+        (10, 15),
       );
       final blocker = FakeBlocker();
       await PenaltyEnforcer(blocker, clock: clock).sync(g);
@@ -494,37 +492,34 @@ void main() {
       expect(await g.confirmCap('social'), isFalse);
     });
 
+    test("the Fitness penalty follows the rank's own daily quest", () async {
+      final g = await awaken(SystemKind.fitness, placement: Rank.d);
+      await nextDay(g);
+      // Rank D daily quest: 20 push-ups and 30 squats.
+      expect(
+        (g.state.debt!.primaryOwed, g.state.debt!.secondaryOwed),
+        (20, 30),
+      );
+    });
+
     test(
-      'the Dungeon Penalty keeps the 150 push-up cap; the rest is squats',
-      () {
-        final engine = QuestEngine();
-        final day = DayKey(2026, 10, 19);
-        final r = engine.closeDaysBefore(
-          state: GameState(startDay: day, level: 21),
-          today: day.addDays(1),
-          plan: QuestPlan.initial(day, const [
-            TaskDefinition(
-              id: 'a',
-              name: 'A',
-              type: TaskType.checkbox,
-              target: 1,
-            ),
-          ]),
-          progressFor: (_) => const {},
-          sleep: const SleepWindow(),
-          random: Random(1),
-          now: day.at(23 * 60),
-          penaltyMultiplier: (_) => 2,
-        );
-        final p = engine.penalties;
-        final issued = r.events.whereType<PenaltyIssued>().single;
-        expect(issued.primary, 150);
+      'the reduction valve lowers the Fitness penalty with the quest',
+      () async {
+        final g = await awaken(SystemKind.fitness, placement: Rank.d);
+        await g.setReduction(20);
+        await nextDay(g); // day 1 failed at full quest
+        await nextDay(g); // day 2 failed at -20%
         expect(
-          issued.secondary,
-          p.squatsForLevel(21) * 2 + p.pushupsForLevel(21) * 2 - 150,
+          (g.state.debt!.primaryOwed, g.state.debt!.secondaryOwed),
+          (16, 24),
         );
       },
     );
+
+    test('rank S Fitness has no push-ups in its quest, so it owes none', () {
+      final quest = fitnessSystem.at(Rank.s).daily;
+      expect(exerciseVolume(quest), (0, 0));
+    });
 
     test(
       'with the clock set back, floor 1 never lands on a judged day',
@@ -601,11 +596,14 @@ void main() {
   });
 
   group('penalties follow the System', () {
-    test('Fitness owes push-ups', () async {
+    test('Fitness owes push-ups and squats from its own daily quest', () async {
       final g = await awaken(SystemKind.fitness);
       await nextDay(g);
       expect(g.state.debt!.kind, PenaltyKind.exercise);
-      expect(g.state.debt!.primaryOwed, 50);
+      expect(
+        (g.state.debt!.primaryOwed, g.state.debt!.secondaryOwed),
+        (10, 15),
+      );
     });
 
     test(

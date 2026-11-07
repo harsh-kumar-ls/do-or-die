@@ -77,6 +77,10 @@
     },
     {
       "type": "action",
+      "description": "Click 'I AM 18 OR OLDER' (the age confirmation above the accept button)"
+    },
+    {
+      "type": "action",
       "description": "Click 'HOLD TO ACCEPT' once (this test build accepts a click in place of the hold)"
     },
     {

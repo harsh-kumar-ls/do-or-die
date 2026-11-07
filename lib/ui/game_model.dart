@@ -670,7 +670,8 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
               .whereType<LockScheduled>()
               .where((l) => l.day == e.day.addDays(1))
               .firstOrNull;
-          final owed = penalty == null
+          final owed =
+              penalty == null || penalty.primary + penalty.secondary == 0
               ? null
               : describePenalty(
                   penalty.kind,
@@ -846,7 +847,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
         'Floor $floor was not cleared.',
         dry
             ? 'Dry run: no penalty is enforced.'
-            : 'Dungeon Penalty today: double lock and double penalty.',
+            : 'Dungeon Penalty today: double lock.',
       ],
       rows: [
         if (lock != null)
@@ -855,10 +856,12 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
             '×2 · ${(lock.window.end.difference(lock.window.start).inMinutes / 60).round()} h',
             RowTone.bad,
           ),
-        if (penalty != null)
+        if (penalty != null && penalty.primary + penalty.secondary > 0)
           NoticeRow(
             'Penalty debt',
-            '×2 · ${describePenalty(penalty.kind, penalty.primary, penalty.secondary)}',
+            // Exercise is never doubled: it stays at the daily quest.
+            '${penalty.kind == PenaltyKind.exercise ? '' : '×2 · '}'
+                '${describePenalty(penalty.kind, penalty.primary, penalty.secondary)}',
             RowTone.bad,
           ),
         NoticeRow('Rank', '${_r(rank)} · kept', RowTone.gold),

@@ -66,6 +66,7 @@ def awakening(system="FITNESS", answers=None):
         CONFIRM_APPS,
         act("Click 'SET REST PERIOD' on the 'REST PERIOD' screen"),
         act("On the 'PENALTY TERMS' screen, scroll the list of terms down to the last term, 'The System does not negotiate.', until the text 'ALL TERMS READ' appears"),
+        act("Click 'I AM 18 OR OLDER' (the age confirmation above the accept button)"),
         act("Click 'HOLD TO ACCEPT' once (this test build accepts a click in place of the hold)"),
         act("Click 'ENTER' on the '[ PLAYER REGISTERED ]' window"),
     ]

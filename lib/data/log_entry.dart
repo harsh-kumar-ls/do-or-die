@@ -38,9 +38,9 @@ class LogEntry {
         'day': day,
         'level': newLevel,
       }),
-      CarriedOver(:final primary, :final secondary, :final kind) => LogEntry(
+      PenaltyExpired(:final primary, :final secondary, :final kind) => LogEntry(
         at,
-        'carried_over',
+        'penalty_expired',
         {
           'day': day,
           'kind': kind.name,

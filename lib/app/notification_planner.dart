@@ -136,7 +136,7 @@ class NotificationPlanner {
         NoticeId.exercise,
         today.at(exerciseAt),
         '[ PENALTY ] Penalty owed',
-        '$owed remaining. Anything unpaid doubles at midnight.',
+        '$owed remaining. Anything unpaid expires at midnight and is logged.',
       );
     }
 

@@ -589,6 +589,17 @@ void main() {
     );
     await pumpFor(tester, 500);
     expect(find.text('ALL TERMS READ'), findsOneWidget);
+    expect(
+      find.textContaining('not a medical device'),
+      findsOneWidget,
+      reason: 'the health notice is part of the terms',
+    );
+    expect(find.textContaining('Stop at once'), findsOneWidget);
+    expect(find.textContaining('unpaid doubles'), findsNothing);
+    // Without the age confirmation the terms can't be accepted.
+    await holdText(tester, find.text('HOLD TO ACCEPT'));
+    expect(find.text('ENTER'), findsNothing);
+    await tapText(tester, 'I AM 18 OR OLDER');
     await holdText(tester, find.text('HOLD TO ACCEPT'));
     await tapText(tester, 'ENTER');
     expect(result!.system, SystemKind.fitness);

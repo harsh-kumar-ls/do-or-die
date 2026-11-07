@@ -1023,7 +1023,7 @@ class _PresenceState extends State<_Presence> {
     return [
       if (m.inPenalty)
         m.dungeonPenalty
-            ? 'Dungeon Penalty in effect. The debt is doubled.'
+            ? 'Dungeon Penalty in effect. The lock is doubled.'
             : 'Penalty in effect. Pay the debt before 23:59.'
       else if (m.isQuestComplete)
         'Quest cleared. The System has noted it.'

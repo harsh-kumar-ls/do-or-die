@@ -42,7 +42,7 @@ void main() {
 
       expect(events.whereType<QuestFailed>(), hasLength(1));
       final penalty = events.whereType<PenaltyIssued>().single;
-      expect(penalty.primary, 50);
+      expect(penalty.primary, 10);
       expect(penalty.enforced, isFalse);
       final lock = events.whereType<LockScheduled>().single;
       expect(lock.enforced, isFalse);
@@ -74,16 +74,16 @@ void main() {
     clock.advance(const Duration(days: 1));
     final events = await g.tick();
     expect(events.whereType<PenaltyIssued>().single.enforced, isTrue);
-    expect(g.state.debt!.primaryOwed, greaterThanOrEqualTo(50));
+    expect(g.state.debt!.primaryOwed, 10);
     expect(g.state.lock, isNotNull);
   });
 
-  test('dry-run failures never feed carry-over', () async {
+  test('dry-run failures never leave a debt behind', () async {
     final g = await start();
     clock.set(DateTime(2026, 10, 21, 8)); // Monday and Tuesday both failed
     await g.tick();
     expect(g.state.debt, isNull);
-    expect(g.game.log.where((e) => e.type == 'carried_over'), isEmpty);
+    expect(g.game.log.where((e) => e.type == 'penalty_expired'), isEmpty);
   });
 
   test(
@@ -104,7 +104,7 @@ void main() {
         clock: clock,
         random: Random(4),
       ))!;
-      expect(reloaded.state.debt!.primaryOwed, 50);
+      expect(reloaded.state.debt!.primaryOwed, 10);
       expect(reloaded.state.lock, isNotNull);
     },
   );
@@ -130,13 +130,13 @@ void main() {
     'restart is refused while a penalty is in effect, so it cannot erase one',
     () async {
       final g = await start(dryRunDays: 0);
-      clock.set(DateTime(2026, 10, 20, 8)); // Monday failed: 50 push-ups today
+      clock.set(DateTime(2026, 10, 20, 8)); // Monday failed: 10 push-ups today
       await g.tick();
       expect(g.penaltyInEffect, isTrue);
 
       expect(await g.restartTrial(), isNull);
       expect(store.archived, isEmpty);
-      expect(g.state.debt!.primaryOwed, 50);
+      expect(g.state.debt!.primaryOwed, 10);
     },
   );
 }

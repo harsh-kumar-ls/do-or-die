@@ -7,7 +7,8 @@ import 'day.dart';
 /// so the penalty trains what the System trains: a Personality failure is
 /// not paid in push-ups.
 enum PenaltyKind {
-  /// Push-ups, then squats past the cap (Fitness, and games without a System).
+  /// Push-ups and squats, never more than the daily quest's own (Fitness,
+  /// and games without a System).
   exercise,
 
   /// Pages to read, plus a written reflection on why the quest failed
@@ -23,33 +24,21 @@ class PenaltyCalculator {
 
   final GameConfig config;
 
-  int _rawPushups(int level) =>
-      config.basePushups + config.pushupsPerLevel * (level - 1);
-
-  int pushupsForLevel(int level) => min(_rawPushups(level), config.pushupCap);
-
-  /// The first level at which push-ups would exceed the cap.
-  int get firstSquatLevel =>
-      (config.pushupCap - config.basePushups) ~/ config.pushupsPerLevel + 2;
-
-  int squatsForLevel(int level) {
-    if (_rawPushups(level) <= config.pushupCap) return 0;
-    return config.baseSquats +
-        config.squatsPerLevel * (level - firstSquatLevel);
-  }
-
-  /// The penalty for failing at [level] as (primary, secondary), scaled by
-  /// [multiplier] (2 for a failed Dungeon floor). Push-ups never go above
-  /// the cap, even doubled: the excess becomes squats.
-  (int, int) amountsFor(PenaltyKind kind, int level, {int multiplier = 1}) {
+  /// The penalty for failing at [level] as (primary, secondary).
+  ///
+  /// Exercise is [exercise] (the push-ups and squats in the failed day's
+  /// quest) or the defaults: never scaled by level and never multiplied, so
+  /// it can never exceed what the user already does daily. Reading and focus
+  /// scale by level and by [multiplier] (2 for a failed Dungeon floor).
+  (int, int) amountsFor(
+    PenaltyKind kind,
+    int level, {
+    int multiplier = 1,
+    (int, int)? exercise,
+  }) {
     switch (kind) {
       case PenaltyKind.exercise:
-        final pushups = pushupsForLevel(level) * multiplier;
-        final capped = min(pushups, config.pushupCap);
-        return (
-          capped,
-          squatsForLevel(level) * multiplier + (pushups - capped),
-        );
+        return exercise ?? (config.defaultPushups, config.defaultSquats);
       case PenaltyKind.reading:
         final pages = min(
           config.basePages + config.pagesPerLevel * (level - 1),

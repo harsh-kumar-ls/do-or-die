@@ -57,9 +57,9 @@ A daily quest you cannot skip. Fail it, and the System locks your apps.
 >
 > Choose one System: Fitness, Personality or Focus. A short placement test sets your starting rank, from E to C. Every day the System issues a quest for your rank: walks, push-ups and squats; reading, journaling and talking to people; phone-free blocks and social-media limits.
 >
-> Clear it before midnight and you earn XP. Fail it and the Penalty Zone follows: the apps you chose lock for hours at a time you are not told, and you owe a penalty that fits your System. Anything unpaid doubles.
+> Clear it before midnight and you earn XP. Fail it and the Penalty Zone follows: the apps you chose lock for hours at a time you are not told, and you owe a penalty that fits your System. Anything unpaid expires at midnight and is logged; nothing carries over.
 >
-> Clear 21 of 30 days and a Gate opens. Enter it for a three-day Dungeon that ends in a Rank Trial. Clear it to rank up. Fail it, and the Dungeon Penalty is double.
+> Clear 21 of 30 days and a Gate opens. Enter it for a three-day Dungeon that ends in a Rank Trial. Clear it to rank up. Fail it, and the Dungeon Penalty doubles the lock.
 >
 > Built to be fair:
 > - Calls, messages, maps, settings, and banking and payment apps are never locked.
@@ -69,7 +69,7 @@ A daily quest you cannot skip. Fail it, and the System locks your apps.
 >
 > Private by design: no account, no ads, no internet access. Everything stays on your phone.
 >
-> Fitness quests are conservative progressions, not medical advice. If you have a health condition, ask a doctor first.
+> Do or Die is not a medical device and does not diagnose, treat, cure, or prevent any medical condition. Fitness quests are conservative progressions; the exercise penalty is never more than your own daily quest. Consult a healthcare professional before starting if you have a health condition or injury, and stop any exercise that causes pain. For adults 18 and over.
 
 **Category:** Health & Fitness. **Tags:** habit tracker, discipline, productivity.
 **Contact email:** your choice (Play shows it publicly).
@@ -79,8 +79,10 @@ A daily quest you cannot skip. Fail it, and the System locks your apps.
 
 **Data safety:**
 - Does the app collect or share any required user data types? **No.**
-- The app has no internet permission; all data stays on the device and is removed on uninstall.
+- The app has no internet permission; all data stays on the device and is removed on uninstall. Android backup and device-to-device transfer are turned off (`android:allowBackup="false"` and `res/xml/data_extraction_rules.xml`), so nothing is copied to the user's Google account.
 - Data encrypted in transit: not applicable (nothing is transmitted).
+
+**Health apps declaration** (required for every app, testing tracks included): select **Activity and Fitness**; the app is not a medical device. The required statement is in the full description above.
 
 **Ads:** No ads. **Target audience:** 18 and over (physical penalties and app locks are not designed for children). **Content rating questionnaire:** no violence, no user-generated content, no sharing of location, no purchases. **News app:** No. **Government app:** No. **Financial features:** None.
 

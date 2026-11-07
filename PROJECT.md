@@ -43,15 +43,15 @@ Everything else is secondary.
 1. Every task's deadline is end of day. Breakfast can be ticked any time that day.
 2. A task not completed by the end of day D is a **failed task**.
 3. If **any** task fails on day D, the penalty applies on the **next day (D+1)**. One penalty per failed day, however many tasks failed.
-4. **Physical:** `50 + 5 × (level − 1)` push-ups, due by the end of D+1. Example: level 10 is 95, level 11 is 100.
-5. **Push-up cap: 150** (reached at level 21). Past the cap, push-ups stay at 150 and **squats** are added: 50 at level 22, +5 per level after that.
+4. ~~**Physical:** `50 + 5 × (level − 1)` push-ups, due by the end of D+1.~~ **Changed 2026-11-07 (audit P0, safety):** the exercise penalty is the push-ups and squats of the user's own daily quest for that day, due by the end of D+1. It never scales with level and never doubles. A game without a System owes 10 push-ups and 15 squats.
+5. ~~**Push-up cap: 150**, then squats.~~ Superseded by rule 4 (2026-11-07).
 6. **Digital:** Instagram, YouTube and BGMI are locked for `4 hours + 20 minutes × (level − 1)` on D+1. Level 1 is 4h, level 10 is 7h. The lock does **not** last the whole day.
 7. **The lock starts at a random time on D+1, not announced in advance** (the twist). It must never start or run during sleep:
    - The user sets a sleep window (default 23:00–07:00). The user can change it, effective from the next day.
    - The start time is picked at random so the whole lock fits inside waking hours.
    - If the lock is longer than the waking window (very high levels), it is clamped to the waking window. Logged.
 8. Doing the exercise does **not** end the lock early.
-9. **Carry-over with 100% interest:** unpaid reps are **doubled** and added to the next day's debt. Example: owe 50, do 40, so 20 are added tomorrow. Carry-over **can exceed the 150 cap**.
+9. ~~**Carry-over with 100% interest.**~~ **Changed 2026-11-07 (audit P0):** unpaid work expires at the end of its day and is logged. Nothing carries over and nothing doubles. (Doubling took an unpaid debt from 50 to 6,350 reps in seven days.)
 
 All numbers live in one config file.
 

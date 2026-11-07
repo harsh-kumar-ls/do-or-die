@@ -8,29 +8,35 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   const calc = PenaltyCalculator(GameConfig());
 
-  group('push-ups and squats by level', () {
-    test('level 1 is 50 push-ups, +5 per level', () {
-      expect(calc.pushupsForLevel(1), 50);
-      expect(calc.pushupsForLevel(10), 95);
-      expect(calc.pushupsForLevel(11), 100);
+  group('exercise penalty is bounded by the quest (P0 safety)', () {
+    test('without a quest volume: 10 push-ups and 15 squats, at any level', () {
+      expect(calc.amountsFor(PenaltyKind.exercise, 1), (10, 15));
+      expect(calc.amountsFor(PenaltyKind.exercise, 40), (10, 15));
     });
 
-    test('push-ups cap at 150 from level 21', () {
-      expect(calc.pushupsForLevel(21), 150);
-      expect(calc.pushupsForLevel(22), 150);
-      expect(calc.pushupsForLevel(60), 150);
+    test('with a quest volume: exactly that, never more', () {
+      expect(calc.amountsFor(PenaltyKind.exercise, 30, exercise: (20, 30)), (
+        20,
+        30,
+      ));
     });
 
-    test('no squats until push-ups pass the cap', () {
-      expect(calc.squatsForLevel(1), 0);
-      expect(calc.squatsForLevel(21), 0);
+    test('a failed Dungeon floor never multiplies exercise', () {
+      expect(
+        calc.amountsFor(
+          PenaltyKind.exercise,
+          5,
+          multiplier: 2,
+          exercise: (10, 15),
+        ),
+        (10, 15),
+      );
     });
 
-    test('squats start at 50 on level 22 and rise +5 per level', () {
-      expect(calc.firstSquatLevel, 22);
-      expect(calc.squatsForLevel(22), 50);
-      expect(calc.squatsForLevel(23), 55);
-      expect(calc.squatsForLevel(30), 90);
+    test('reading and focus penalties still scale and double', () {
+      expect(calc.amountsFor(PenaltyKind.reading, 1), (20, 1));
+      expect(calc.amountsFor(PenaltyKind.reading, 1, multiplier: 2), (40, 2));
+      expect(calc.amountsFor(PenaltyKind.focus, 1, multiplier: 2), (120, 0));
     });
   });
 

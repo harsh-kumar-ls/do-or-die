@@ -41,11 +41,11 @@ A habit app run by a cold, game-style **System**. Original theme, inspired only 
 3. Every day the System issues a **daily quest** for your System and rank. Clear it before midnight for XP.
 4. Fail it and the **Penalty Zone** follows the next day:
    - Your chosen apps lock for 4 h + 20 min per level, starting at a random time during waking hours (never during your rest period).
-   - You owe a penalty that matches your System: push-ups for Fitness (squats past the 150 cap), pages plus a written reflection for Personality, a phone-free block for Focus.
-   - Anything unpaid doubles the next day.
+   - You owe a penalty that matches your System: the push-ups and squats from your own daily quest for Fitness (never more, never doubled), pages plus a written reflection for Personality, a phone-free block for Focus.
+   - Anything unpaid expires at midnight and is logged; nothing carries over (changed 2026-11-07, audit P0).
    - A 15-minute release is always available; it's free, but every release is counted.
 5. Clear **21 of the last 30 days** and a **Gate** opens. Enter within 48 h for a 3-day **Dungeon**: Floor 1 is the quest +25%, Floor 2 is +50% and must be done by 18:00, Floor 3 is the **Rank Trial**. Clear it to rank up.
-6. Fail a floor and the **Dungeon Penalty** follows: double lock, double penalty, Gate closed for 7 days. Ranks never go down.
+6. Fail a floor and the **Dungeon Penalty** follows: double lock (and double reading or phone-free penalty; exercise never doubles), Gate closed for 7 days. Ranks never go down.
 7. A System is complete when rank S is held for 30 days. Only then can a second System be chosen. No switching before that.
 8. Every 30 days a **report** shows what changed, including every release taken. It can be shared as an image.
 
@@ -109,6 +109,7 @@ Changes from the first live days:
 |---|---|
 | 2026-10-20 | Trial first, launch only if it works. Android only for now |
 | 2026-10-20 | Penalty rules: next-day penalty, random lock in waking hours, push-up cap 150 then squats, unpaid doubles. Exercise does not end the lock early |
+| 2026-11-07 | Audit P0 fixes: the exercise penalty is the push-ups and squats of the user's own daily quest (no level scaling, no doubling); nothing carries over or doubles; game changes are serialised (fixes a lost-update bug); 18+ confirmation, health notice and stop rule in the terms; backup and device transfer off. See audit/AUDIT_REPORT_2026-11-07.md |
 | 2026-10-21 | Emergency exit replaced by the counted 15-minute release |
 | 2026-10-22 | No accessibility service (banking apps refuse it); usage-access watcher instead |
 | 2026-10-27 | One System at a time; System-written quests replace user-written ones; no rank loss; 21/30 opens a Gate |

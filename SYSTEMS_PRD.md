@@ -207,14 +207,14 @@ Acceptance:
 ### 6.5 Dungeon Penalty Zone
 - [ ] Applies the day after a failed floor.
 - [ ] **Lock length = 2 × the normal lock for your level**, random start within waking hours, clamped to waking hours (existing scheduler).
-- [ ] **Exercise = 2 × the normal penalty for your level** (push-ups, and squats past the cap); unpaid reps still carry over doubled.
+- [ ] ~~**Exercise = 2 × the normal penalty for your level**; unpaid reps carry over doubled.~~ **Changed 2026-11-07:** exercise stays at the daily quest's own push-ups and squats; reading and phone-free penalties double; nothing carries over.
 - [ ] Releases still work (15 min each, counted); the block screen and Penalty tab show **DUNGEON PENALTY** in the new palette.
 - [ ] Distinct look (darker palette with crimson and gold), title and sound, so it never feels like an ordinary failed day.
 - [ ] Restart Trial and diagnostics are refused while it is in effect (existing rule).
 
 ### 6.6 Safety
 - Fitness ranks are conservative progressions, not medical advice; onboarding says so and recommends a doctor's advice for health conditions.
-- Daily penalty caps from PROJECT.md stay (150 push-ups, then squats); the Dungeon Penalty doubles the *new* penalty but the same safety notice and stop rule apply.
+- **Changed 2026-11-07:** the exercise penalty is never more than the user's own daily quest and never doubles; the terms carry a health notice (not a medical device; ask a healthcare professional), a stop rule and an 18+ confirmation.
 - The 20% quest reduction valve (6.1) exists so injury never forces a failure.
 
 ### 6.7 The 30-day report
@@ -285,6 +285,7 @@ Generated every 30 days and at the end of each Dungeon:
 ---
 
 ## Changelog
+- **v0.7 (2026-11-07, independent audit P0 fixes):** the exercise penalty is the push-ups and squats of the user's own daily quest for that day (reduction valve applied; never scaled by level, never doubled by the Dungeon Penalty; rank S Fitness owes none); unpaid penalties expire at midnight and are logged, never carried or doubled; the Dungeon Penalty doubles the lock and a reading or phone-free penalty only; the terms add the health notice, a stop rule and an 18+ confirmation; app data is excluded from backup and device transfer. Supersedes the exercise lines in 6.5 and 6.6. See audit/AUDIT_REPORT_2026-11-07.md.
 - **v0.6 (2026-10-31, user decisions after the Claude Design review):** release stays free; one System at a time is reaffirmed; attributes deferred to V2 or V3 with no effect in V1; the reduction valve is limited to 6 days in any 30; banking and UPI apps are never locked; the report can be shared as an image, with the honesty figures optional; the verdict adds "Most of it rests on your word" when more than 60% of judged days carry an honour confirmation.
 - **v0.5 (2026-10-31, from the Claude Design review):** the Personality reflection needs five lines of at least four words each; counted objectives and penalty reps have an undo (never below zero); the reduction valve is locked while a Dungeon is in progress; System notices queue by priority (gate, rank-up, failure, cleared) with a "NOTICE i / n" counter, and ACKNOWLEDGE arms only after the notice has played; a cleared quest with a screen-time cap says the cap still holds until 23:59; the report's verdict opens with one rule-based headline (under half cleared, more releases than locks served, lock outages, or the clear rate).
 - **v0.4 (2026-10-31, from the first device test):** each System has its own penalty besides the app lock: Fitness owes push-ups (squats past the cap); Personality owes pages (20 +2/level, cap 60) and a written reflection of at least five lines (kept in the log); Focus owes a phone-free block (60 min +5/level, cap 180) run in the app with the chosen apps locked. Anything unpaid still doubles. Personality rank E adds "Say hello to someone you rarely talk to". Each day's quest is frozen when first issued, so an app update never changes a quest already shown. The System choice explains each System (what it trains, rank E and S quests, its penalty); the placement test says it only sets the rank; the rank step reveals the daily quest.
