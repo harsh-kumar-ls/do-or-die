@@ -302,6 +302,10 @@ class _LockPanel extends StatefulWidget {
 
 class _LockPanelState extends State<_LockPanel> {
   Map<String, String> _labels = const {};
+
+  /// The phone's app names have arrived (or failed to); until then the chips
+  /// stay hidden so a short fallback name never flashes first.
+  bool _labelsLoaded = false;
   final _rand = Random();
 
   static const _fallback = {
@@ -313,11 +317,19 @@ class _LockPanelState extends State<_LockPanel> {
   @override
   void initState() {
     super.initState();
-    widget.blocker.installedApps().then((apps) {
-      if (mounted) {
-        setState(() => _labels = {for (final a in apps) a.package: a.label});
-      }
-    });
+    widget.blocker
+        .installedApps()
+        .then((apps) {
+          if (mounted) {
+            setState(() {
+              _labels = {for (final a in apps) a.package: a.label};
+              _labelsLoaded = true;
+            });
+          }
+        })
+        .catchError((Object _) {
+          if (mounted) setState(() => _labelsLoaded = true);
+        });
   }
 
   String _name(String pkg) =>
@@ -404,13 +416,17 @@ class _LockPanelState extends State<_LockPanel> {
               style: Hud.mono(11, Hud.warn),
             )
           else
-            Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final pkg in apps) _AppChip(_name(pkg), open: open),
-              ],
+            AnimatedOpacity(
+              opacity: _labelsLoaded ? 1 : 0,
+              duration: const Duration(milliseconds: 200),
+              child: Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final pkg in apps) _AppChip(_name(pkg), open: open),
+                ],
+              ),
             ),
           const SizedBox(height: 12),
           StepButton('EDIT LOCKED APPS', onPressed: widget.onEditApps),
