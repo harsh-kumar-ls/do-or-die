@@ -39,7 +39,7 @@
 <table>
   <tr><th>Permission</th><th>Why</th></tr>
   <tr><td>Usage access (<code>PACKAGE_USAGE_STATS</code>)</td><td>To see which app is in front, so a locked app can be covered during a penalty, and to measure screen-time objectives. Read on the device only; never stored outside the app or sent anywhere.</td></tr>
-  <tr><td>Display over other apps (<code>SYSTEM_ALERT_WINDOW</code>)</td><td>To show the Penalty Zone screen over an app you chose to lock.</td></tr>
+  <tr><td>Display over other apps (<code>SYSTEM_ALERT_WINDOW</code>)</td><td>To show the Lockdown screen over an app you chose to lock.</td></tr>
   <tr><td>Foreground service (<code>FOREGROUND_SERVICE</code>, <code>FOREGROUND_SERVICE_SPECIAL_USE</code>)</td><td>Runs the lock watcher only while a lock, a phone-free block or a pending verdict needs it, with a visible notification. It stops otherwise; exact alarms wake it at midnight and just before a lock.</td></tr>
   <tr><td>Notifications (<code>POST_NOTIFICATIONS</code>)</td><td>Quest warnings, penalty notices and reminders.</td></tr>
   <tr><td>Exact alarms (<code>SCHEDULE_EXACT_ALARM</code>)</td><td>So deadline warnings arrive on time. Optional; without it, notices may be delayed.</td></tr>

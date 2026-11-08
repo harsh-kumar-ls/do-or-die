@@ -106,6 +106,11 @@ class LogEntry {
         'dungeon_cleared',
         {'day': day, 'newRank': newRank.name, 'title': title},
       ),
+      RankEarned(:final newRank, :final title) => LogEntry(at, 'rank_earned', {
+        'day': day,
+        'newRank': newRank.name,
+        'title': title,
+      }),
       DungeonFailed(:final floor) => LogEntry(at, 'dungeon_failed', {
         'day': day,
         'floor': floor,

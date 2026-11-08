@@ -107,7 +107,7 @@ class QuestScreen extends StatelessWidget {
 
     if (model.inPenalty) {
       add(
-        model.dungeonPenalty ? 'DUNGEON PENALTY ACTIVE' : 'PENALTY ZONE ACTIVE',
+        model.dungeonPenalty ? 'DUNGEON PENALTY ACTIVE' : 'LOCKDOWN ACTIVE',
         'A penalty is in effect today.',
         'OPEN',
         onOpenPenalty,
@@ -369,7 +369,7 @@ class _QuestWindow extends StatelessWidget {
               : 'Penalty avoided. The next quest issues at 00:00.')
         : floor > 0
         ? 'Fail this floor and the Dungeon Penalty follows.'
-        : 'Under 80% done at 23:59 brings the Penalty Zone.';
+        : 'Under 80% done at 23:59 brings the Lockdown.';
     final s = model.state;
     return HudFrame(
       padding: EdgeInsets.zero,
@@ -511,46 +511,48 @@ class _QuestWindow extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(warn, style: Hud.mono(11, complete ? Hud.gold : Hud.warn)),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Text('XP', style: Hud.mono(10, p.dim, spacing: .1)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: XpBar(
-                        xp: s.xp,
-                        max: model.xpToNext,
-                        pending: complete ? model.xpReward : 0,
+                if (!model.simple) ...[
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Text('XP', style: Hud.mono(10, p.dim, spacing: .1)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: XpBar(
+                          xp: s.xp,
+                          max: model.xpToNext,
+                          pending: complete ? model.xpReward : 0,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text.rich(
-                          TextSpan(
-                            text: '${s.xp} / ${model.xpToNext}',
-                            style: Hud.mono(
-                              10,
-                              p.text,
-                              weight: FontWeight.w700,
-                            ),
-                            children: [
-                              TextSpan(
-                                text: ' +${model.xpReward}',
-                                style: Hud.mono(
-                                  10,
-                                  Hud.gold,
-                                  weight: FontWeight.w700,
-                                ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text.rich(
+                            TextSpan(
+                              text: '${s.xp} / ${model.xpToNext}',
+                              style: Hud.mono(
+                                10,
+                                p.text,
+                                weight: FontWeight.w700,
                               ),
-                            ],
+                              children: [
+                                TextSpan(
+                                  text: ' +${model.xpReward}',
+                                  style: Hud.mono(
+                                    10,
+                                    Hud.gold,
+                                    weight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -778,15 +780,17 @@ class _Objective extends StatelessWidget {
             : '${task.target - v} MIN LEFT';
         return [
           const SizedBox(height: 8),
-          Row(
+          // Wraps under a large font instead of overflowing.
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            spacing: 8,
+            runSpacing: 4,
             children: [
-              Expanded(
-                child: Text(
-                  model.capsMeasurable
-                      ? 'MEASURED · LOWER IS BETTER'
-                      : 'NO USAGE ACCESS · CONFIRM ON YOUR WORD',
-                  style: Hud.mono(10, p.dim, spacing: .12),
-                ),
+              Text(
+                model.capsMeasurable
+                    ? 'MEASURED · LOWER IS BETTER'
+                    : 'NO USAGE ACCESS · CONFIRM ON YOUR WORD',
+                style: Hud.mono(10, p.dim, spacing: .12),
               ),
               Text(
                 status,

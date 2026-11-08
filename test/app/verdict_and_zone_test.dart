@@ -147,7 +147,7 @@ void main() {
     Future<String?> london() async => 'Europe/London';
 
     test(
-      'moving to a zone further west can never push the deadline later',
+      'a zone set by hand further west can never push the deadline later',
       () async {
         final g = await focus();
         // The day was issued in Tokyo, 6 hours further east than here: there,
@@ -160,6 +160,7 @@ void main() {
           store: store,
           clock: clock,
           zoneId: london,
+          zoneIsAutomatic: () async => false,
         ))!;
         clock.set(day1.at(21 * 60));
         await h.tick();
@@ -183,6 +184,31 @@ void main() {
       expect(h.game.zoneOffsetMinutes, clock.now().timeZoneOffset.inMinutes);
       expect(h.game.zoneId, 'Europe/London');
       expect(h.game.log.where((e) => e.type == 'zone_changed'), hasLength(1));
+    });
+
+    test('real travel west (automatic zone): the day ends at local '
+        'midnight, never hours early', () async {
+      final g = await focus();
+      final east = clock.now().timeZoneOffset.inMinutes + 6 * 60;
+      await store.save(
+        g.game.copyWith(zoneOffsetMinutes: east, zoneId: 'Asia/Kolkata'),
+      );
+      final h = (await GameService.load(
+        store: store,
+        clock: clock,
+        zoneId: london,
+        zoneIsAutomatic: () async => true,
+      ))!;
+      clock.set(day1.at(21 * 60));
+      await h.tick();
+      expect(
+        h.state.lastClosedDay,
+        isNull,
+        reason: 'open until local midnight',
+      );
+      expect(h.state.isOpen(day1), isTrue);
+      final moved = h.game.log.where((e) => e.type == 'zone_changed').single;
+      expect(moved.data['automatic'], isTrue);
     });
 
     test('daylight saving ending (same zone, offset back an hour) never '

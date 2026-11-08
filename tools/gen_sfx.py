@@ -107,7 +107,7 @@ def main():
     chord = [tone(f, 0.9, 0.22, 0.02, 0.8, harmonics=(1.0, 0.25, 0.08)) for f in (523.25, 783.99, 1046.5, 1568.0)]
     write("level_up", mix(*arp, *chord, offsets=[0, 0.08, 0.16, 0.24] + [0.32] * 4), peak=0.75)
 
-    # Penalty Zone: low, heavy throb with a dissonant edge.
+    # Lockdown: low, heavy throb with a dissonant edge.
     throb = []
     n = int(RATE * 1.2)
     for i in range(n):
@@ -117,7 +117,7 @@ def main():
         s = math.tanh(1.8 * s)  # soft distortion
         throb.append(s * wobble * env(i, n, 0.02, 0.9) * 0.6)
 
-    # Penalty Zone entry: a hard impact (noise crack + deep hit), then a long,
+    # Lockdown entry: a hard impact (noise crack + deep hit), then a long,
     # heavy throb. Soft-clipped so it plays near full scale without harshness.
     crack = lowpass(noise(0.06, 1.0, 0.25, seed=11), 0.6)
     hit = tone(90, 0.45, 1.0, 0.001, 0.5, sweep_to=40, harmonics=(1.0, 0.5, 0.2))
@@ -173,7 +173,7 @@ def main():
     write("rank_up", mix(drum, *run, *wide, offsets=[0, 0.12, 0.2, 0.28, 0.36, 0.44] + [0.52] * 6), peak=0.85)
 
     # Dungeon Penalty: two hard impacts, a metallic bell clang, and a deeper,
-    # slower throb than the normal Penalty Zone, with phone-speaker overtones.
+    # slower throb than the normal Lockdown, with phone-speaker overtones.
     hit1 = tone(80, 0.5, 1.0, 0.001, 0.5, sweep_to=35, harmonics=(1.0, 0.6, 0.3))
     hit2 = tone(70, 0.6, 1.0, 0.001, 0.5, sweep_to=30, harmonics=(1.0, 0.6, 0.3))
     crack2 = lowpass(noise(0.08, 1.0, 0.25, seed=13), 0.55)

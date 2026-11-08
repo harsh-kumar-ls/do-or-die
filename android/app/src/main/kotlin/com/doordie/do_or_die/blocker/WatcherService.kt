@@ -141,7 +141,7 @@ class WatcherService : Service() {
     private fun startForegroundWithNotice() {
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
-            NotificationChannel(CHANNEL, "Penalty Zone watcher", NotificationManager.IMPORTANCE_MIN).apply {
+            NotificationChannel(CHANNEL, "Lockdown watcher", NotificationManager.IMPORTANCE_MIN).apply {
                 description = "Shown only while a lock, a phone-free block or a verdict is pending."
                 setShowBadge(false)
             },
@@ -154,7 +154,7 @@ class WatcherService : Service() {
         )
         val notice: Notification = Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("Penalty Zone watcher")
+            .setContentTitle("Lockdown watcher")
             .setContentText("Watching your locked apps.")
             .setContentIntent(open)
             .setOngoing(true)

@@ -169,7 +169,7 @@ class TrialReport {
           .length,
       nearMisses: of('quest_near_miss').length,
       expiredPenalties: of('penalty_expired').length,
-      // Ordinary Penalty Zones only; Dungeon Penalties are counted apart.
+      // Ordinary Lockdowns only; Dungeon Penalties are counted apart.
       penaltyZones:
           of('penalty_issued')
               .where((e) => e.data['enforced'] != false)
@@ -253,13 +253,13 @@ class TrialReport {
   String get headline {
     if (cleared + failed == 0) return 'Insufficient data. Continue.';
     if (clearRate < 50) {
-      return 'Fewer than half the days were cleared. The System expected more.';
+      return 'Cleared $clearRate%, under half. Next: lower the quest in Status by 10-20%.';
     }
     if (releases > penaltyZones + dungeonPenalties) {
-      return 'You cleared $clearRate% of days and escaped more locks than you served.';
+      return 'Cleared $clearRate%. More releases taken than locks served. Next: fewer releases.';
     }
     if (watcherOutages > 0) {
-      return 'Cleared $clearRate%. The lock was down $watcherOutages time${watcherOutages == 1 ? '' : 's'}. That was not an accident.';
+      return 'Cleared $clearRate%. The lock was down $watcherOutages time${watcherOutages == 1 ? '' : 's'}. Next: fix anything in System Check.';
     }
     if (honourConfirmations * 100 > (cleared + failed) * 60) {
       return 'Cleared $clearRate%. Most of it rests on your word.';

@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../../app/build_flags.dart';
 import '../../domain/penalty.dart';
 import '../../platform/share_file.dart';
 import '../game_model.dart';
@@ -116,7 +115,7 @@ class SettingsScreen extends StatelessWidget {
             ],
           ),
         ),
-        if (!BuildFlags.focusOnly) ...[
+        if (!model.simple) ...[
           const SizedBox(height: 14),
           SystemWindow(
             title: 'SYSTEM',

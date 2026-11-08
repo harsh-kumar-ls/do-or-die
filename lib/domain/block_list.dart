@@ -40,7 +40,7 @@ class BlockListVersion {
   final Set<String> packages;
 }
 
-/// The apps the user has chosen to lock during the Penalty Zone.
+/// The apps the user has chosen to lock during the Lockdown.
 ///
 /// Adding an app applies immediately (makes the penalty harder). Removing one
 /// applies from the next day, so a lock can't be dodged after failing.

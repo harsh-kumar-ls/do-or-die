@@ -21,8 +21,8 @@ The detailed records stay where they are. This file summarises them and points t
 
 | | |
 |---|---|
-| **Version** | 0.9.2 (build 15): audit-loop build; internal testing only after the device checks (see BUILD_LOOP.md) |
-| **Play bundle** | `dist/DoOrDie-0.9.2.aab`, signed with the upload key; `tools/check_release.py` must pass before upload. Older builds are in `dist/superseded/` (do not use) |
+| **Version** | 0.9.3 (build 16): audit-loop build, simple game by default; internal testing only after the device checks (see BUILD_LOOP.md) |
+| **Play bundle** | `dist/DoOrDie-0.9.3.aab`, signed with the upload key; `tools/check_release.py` must pass before upload. Older builds are in `dist/superseded/` (do not use) |
 | **Phone** | Same code installed (`dist/DoOrDie-0.9.0-device.apk`, development-signed so the trial data is kept); no crashes, watcher running, System Check 7/7 |
 | **Current run** | Personality System, rank E, day 8 of 30, live. 2 of 21 days toward the Gate, streak 1 (best 2) |
 | **Tests** | Format and analyze clean; 205/205 automated tests; TestSprite 14/14 in one batch on the final build |
@@ -39,7 +39,7 @@ A habit app run by a cold, game-style **System**. Original theme, inspired only 
 1. You choose **one System**: Fitness (trains STR, VIT), Personality (INT, CHA) or Focus (DIS).
 2. A short **placement test** sets your starting rank (E, D or C at most).
 3. Every day the System issues a **daily quest** for your System and rank. Clear it before midnight for XP.
-4. Fail it and the **Penalty Zone** follows the next day:
+4. Fail it and the **Lockdown** follows the next day:
    - Your chosen apps lock for 4 h + 20 min per level, starting at a random time during waking hours (never during your rest period).
    - You owe a penalty that matches your System: the push-ups and squats from your own daily quest for Fitness (never more, never doubled), pages plus a written reflection for Personality, a phone-free block for Focus.
    - Anything unpaid expires at midnight and is logged; nothing carries over (changed 2026-11-07, audit P0).
@@ -67,7 +67,7 @@ A habit app run by a cold, game-style **System**. Original theme, inspired only 
 | M3 Quest UI | Quest, Status and Penalty screens, System notices, original sounds and haptics |
 | M4 Notifications and trusted time | Scheduled warnings and notices; a trusted clock so changing the phone's time can't dodge a failure |
 | M5 Blocking spike | Proved app blocking works on the phone |
-| M6 Penalty Zone | Real locks on the user's chosen apps, block screen, protected apps |
+| M6 Lockdown | Real locks on the user's chosen apps, block screen, protected apps |
 | M7 Dry run | 3 days of penalties logged but not applied; restart trial (refused while a penalty is owed) |
 | M8 Hardening | Watchdog for the blocker, System Check screen, outage logging, regression pass |
 
@@ -93,13 +93,13 @@ Changes from the first live days:
 | 0.2.1 | Hotfix: black screen at start. Release builds stripped code the save system needs; shrinking is now off |
 | 0.3.0 | Your first device feedback: onboarding fills the screen; placement questions match the quest; each System explained; **penalties follow the System** (no push-ups for Personality); each day's quest frozen when issued |
 | 0.4.0 | Awakening rebuilt from the Claude Design prototype |
-| 0.5.0 | Every other Claude Design screen ported: Quest, Status, Penalty Zone, notices, report, native block screen, flip-card System carousel |
+| 0.5.0 | Every other Claude Design screen ported: Quest, Status, Lockdown, notices, report, native block screen, flip-card System carousel |
 | 0.5.1 | The line under the date shrinks to fit instead of cutting off |
 | 0.6.0 | Report share image, 6-day reduction limit, banking and UPI apps never lockable, verdict line for records that rest on your word |
 | 0.7.0 | The Player: an original animated avatar on Quest, Status and the System cards; System entry sequence; new app icon |
 | 0.7.1 | "Lock served" caption, System name fits on Status, outages measured by a watcher heartbeat (restarts no longer counted) |
 | 0.8.0 | An anime-style 3D character (later removed) |
-| 0.9.0 | Character removed; animated System sigil; emblem icon and Play assets; release signing; Play-restricted battery permission removed; privacy policy; release kit; Penalty Zone fixes (no "lock served" on the next day, no app-name flash) |
+| 0.9.0 | Character removed; animated System sigil; emblem icon and Play assets; release signing; Play-restricted battery permission removed; privacy policy; release kit; Lockdown fixes (no "lock served" on the next day, no app-name flash) |
 
 ---
 
@@ -109,6 +109,7 @@ Changes from the first live days:
 |---|---|
 | 2026-10-20 | Trial first, launch only if it works. Android only for now |
 | 2026-10-20 | Penalty rules: next-day penalty, random lock in waking hours, push-up cap 150 then squats, unpaid doubles. Exercise does not end the lock early |
+| 2026-11-08 | Audit loop iteration 4 (0.9.3): simple game by default (Focus only, milestones, no levels or stats shown, short terms); Penalty Zone renamed Lockdown; travel west fixed; measured Focus E; calm empty Lockdown tab; accessibility and block-screen fixes. See BUILD_LOOP.md |
 | 2026-11-08 | Audit loop iteration 3 (0.9.2): DST-safe day boundary (zone id), first quest tomorrow without a dry run, alarms on trusted elapsed time, near-miss wording and streak notice, delete old trials, 48 dp holds. See BUILD_LOOP.md |
 | 2026-11-08 | Audit loop iteration 2 (0.9.1): near misses, two-day settings delay, excused unmeasured caps, no doubled Dungeon lock, quiet nights, start-failure notice, 200% text support, release check script, rebuilt artefacts. See BUILD_LOOP.md |
 | 2026-11-07 | Audit loop iteration 1: Focus core (Fitness and Personality optional, switching allowed), lock at a chosen time with 2 releases and an emergency exit, contest a verdict, Settings, watcher only while needed, trusted time, blocker reset, disclosure. See BUILD_LOOP.md |
@@ -179,7 +180,7 @@ release/       Play release kit and store screenshots
 - [ ] Line up at least 12 people for the closed test (14 continuous days) that a personal account needs before a public release.
 - [ ] Your own phone: stay on the sideloaded build during the trial; installing from Play means uninstalling first, which erases the trial data.
 
-Done since the last update: the midnight checks worked (6 Nov cleared and credited); Status, Penalty Zone and System Check verified on the phone; UPI and banking apps unaffected.
+Done since the last update: the midnight checks worked (6 Nov cleared and credited); Status, Lockdown and System Check verified on the phone; UPI and banking apps unaffected.
 
 ### 6.2 Device checks still open (from BUILD_LOOP.md)
 - [ ] Focus System: a phone-free block locks the chosen apps and unlocks when it ends.

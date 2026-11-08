@@ -511,7 +511,7 @@ class _Calendar extends StatelessWidget {
       final dt = DateTime(d.year, d.month, d.day);
       final st = switch (m) {
         DayMark.cleared => 'CLEARED',
-        DayMark.failed => 'FAILED · PENALTY ZONE',
+        DayMark.failed => 'FAILED · LOCKDOWN',
         DayMark.dryRun => 'DRY RUN · NO PENALTY',
         DayMark.none => 'NOT JUDGED',
       };
@@ -612,7 +612,7 @@ class _Honesty extends StatelessWidget {
     final p = HudScope.of(context);
     final counted = r.cleared + r.failed;
     final tiles = [
-      ('PENALTY ZONES', '${r.penaltyZones}', 'of $counted counted days', false),
+      ('LOCKDOWNS', '${r.penaltyZones}', 'of $counted counted days', false),
       (
         'DUNGEON PENALTIES',
         '${r.dungeonPenalties}',

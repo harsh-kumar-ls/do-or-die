@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="blocker_label">Do or Die Penalty Zone</string>
-    <string name="blocker_description">Locks the apps you choose in Do or Die while a Penalty Zone lock is active. It only notices when those apps open; it never reads anything on screen.</string>
+    <string name="blocker_label">Do or Die Lockdown</string>
+    <string name="blocker_description">Locks the apps you choose in Do or Die while a Lockdown lock is active. It only notices when those apps open; it never reads anything on screen.</string>
 </resources>

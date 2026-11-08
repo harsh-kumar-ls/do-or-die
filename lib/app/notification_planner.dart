@@ -37,6 +37,7 @@ abstract final class NoticeId {
   static const lockReengaged = 6;
   static const floor2Warning = 7;
   static const gateClosing = 8;
+  static const capUnmeasured = 9;
 }
 
 /// Works out which notifications should be scheduled right now. Pure, so the
@@ -46,12 +47,14 @@ class NotificationPlanner {
     this.warnAt3h = 21 * 60,
     this.warnAt1h = 23 * 60,
     this.exerciseAt = 20 * 60,
+    this.capWarnAt = 20 * 60 + 30,
   });
 
   /// Minutes after midnight for each reminder.
   final int warnAt3h;
   final int warnAt1h;
   final int exerciseAt;
+  final int capWarnAt;
 
   List<PlannedNotice> plan(GameService g, DateTime now) {
     final today = DayKey.fromDateTime(now);
@@ -79,7 +82,23 @@ class NotificationPlanner {
         NoticeId.warning1h,
         today.at(warnAt1h),
         '[ WARNING ] 1 hour remains',
-        'Incomplete: $names. The Penalty Zone follows at midnight.',
+        'Incomplete: $names. The Lockdown follows at midnight.',
+      );
+    }
+
+    // A screen-time limit the phone hasn't measured today fails at midnight
+    // unless it is confirmed or usage access comes back: say so in time.
+    final unmeasured = [
+      for (final t in g.todaysTasks)
+        if (t.isCap && g.liveProgress(t.id) == null) t,
+    ];
+    if (questOpen && unmeasured.isNotEmpty) {
+      add(
+        NoticeId.capUnmeasured,
+        today.at(capWarnAt),
+        '[ SYSTEM ] Screen time not measured',
+        'Allow Usage access in System Check, or confirm the limit on your '
+            'word before 23:59. An unconfirmed limit is failed.',
       );
     }
 
@@ -146,7 +165,7 @@ class NotificationPlanner {
       add(
         NoticeId.lockEngaged,
         lock.start,
-        '[ PENALTY ZONE ] Lock engaged',
+        '[ LOCKDOWN ] Lock engaged',
         'Your chosen apps are locked until ${_hm(lock.end)}.',
       );
 
@@ -156,7 +175,7 @@ class NotificationPlanner {
         add(
           NoticeId.lockReengaged,
           until,
-          '[ PENALTY ZONE ] Lock re-engaged',
+          '[ LOCKDOWN ] Lock re-engaged',
           'Release over. Releases used: ${lock.releases} '
               '(${lock.releases * 15} min). Locked until ${_hm(lock.end)}.',
         );

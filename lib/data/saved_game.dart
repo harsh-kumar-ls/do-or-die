@@ -38,6 +38,7 @@ class SavedGame {
     this.lockStartMinute,
     this.zoneOffsetMinutes,
     this.zoneId,
+    this.simple = false,
     this.pendingSleep,
     this.pendingLockStart,
     this.capReadAt,
@@ -65,6 +66,7 @@ class SavedGame {
     lockStartMinute: j['lockStartMinute'] as int?,
     zoneOffsetMinutes: j['zoneOffsetMinutes'] as int?,
     zoneId: j['zoneId'] as String?,
+    simple: j['simple'] as bool? ?? false,
     pendingSleep: j['pendingSleep'] == null
         ? null
         : (
@@ -117,6 +119,10 @@ class SavedGame {
   /// The IANA zone the open day was issued in (null if unknown).
   final String? zoneId;
 
+  /// The simple game: Focus first, ranks earned by milestones (cleared
+  /// days), no Gates, Dungeons, levels or stat points shown.
+  final bool simple;
+
   /// A rest-period change waiting to take effect (from that day on).
   final (DayKey, SleepWindow)? pendingSleep;
 
@@ -155,6 +161,7 @@ class SavedGame {
     'lockStartMinute': lockStartMinute,
     'zoneOffsetMinutes': zoneOffsetMinutes,
     'zoneId': zoneId,
+    'simple': simple,
     'capReadAt': capReadAt == null ? null : instantToJson(capReadAt!),
     'pendingSleep': pendingSleep == null
         ? null
@@ -199,6 +206,7 @@ class SavedGame {
     lockStartMinute: lockStartMinute ?? this.lockStartMinute,
     zoneOffsetMinutes: zoneOffsetMinutes ?? this.zoneOffsetMinutes,
     zoneId: zoneId ?? this.zoneId,
+    simple: simple,
     pendingSleep: pendingSleep != null ? pendingSleep() : this.pendingSleep,
     pendingLockStart: pendingLockStart != null
         ? pendingLockStart()

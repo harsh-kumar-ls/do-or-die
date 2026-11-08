@@ -356,7 +356,7 @@ void main() {
       tester,
       clock: clock,
       prepare: (g) async {
-        // Fail day 1; day 2 is a Penalty Zone with a lock.
+        // Fail day 1; day 2 is a Lockdown with a lock.
         clock.set(g.today.addDays(1).at(9 * 60));
         await g.tick();
         // Fitness owes no exercise: the lock is the whole penalty.
@@ -385,9 +385,12 @@ void main() {
     await openTab(tester, 'STATUS');
     expect(find.text('[ STATUS ]'), findsOneWidget);
     await openTab(tester, 'PENALTY');
-    expect(find.text('[ PENALTY ZONE ]'), findsOneWidget);
+    expect(find.text('[ LOCKDOWN ]'), findsOneWidget);
     expect(find.text('No penalty is in effect.'), findsOneWidget);
     expect(find.text('NO LOCK TODAY'), findsOneWidget);
+    // Calm, not alarm-red, when nothing is owed.
+    final scope = tester.widget<HudScope>(find.byType(HudScope).last);
+    expect(scope.palette, HudPalette.system);
     expect(find.text('Instagram'), findsOneWidget); // fallback name
   });
 
@@ -522,6 +525,7 @@ void main() {
     ValueChanged<OnboardingResult> onDone, {
     bool nextSystemOnly = false,
     Set<SystemKind> completed = const {},
+    bool simple = false,
   }) async {
     tester.view.physicalSize = const Size(1080, 2340);
     tester.view.devicePixelRatio = 3;
@@ -535,6 +539,7 @@ void main() {
             body: OnboardingScreen(
               blocker: NoopAppBlocker(),
               onDone: onDone,
+              simple: simple,
               nextSystemOnly: nextSystemOnly,
               completed: completed,
             ),
@@ -637,5 +642,68 @@ void main() {
       find.bySemanticsLabel('Show the Personality System'),
       findsOneWidget,
     );
+  });
+
+  testUi('the simple game: no System picker, short terms with All rules', (
+    tester,
+  ) async {
+    OnboardingResult? result;
+    await pumpOnboarding(tester, (r) => result = r, simple: true);
+    await makeContact(tester);
+    expect(find.text('CHOOSE YOUR SYSTEM'), findsNothing);
+    await pumpFor(tester, 1500);
+    expect(find.text('PLACEMENT TEST'), findsOneWidget);
+    await tapText(tester, 'SUBMIT');
+    await pumpFor(tester, 2500);
+    await tapText(tester, 'CONTINUE');
+    await tapText(tester, 'CONFIRM TARGETS');
+    await tapText(tester, 'SET REST PERIOD');
+    expect(find.text('PENALTY TERMS'), findsOneWidget);
+    expect(find.textContaining('/7'), findsOneWidget, reason: 'seven lines');
+    await tapText(tester, 'ALL RULES');
+    expect(find.text('All rules'), findsOneWidget);
+    await tapText(tester, 'CLOSE');
+    await tester.drag(
+      find.textContaining('Keep the daily quest'),
+      const Offset(0, -3000),
+    );
+    await pumpFor(tester, 500);
+    await tapText(tester, 'I AM 18 OR OLDER');
+    await holdText(tester, find.text('HOLD TO ACCEPT'));
+    await tapText(tester, 'ENTER');
+    expect(result!.system, SystemKind.focus);
+  });
+
+  testUi('the simple game hides levels, XP and stat points', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final service = await GameService.awaken(
+      store: MemoryGameStore(),
+      system: SystemKind.focus,
+      placement: Rank.e,
+      dryRunDays: 0,
+      simple: true,
+      blockedPackages: const {'com.instagram.android'},
+      clock: FixedClock(DateTime(2026, 10, 19, 10)),
+      random: Random(1),
+    );
+    final model = GameModel(service, pollEvery: null);
+    addTearDown(model.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: Hud.theme(HudPalette.system),
+        home: MediaQuery(
+          data: const MediaQueryData(disableAnimations: true),
+          child: AppShell(model: model, blocker: NoopAppBlocker()),
+        ),
+      ),
+    );
+    await pumpFor(tester, 600);
+    expect(find.text('XP'), findsNothing);
+    await openTab(tester, 'STATUS');
+    expect(find.text('LEVEL'), findsNothing);
+    expect(find.text('ATTRIBUTES'), findsNothing);
+    expect(find.text('NEXT RANK · 0 / 5'), findsOneWidget);
   });
 }

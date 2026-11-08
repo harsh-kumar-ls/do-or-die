@@ -131,10 +131,10 @@ PLANS = {
         ],
     ),
     "07-penalty-tab": (
-        "Penalty: with no failed day, the Penalty Zone shows no penalty and no chosen apps",
+        "Penalty: with no failed day, the Lockdown shows no penalty and no chosen apps",
         awakening() + [
             act("Click 'PENALTY' in the bottom bar"),
-            check("The '[ PENALTY ZONE ]' screen shows 'No penalty is in effect.', a clock '00:00:00', 'NO LOCK TODAY' and an 'EDIT LOCKED APPS' button"),
+            check("The '[ LOCKDOWN ]' screen shows 'No penalty is in effect.', a clock '00:00:00', 'NO LOCK TODAY' and an 'EDIT LOCKED APPS' button"),
             check("No '[ PENALTY DEBT ]' panel and no 'RELEASE 15 MIN' button are shown"),
         ],
     ),

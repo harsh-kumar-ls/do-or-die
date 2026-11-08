@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../domain/progression.dart';
 
-/// Look of one mode of the app. A2 for normal use, P3 for the Penalty Zone.
+/// Look of one mode of the app. A2 for normal use, P3 for the Lockdown.
 /// See design/DESIGN.md.
 class HudPalette {
   const HudPalette({

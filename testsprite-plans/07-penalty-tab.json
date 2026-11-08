@@ -1,7 +1,7 @@
 {
   "projectId": "d37f7ffc-2ffc-4da9-88ea-8ee0106eba69",
   "type": "frontend",
-  "name": "Penalty: with no failed day, the Penalty Zone shows no penalty and no chosen apps",
+  "name": "Penalty: with no failed day, the Lockdown shows no penalty and no chosen apps",
   "planSteps": [
     {
       "type": "action",
@@ -73,7 +73,7 @@
     },
     {
       "type": "assertion",
-      "description": "The '[ PENALTY ZONE ]' screen shows 'No penalty is in effect.', a clock '00:00:00', 'NO LOCK TODAY' and an 'EDIT LOCKED APPS' button"
+      "description": "The '[ LOCKDOWN ]' screen shows 'No penalty is in effect.', a clock '00:00:00', 'NO LOCK TODAY' and an 'EDIT LOCKED APPS' button"
     },
     {
       "type": "assertion",

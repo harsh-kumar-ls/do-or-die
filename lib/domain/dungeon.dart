@@ -98,6 +98,14 @@ class DungeonFailed extends SystemEvent {
   final int floor;
 }
 
+/// A rank earned by a milestone (cleared days in the window), in games that
+/// use milestones instead of Gates and Dungeons.
+class RankEarned extends SystemEvent {
+  const RankEarned(super.day, this.newRank, this.title);
+  final Rank newRank;
+  final String title;
+}
+
 class SystemCompleted extends SystemEvent {
   const SystemCompleted(super.day, this.system);
   final SystemKind system;
@@ -313,14 +321,26 @@ class SystemsState {
     );
   }
 
+  /// Cleared days (in the 30-day window) needed to earn the next rank in a
+  /// milestone game: a first milestone within a week, then longer.
+  static int milestoneFor(Rank r) => switch (r) {
+    Rank.e => 5,
+    Rank.d => 10,
+    Rank.c => 15,
+    Rank.b || Rank.a || Rank.s => DungeonRules.clearedNeeded,
+  };
+
   /// Applies the verdict for [day] to the System.
   ///
   /// [dryRun]: the day was a dry run (never counts toward a Gate).
+  /// [milestones]: ranks are earned by cleared days alone (the simple game),
+  /// with no Gate or Dungeon.
   (SystemsState, List<SystemEvent>) afterDayClosed({
     required DayKey day,
     required bool cleared,
     required bool dryRun,
     required DateTime now,
+    bool milestones = false,
   }) {
     final kind = active;
     if (kind == null || progress.completed.contains(kind)) {
@@ -372,6 +392,26 @@ class SystemsState {
         return (
           s.copyWith(progress: progress.rankUp(), sHold: 0),
           [SystemCompleted(day, kind)],
+        );
+      }
+      return (s, const []);
+    }
+
+    // The simple game: the rank comes with the milestone itself.
+    if (milestones) {
+      final r = rank!;
+      if (s.clearedInWindow(day) >= milestoneFor(r)) {
+        final next = progress.rankUp();
+        final newRank = next.rankOf(kind)!;
+        final title =
+            'Milestone · ${_systemShort(kind)} ${newRank.name.toUpperCase()}';
+        return (
+          s.copyWith(
+            progress: next,
+            countFrom: () => day.addDays(1),
+            titles: [...titles, title],
+          ),
+          [RankEarned(day, newRank, title)],
         );
       }
       return (s, const []);

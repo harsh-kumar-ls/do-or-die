@@ -15,7 +15,7 @@ import '../widgets/system_frame.dart';
 import 'quest_screen.dart' show QuestScreen;
 
 /// The Penalty tab, built from design/claude-design/penalty.html, in the
-/// Penalty Zone (red, glitching) or Dungeon Penalty (crimson and gold,
+/// Lockdown (red, glitching) or Dungeon Penalty (crimson and gold,
 /// still and ceremonial) look: lock countdown, locked apps, the 15-minute
 /// release and its tally, and the System-specific debt.
 class PenaltyScreen extends StatelessWidget {
@@ -66,7 +66,7 @@ class PenaltyScreen extends StatelessWidget {
                     ],
                     Center(
                       child: _GlitchTitle(
-                        dungeon ? '[ DUNGEON PENALTY ]' : '[ PENALTY ZONE ]',
+                        dungeon ? '[ DUNGEON PENALTY ]' : '[ LOCKDOWN ]',
                         glitch: !dungeon && any,
                         size: dungeon ? 20 : 22,
                       ),
@@ -122,7 +122,7 @@ class PenaltyScreen extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // Title and seal
 
-/// The Penalty Zone title: a short glitch burst every 2.6 s (offset red and
+/// The Lockdown title: a short glitch burst every 2.6 s (offset red and
 /// pale copies, jitter). Still when reduce-motion is on or [glitch] is off.
 class _GlitchTitle extends StatefulWidget {
   const _GlitchTitle(this.text, {required this.glitch, required this.size});
@@ -840,7 +840,7 @@ class _DebtPanel extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             debt.isPaid
-                ? 'Debt cleared. ${dungeon ? 'The Dungeon Penalty' : 'The Penalty Zone'} ends when the lock expires.'
+                ? 'Debt cleared. ${dungeon ? 'The Dungeon Penalty' : 'The Lockdown'} ends when the lock expires.'
                 : 'Clear the debt today. Anything unpaid expires at midnight and is logged.',
             textAlign: TextAlign.center,
             style: Hud.mono(
@@ -1199,7 +1199,7 @@ class _EnforcementStatusState extends State<_EnforcementStatus> {
             Text('ENFORCEMENT OFFLINE', style: Hud.head(12, p.hi, spacing: .2)),
             const SizedBox(height: 6),
             Text(
-              'The Penalty Zone watcher is off, so locks cannot be enforced.',
+              'The Lockdown watcher is off, so locks cannot be enforced.',
               style: Hud.mono(11, p.text),
             ),
             const SizedBox(height: 10),

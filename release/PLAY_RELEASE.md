@@ -1,27 +1,27 @@
 # Do or Die: Google Play internal testing release
 
-Version **0.9.2 (build 15)**. Track: **Internal testing** (up to 100 testers you invite by email; available minutes after upload, light review).
+Version **0.9.3 (build 16)**. Track: **Internal testing** (up to 100 testers you invite by email; available minutes after upload, light review).
 
 ## 1. What to upload
 
 | File | Use |
 |---|---|
-| `dist/DoOrDie-0.9.2.aab` | The App Bundle for Play Console. Signed with the upload key. |
+| `dist/DoOrDie-0.9.3.aab` | The App Bundle for Play Console. Signed with the upload key. |
 | `design/brand/play_icon.png` | Store icon, 512 x 512. |
 | `design/brand/feature_graphic.png` | Feature graphic, 1024 x 500. |
-| `release/screenshots/*.png` | Phone screenshots, 1080 x 2400 (Quest, Status, Penalty Zone, System Check). |
+| `release/screenshots/*.png` | Phone screenshots, 1080 x 2400 (Quest, Status, Lockdown, System Check). |
 
-`dist/DoOrDie-0.9.2-device.apk` is the same code signed with the development key, for the test phone only. Do not upload it.
+`dist/DoOrDie-0.9.3-device.apk` is the same code signed with the development key, for the test phone only. Do not upload it.
 
 **Before any upload or install, run the release check** (it fails a stale or unsafe build):
 
 ```bash
-python3 -I tools/check_release.py dist/DoOrDie-0.9.2.aab dist/DoOrDie-0.9.2-device.apk
+python3 -I tools/check_release.py dist/DoOrDie-0.9.3.aab dist/DoOrDie-0.9.3-device.apk
 ```
 
 It checks the version code, target SDK, `allowBackup=false`, and that the compiled code is the current rules engine. Older builds are in `dist/superseded/` and must not be used.
 
-A Focus-only tester build (Fitness and Personality hidden): `flutter build appbundle --release --dart-define=DOD_FOCUS_ONLY=true`.
+The default build is the simple game (Focus only, milestones, short terms, no levels or stat points on screen). The full game (three Systems, Gates and Dungeons): add `--dart-define=DOD_FULL=true`.
 
 ## 2. The upload key (back it up today)
 
@@ -45,7 +45,7 @@ The first is for Play. The second signs with the development key so it can updat
 ## 3. Play Console steps (you do these; they are outward-facing)
 
 1. Create the app: name **Do or Die**, default language English, App, Free.
-2. **Testing → Internal testing → Create new release**, upload `DoOrDie-0.9.2.aab` (after the release check passes), release notes from section 6.
+2. **Testing → Internal testing → Create new release**, upload `DoOrDie-0.9.3.aab` (after the release check passes), release notes from section 6.
 3. **Testers**: create an email list, add testers, copy the opt-in link and send it to them.
 4. Complete **App content** (section 5) and the **Store listing** (section 4). Internal testing can start before the listing is complete, but Play asks for most of App content first.
 5. Testers open the opt-in link, accept, then install from the Play Store.
@@ -67,7 +67,7 @@ A daily quest you cannot skip. Fail it, and the System locks your apps.
 >
 > Start with the Focus System: limits on the apps you choose, phone-free blocks, and a lock you set in advance. Add the Fitness or Personality pack if you want; you can switch at any time. A short placement test sets your starting rank, from E to C. Every day the System issues a quest for your rank.
 >
-> Clear it before midnight and you earn XP. Fail it and the Penalty Zone follows: the apps you chose lock for 4 hours the next day, at a time you picked, and Focus and Personality add a short penalty (a phone-free block, or reading and a plan for tomorrow); a day at least 80% done costs nothing. Fitness never uses exercise as a punishment. Anything unpaid expires at midnight and is logged; nothing carries over.
+> Clear it before midnight and you earn XP. Fail it and the Lockdown follows: the apps you chose lock for 4 hours the next day, at a time you picked, and Focus and Personality add a short penalty (a phone-free block, or reading and a plan for tomorrow); a day at least 80% done costs nothing. Fitness never uses exercise as a punishment. Anything unpaid expires at midnight and is logged; nothing carries over.
 >
 > Clear 21 of 30 days and a Gate opens. Enter it for a three-day Dungeon that ends in a Rank Trial. Clear it to rank up. Fail it, and the Dungeon Penalty follows: the normal lock, a doubled reading or phone-free penalty, and the Gate shut for 7 days.
 >
@@ -104,7 +104,7 @@ A daily quest you cannot skip. Fail it, and the System locks your apps.
 | Foreground service, special use | Required form. Text: "The foreground service watches which app is open while a lock the user set up, a phone-free block the user started, or a pending daily verdict needs it, so the user's own lock can be enforced. It stops when none is pending; exact alarms wake it at midnight and just before a scheduled lock. The user can end any lock at once with the in-app emergency exit." Video: show the lock time in Settings, a failed day, the lock screen over a chosen app, and the emergency exit. |
 | Usage access (`PACKAGE_USAGE_STATS`) | No form. The in-app prominent disclosure (what is read, why, that it stays on the phone, ACCEPT / NOT NOW) appears before Android's Usage access page, in the Awakening and in System Check. The privacy policy is also in the app (Status → Settings). |
 | Display over other apps | No form. |
-| Exact alarms (`SCHEDULE_EXACT_ALARM`) | User-granted on Android 14+. [Likely] no declaration for internal testing; if Play asks, the use is deadline warnings for the daily quest. |
+| Exact alarms (`SCHEDULE_EXACT_ALARM`) | User-granted on Android 14+. Two uses: on-time deadline warnings, and waking the lock watcher at midnight and just before a lock the user scheduled (so the foreground service runs only when needed). Without it the app still works: warnings may be late and the watcher runs all the time. Not `USE_EXACT_ALARM`. |
 
 `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` was removed in 0.9.0 (Play restricts it to a few app types). System Check now opens the battery list instead.
 

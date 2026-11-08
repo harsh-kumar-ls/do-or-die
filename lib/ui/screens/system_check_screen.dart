@@ -100,7 +100,7 @@ class _SystemCheckScreenState extends State<SystemCheckScreen>
       ),
       _Check(
         'DISPLAY OVER APPS',
-        'Lets the Penalty Zone appear over a locked app. '
+        'Lets the Lockdown appear over a locked app. '
             'If refused, allow restricted settings as above first.',
         s?.overlay,
         'ALLOW',

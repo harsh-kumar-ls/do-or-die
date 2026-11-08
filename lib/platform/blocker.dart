@@ -101,10 +101,10 @@ class SystemStatus {
   /// "Usage access": the watcher can see which app is in front.
   final bool usageAccess;
 
-  /// "Display over other apps": the Penalty Zone can appear over a locked app.
+  /// "Display over other apps": the Lockdown can appear over a locked app.
   final bool overlay;
 
-  /// The Penalty Zone watcher service is alive.
+  /// The Lockdown watcher service is alive.
   final bool watcherRunning;
 
   /// Exempt from battery optimisation, so the OS won't stop the blocker.

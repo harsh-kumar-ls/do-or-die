@@ -15,6 +15,8 @@ import 'package:do_or_die/ui/screens/settings_screen.dart';
 import 'package:do_or_die/ui/screens/system_check_screen.dart';
 import 'package:do_or_die/ui/theme.dart';
 import 'package:do_or_die/ui/widgets/hud_controls.dart';
+import 'package:do_or_die/ui/widgets/hud_kit.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -257,6 +259,35 @@ void main() {
     await pumpFor(tester, 300);
     expect(store.archived, isEmpty);
     expect(find.text('NO OLD TRIALS STORED'), findsOneWidget);
+  });
+
+  testWidgets('a screen reader can confirm a hold control with a long press', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    var confirmed = 0;
+    await pump(
+      tester,
+      Scaffold(
+        body: Center(
+          child: HoldSquare(
+            semanticLabel: 'Hold to confirm Walk',
+            onConfirmed: () => confirmed++,
+          ),
+        ),
+      ),
+    );
+    final node = tester.getSemantics(
+      find.bySemanticsLabel('Hold to confirm Walk'),
+    );
+    expect(
+      node.getSemanticsData().hasAction(SemanticsAction.longPress),
+      isTrue,
+    );
+    tester.semantics.longPress(find.semantics.byLabel('Hold to confirm Walk'));
+    await tester.pump();
+    expect(confirmed, 1);
+    handle.dispose();
   });
 }
 

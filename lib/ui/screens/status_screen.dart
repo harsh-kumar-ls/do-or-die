@@ -55,6 +55,9 @@ class StatusScreen extends StatelessWidget {
     if (sys.dungeon != null) return 'DUNGEON FROM TOMORROW';
     if (m.gate != null) return 'GATE OPEN · ENTER ON QUEST';
     if (m.gateBlockedDays > 0) return 'GATE SHUT · ${m.gateBlockedDays} DAYS';
+    if (m.simple) {
+      return 'NEXT RANK · ${m.clearedInWindow} / ${m.nextRankNeeds}';
+    }
     return 'NEXT GATE · ${m.clearedInWindow} / ${DungeonRules.clearedNeeded}';
   }
 
@@ -167,20 +170,22 @@ class StatusScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                row('LEVEL', Text.rich(big('${s.level}'))),
-                const SizedBox(height: 9),
-                row(
-                  'EXPERIENCE',
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text.rich(big('${s.xp}', '/ ${model.xpToNext}')),
-                      const SizedBox(height: 4),
-                      XpBar(xp: s.xp, max: model.xpToNext, height: 4),
-                    ],
+                if (!model.simple) ...[
+                  row('LEVEL', Text.rich(big('${s.level}'))),
+                  const SizedBox(height: 9),
+                  row(
+                    'EXPERIENCE',
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text.rich(big('${s.xp}', '/ ${model.xpToNext}')),
+                        const SizedBox(height: 4),
+                        XpBar(xp: s.xp, max: model.xpToNext, height: 4),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 9),
+                  const SizedBox(height: 9),
+                ],
                 row(
                   'CURRENT STREAK',
                   Text.rich(big('$streak', 'days · best $best')),
@@ -220,7 +225,7 @@ class StatusScreen extends StatelessWidget {
               children: [
                 _GateRing(
                   cleared: model.clearedInWindow,
-                  of: DungeonRules.clearedNeeded,
+                  of: model.nextRankNeeds,
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -318,8 +323,11 @@ class StatusScreen extends StatelessWidget {
                     ],
                   ),
                   const Spacer(),
-                  const SizedBox(height: 10),
-                  _Attributes(model: model, trained: trainedStats),
+                  // Stat points do nothing in play; the simple game hides them.
+                  if (!model.simple) ...[
+                    const SizedBox(height: 10),
+                    _Attributes(model: model, trained: trainedStats),
+                  ],
                 ],
               ),
             ),

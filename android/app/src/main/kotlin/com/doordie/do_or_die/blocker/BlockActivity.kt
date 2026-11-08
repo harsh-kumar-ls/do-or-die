@@ -23,7 +23,7 @@ import android.window.OnBackInvokedDispatcher
 
 /**
  * Shown in place of a locked app, in one of three looks from the Claude
- * Design prototype (design/claude-design/penalty.html): Penalty Zone (red),
+ * Design prototype (design/claude-design/penalty.html): Lockdown (red),
  * Dungeon Penalty (crimson and gold) and phone-free block (blue).
  */
 class BlockActivity : Activity() {
@@ -141,7 +141,7 @@ class BlockActivity : Activity() {
             when (mode) {
                 "dungeon" -> "The Dungeon was not cleared. Your debt is in Do or Die."
                 "focus" -> "Ending the block early stops your progress toward today's quest."
-                else -> "Emergency release is in Do or Die · Penalty."
+                else -> "Releases and the emergency exit are one tap away in Do or Die."
             },
             dim, 11f, mono,
         ).apply { setLineSpacing(0f, 1.4f); setPadding(0, dp(14f).toInt(), 0, 0) }
@@ -154,6 +154,18 @@ class BlockActivity : Activity() {
             }
             minHeight = dp(56f).toInt()
             setOnClickListener { goHome() }
+        }
+
+        // The way to the emergency exit, the releases and the contest.
+        val openApp = tv("OPEN DO OR DIE", acc2, 13f, head, .2f).apply {
+            minHeight = dp(48f).toInt()
+            setOnClickListener {
+                startActivity(
+                    Intent(this@BlockActivity, com.doordie.do_or_die.MainActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+                )
+                finish()
+            }
         }
 
         val middle = LinearLayout(this).apply {
@@ -172,7 +184,22 @@ class BlockActivity : Activity() {
             background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(glow, bg, bg))
             setPadding(dp(24f).toInt(), dp(44f).toInt(), dp(24f).toInt(), dp(40f).toInt())
             addView(middle, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
+            addView(openApp, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = dp(8f).toInt() })
             addView(leave, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+        }
+        // Android 15+ draws edge to edge: keep both buttons clear of the
+        // status and navigation bars.
+        val basePad = intArrayOf(dp(24f).toInt(), dp(44f).toInt(), dp(24f).toInt(), dp(40f).toInt())
+        root.setOnApplyWindowInsetsListener { v, insets ->
+            val (l, t, r, b) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                val bars = insets.getInsets(android.view.WindowInsets.Type.systemBars())
+                listOf(bars.left, bars.top, bars.right, bars.bottom)
+            } else {
+                @Suppress("DEPRECATION")
+                listOf(insets.systemWindowInsetLeft, insets.systemWindowInsetTop, insets.systemWindowInsetRight, insets.systemWindowInsetBottom)
+            }
+            v.setPadding(basePad[0] + l, basePad[1] + t, basePad[2] + r, basePad[3] + b)
+            insets
         }
         setContentView(root)
         window.statusBarColor = bg

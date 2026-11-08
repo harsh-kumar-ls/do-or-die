@@ -169,6 +169,7 @@ class _HoldButtonState extends State<HoldButton>
       container: true,
       button: true,
       label: widget.done ? widget.doneLabel : widget.label,
+      hint: widget.done ? null : 'Double-tap and hold to confirm',
       onLongPress: widget.done ? null : widget.onConfirmed,
       child: GestureDetector(
         onTapDown: (_) => _down(),

@@ -221,7 +221,7 @@ class ShareCard extends StatelessWidget {
                       children: [
                         _tile(
                           '${r.penaltyZones + r.dungeonPenalties}',
-                          'PENALTY ZONES',
+                          'LOCKDOWNS',
                         ),
                         _tile('${r.releases}', 'RELEASES'),
                         _tile('${r.reducedDays}', 'REDUCED DAYS'),

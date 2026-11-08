@@ -5,6 +5,8 @@ import 'package:do_or_die/app/notification_planner.dart';
 import 'package:do_or_die/data/game_store.dart';
 import 'package:do_or_die/domain/clock.dart';
 import 'package:do_or_die/domain/tasks.dart';
+import 'package:do_or_die/domain/progression.dart';
+import 'package:do_or_die/domain/systems.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const tasks = [
@@ -165,5 +167,20 @@ void main() {
     clock.set(lock.end.subtract(const Duration(minutes: 5)));
     await g.releaseLock();
     expect(byId(planner.plan(g, clock.now()), NoticeId.lockReengaged), isNull);
+  });
+
+  test('an unmeasured screen-time limit gets a warning at 20:30', () async {
+    final g = await GameService.awaken(
+      store: MemoryGameStore(),
+      system: SystemKind.focus,
+      placement: Rank.e,
+      blockedPackages: const {'com.instagram.android'},
+      clock: clock,
+    );
+    final plan = planner.plan(g, clock.now());
+    final warn = byId(plan, NoticeId.capUnmeasured)!;
+    expect(warn.at.hour, 20);
+    expect(warn.at.minute, 30);
+    expect(warn.body, contains('Usage access'));
   });
 }

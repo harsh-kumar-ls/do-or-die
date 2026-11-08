@@ -28,7 +28,17 @@ class GameService {
     this._game, {
     this.meter = const NoUsageMeter(),
     this.zoneId = noZoneId,
+    this.zoneIsAutomatic = alwaysAutomatic,
   });
+
+  /// Whether "Set time zone automatically" is on. A zone change made by the
+  /// network is travel: the day simply ends at local midnight. Only a zone
+  /// set by hand is pinned, so it can't push a deadline later.
+  final Future<bool> Function() zoneIsAutomatic;
+
+  static Future<bool> alwaysAutomatic() async => true;
+
+  bool _zoneAutoNow = true;
 
   /// The phone's IANA time zone (e.g. "Europe/Berlin"), or null when it
   /// can't be read. Tells a daylight-saving change (same zone) from travel.
@@ -65,7 +75,8 @@ class GameService {
     final saved = _game.zoneId;
     final current = _zoneIdNow;
     final moved = saved != null && current != null && saved != current;
-    return dayIn(now, moved ? _game.zoneOffsetMinutes : null);
+    final pinned = moved && !_zoneAutoNow;
+    return dayIn(now, pinned ? _game.zoneOffsetMinutes : null);
   }
 
   /// [now]'s date, but never earlier than its date in [offsetMinutes].
@@ -104,6 +115,7 @@ class GameService {
     QuestEngine? engine,
     UsageMeter meter = const NoUsageMeter(),
     Future<String?> Function() zoneId = noZoneId,
+    Future<bool> Function() zoneIsAutomatic = alwaysAutomatic,
   }) async {
     final saved = await store.load();
     if (saved == null) return null;
@@ -115,6 +127,7 @@ class GameService {
       saved,
       meter: meter,
       zoneId: zoneId,
+      zoneIsAutomatic: zoneIsAutomatic,
     );
     await service.tick();
     return service;
@@ -135,6 +148,7 @@ class GameService {
     QuestEngine? engine,
     UsageMeter meter = const NoUsageMeter(),
     Future<String?> Function() zoneId = noZoneId,
+    Future<bool> Function() zoneIsAutomatic = alwaysAutomatic,
   }) async {
     final now = clock.now();
     final day = DayKey.fromDateTime(now);
@@ -166,6 +180,7 @@ class GameService {
       game,
       meter: meter,
       zoneId: zoneId,
+      zoneIsAutomatic: zoneIsAutomatic,
     );
   }
 
@@ -180,12 +195,14 @@ class GameService {
     int dryRunDays = 3,
     int lockStartMinute = defaultLockStart,
     bool startTomorrow = false,
+    bool simple = false,
     Map<String, Object?> placementAnswers = const {},
     Clock clock = const SystemClock(),
     Random? random,
     QuestEngine? engine,
     UsageMeter meter = const NoUsageMeter(),
     Future<String?> Function() zoneId = noZoneId,
+    Future<bool> Function() zoneIsAutomatic = alwaysAutomatic,
   }) async {
     final now = clock.now();
     final day = DayKey.fromDateTime(now);
@@ -205,8 +222,10 @@ class GameService {
       systems: systems,
       lockStartMinute: lockStartMinute,
       zoneOffsetMinutes: now.timeZoneOffset.inMinutes,
+      simple: simple,
       log: List.unmodifiable([
         LogEntry(now, 'awakened', {
+          'simple': simple,
           'day': day.toString(),
           'system': system.name,
           'placement': placement.name,
@@ -227,6 +246,7 @@ class GameService {
       game,
       meter: meter,
       zoneId: zoneId,
+      zoneIsAutomatic: zoneIsAutomatic,
     );
   }
 
@@ -280,6 +300,7 @@ class GameService {
       engine: engine,
       meter: meter,
       zoneId: zoneId,
+      zoneIsAutomatic: zoneIsAutomatic,
     );
   }
 
@@ -352,8 +373,10 @@ class GameService {
   Future<List<GameEvent>> _tick() async {
     try {
       _zoneIdNow = await zoneId();
+      _zoneAutoNow = await zoneIsAutomatic();
     } catch (_) {
       _zoneIdNow = null;
+      _zoneAutoNow = true;
     }
     final now = _clock.now();
     final today = _dayOf(now);
@@ -414,6 +437,7 @@ class GameService {
           cleared: cleared,
           dryRun: !g.isEnforced(day),
           now: now,
+          milestones: g.simple,
         );
         nextSys = after;
         for (final e in sysEvents) {
@@ -449,7 +473,9 @@ class GameService {
     // Within one zone (daylight saving) the offset simply follows.
     final offset = now.timeZoneOffset.inMinutes;
     final zone = _zoneIdNow;
-    final sameZone = zone != null && zone == g.zoneId;
+    // Travel (an automatic zone) follows the new zone at once; only a zone
+    // set by hand keeps the old one until the open day is judged.
+    final sameZone = zone != null && (zone == g.zoneId || _zoneAutoNow);
     final newDay = g.state.nextDayToClose != _game.state.nextDayToClose;
     final unset = g.zoneOffsetMinutes == null || g.zoneId == null;
     if ((g.zoneOffsetMinutes != offset || g.zoneId != zone) &&
@@ -458,8 +484,9 @@ class GameService {
         zoneOffsetMinutes: offset,
         zoneId: zone,
         newLogEntries: [
-          if (!unset && !sameZone)
+          if (!unset && zone != g.zoneId)
             LogEntry(now, 'zone_changed', {
+              'automatic': _zoneAutoNow,
               'from': g.zoneId,
               'to': zone,
               'fromMinutes': g.zoneOffsetMinutes,

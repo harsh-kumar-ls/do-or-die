@@ -29,7 +29,7 @@
     },
     {
       "type": "assertion",
-      "description": "The card now shows '[ PERSONALITY \u00b7 BRIEF ]', a 'WHERE YOU START' list containing 'Read (pages)' with '10', and an 'IF YOU FAIL A DAY' section mentioning '20 pages and a written reflection' and no push-ups; the button at the bottom reads 'CHOOSE PERSONALITY SYSTEM'"
+      "description": "The card now shows '[ PERSONALITY \u00b7 BRIEF ]', a 'WHERE YOU START' list containing 'Read (pages)' with '10', and an 'IF YOU FAIL A DAY' section mentioning '20 pages and a plan for tomorrow' and no push-ups; the button at the bottom reads 'CHOOSE PERSONALITY SYSTEM'"
     },
     {
       "type": "action",

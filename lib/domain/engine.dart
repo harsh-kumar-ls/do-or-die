@@ -259,6 +259,26 @@ class QuestEngine {
     // Penalty uses the level the player held on the failed day.
     final penaltyLevel = level;
 
+    if (tasks.isEmpty) {
+      // No quest was issued (a System starting tomorrow, or complete):
+      // no verdict, no XP, no penalty. An old debt still ends with the day.
+      final debt = s.debt;
+      if (debt != null && !debt.dueDay.isAfter(day) && !debt.isPaid) {
+        events.add(
+          PenaltyExpired(
+            day,
+            primary: debt.primaryRemaining,
+            secondary: debt.secondaryRemaining,
+            kind: debt.kind,
+          ),
+        );
+      }
+      return s.copyWith(
+        lastClosedDay: day,
+        debt: () => debt != null && !debt.dueDay.isAfter(day) ? null : debt,
+      );
+    }
+
     if (cleared) {
       final gained = config.xpPerClear * xpPercent ~/ 100;
       xp += gained;

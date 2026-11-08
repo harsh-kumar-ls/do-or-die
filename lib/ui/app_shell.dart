@@ -113,6 +113,8 @@ class _AppShellState extends State<AppShell> {
       builder: (context, _) {
         final m = widget.model;
         final palette = switch (_tab) {
+          // Calm when nothing is owed: red only while a penalty is real.
+          _Tab.penalty when !m.inPenalty => HudPalette.system,
           _Tab.penalty =>
             m.dungeonPenalty ? HudPalette.dungeon : HudPalette.penalty,
           _Tab.quest when m.floorToday > 0 => HudPalette.dungeon,

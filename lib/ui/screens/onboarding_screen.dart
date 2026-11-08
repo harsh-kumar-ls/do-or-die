@@ -4,7 +4,6 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../app/build_flags.dart';
 import '../../app/game_service.dart';
 
 import '../../data/codec.dart';
@@ -57,6 +56,7 @@ class OnboardingScreen extends StatefulWidget {
     this.completed = const {},
     this.yesterdaySocialMinutes,
     this.dryRun = true,
+    this.simple = false,
   });
 
   final AppBlocker blocker;
@@ -72,6 +72,9 @@ class OnboardingScreen extends StatefulWidget {
   /// Whether this game starts with the 3-day dry run (once per install).
   final bool dryRun;
 
+  /// The simple game: Focus only (no System picker) and short terms.
+  final bool simple;
+
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
@@ -81,7 +84,24 @@ enum _Step { contact, system, placement, quest, apps, rest, terms }
 class _OnboardingScreenState extends State<OnboardingScreen> {
   late final List<_Step> _steps = widget.nextSystemOnly
       ? const [_Step.system, _Step.placement, _Step.quest]
+      : widget.simple
+      // Focus is the only System: no picker.
+      ? const [
+          _Step.contact,
+          _Step.placement,
+          _Step.quest,
+          _Step.apps,
+          _Step.rest,
+          _Step.terms,
+        ]
       : _Step.values;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.simple && !widget.nextSystemOnly) _select(SystemKind.focus);
+  }
+
   int _index = 0;
   _Step get _step => _steps[_index];
 
@@ -111,18 +131,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   void _choose(SystemKind k) {
     HapticFeedback.selectionClick();
-    setState(() {
-      if (_system != k) _answers.clear();
-      _system = k;
-      for (final q in placementQuestions[k]!) {
-        _answers.putIfAbsent(
-          q.id,
-          () => q.id == 'social_minutes'
-              ? widget.yesterdaySocialMinutes ?? q.initial
-              : q.initial,
-        );
-      }
-    });
+    setState(() => _select(k));
+  }
+
+  void _select(SystemKind k) {
+    if (_system != k) _answers.clear();
+    _system = k;
+    for (final q in placementQuestions[k]!) {
+      _answers.putIfAbsent(
+        q.id,
+        () => q.id == 'social_minutes'
+            ? widget.yesterdaySocialMinutes ?? q.initial
+            : q.initial,
+      );
+    }
   }
 
   void _finish() {
@@ -159,9 +181,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       _Step.system => _SystemStep(
         choices: [
           // Focus is the core System; Fitness and Personality are packs
-          // (hidden in a Focus-only tester build).
+          // (not offered in the simple game).
           for (final k
-              in BuildFlags.focusOnly
+              in widget.simple
                   ? const [SystemKind.focus]
                   : const [
                       SystemKind.focus,
@@ -217,6 +239,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         sleepStart: _sleepStart,
         sleepEnd: _sleepEnd,
         dryRun: widget.dryRun,
+        simple: widget.simple,
         onAccepted: () {
           _fx
             ..flash()
@@ -2198,6 +2221,7 @@ class _TermsStep extends StatefulWidget {
     required this.sleepEnd,
     required this.onAccepted,
     this.dryRun = true,
+    this.simple = false,
   });
 
   final SystemKind kind;
@@ -2206,6 +2230,7 @@ class _TermsStep extends StatefulWidget {
   final int sleepEnd;
   final VoidCallback onAccepted;
   final bool dryRun;
+  final bool simple;
 
   @override
   State<_TermsStep> createState() => _TermsStepState();
@@ -2219,12 +2244,50 @@ class _TermsStepState extends State<_TermsStep> {
   bool _adult = false;
   final _listKey = GlobalKey();
   final _seen = <int>{};
-  late final List<(String, bool)> _lines = [
+
+  /// The simple game's terms: the rules that matter, in a few lines. The
+  /// full list is one tap away ("ALL RULES").
+  late final List<(String, bool)> _short = [
+    (
+      'Keep the daily quest before 23:59. A day at least 80% done is a near miss: no penalty, no reward.',
+      false,
+    ),
+    (
+      'Miss it and your ${widget.lockTargets} lock target${widget.lockTargets == 1 ? '' : 's'} close for 4 hours the next day from ${_hm(GameService.defaultLockStart)} (change it in Settings), and you owe ${penaltyShort(penaltyKindFor(widget.kind))}.',
+      true,
+    ),
+    (
+      'Each lock allows 2 releases of 15 minutes, and an emergency exit always ends it. Both are logged in your report.',
+      false,
+    ),
+    (
+      'Calls, messages, maps, banking apps and settings are never locked. Locks never start in your rest period, ${_hm(widget.sleepStart)} to ${_hm(widget.sleepEnd)}.',
+      false,
+    ),
+    (
+      'Judged wrongly? One verdict in any 14 days can be contested. Unpaid penalties expire at midnight; nothing carries over.',
+      false,
+    ),
+    (
+      widget.dryRun
+          ? 'The first 3 days are a dry run: failures are shown, never enforced.'
+          : 'This install has had its dry run: penalties apply from tomorrow.',
+      false,
+    ),
+    (
+      'Not a medical device. Stop anything that harms your health; no penalty is worth it. For adults 18 and over only.',
+      false,
+    ),
+  ];
+
+  late final List<(String, bool)> _lines = widget.simple ? _short : _full;
+
+  late final List<(String, bool)> _full = [
     (
       'Clear every objective of the daily quest before 23:59. A day at least 80% done is a near miss: no penalty, and no reward.',
       false,
     ),
-    ('Failure opens the Penalty Zone the next day.', true),
+    ('Failure opens the Lockdown the next day.', true),
     (
       'Your ${widget.lockTargets} lock target${widget.lockTargets == 1 ? '' : 's'} close for 4 hours from ${_hm(GameService.defaultLockStart)} the next day. Change the time in Settings. A late verdict shortens a lock; it never runs later.',
       true,
@@ -2399,6 +2462,27 @@ class _TermsStepState extends State<_TermsStep> {
             ),
           ),
         ),
+        if (widget.simple)
+          TextButton(
+            onPressed: () => showDialog<void>(
+              context: context,
+              builder: (c) => AlertDialog(
+                title: const Text('All rules'),
+                content: SingleChildScrollView(
+                  child: Text(
+                    [for (final (t, _) in _full) '• $t'].join('\n\n'),
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(c).pop(),
+                    child: const Text('CLOSE'),
+                  ),
+                ],
+              ),
+            ),
+            child: Text('ALL RULES', style: Hud.mono(12, p.sys, spacing: .16)),
+          ),
         Text(
           all
               ? 'ALL TERMS READ'

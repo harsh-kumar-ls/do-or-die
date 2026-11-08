@@ -79,7 +79,7 @@ class SystemWindow extends StatelessWidget {
 }
 
 /// Window heading: decodes from random glyphs, glows, and glitches in the
-/// Penalty Zone.
+/// Lockdown.
 class WindowTitle extends StatelessWidget {
   const WindowTitle(
     this.text, {

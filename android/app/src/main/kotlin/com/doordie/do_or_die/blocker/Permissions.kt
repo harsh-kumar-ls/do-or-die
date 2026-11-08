@@ -18,6 +18,6 @@ object Permissions {
         return mode == AppOpsManager.MODE_ALLOWED
     }
 
-    /** "Display over other apps": lets the Penalty Zone appear over a locked app. */
+    /** "Display over other apps": lets the Lockdown appear over a locked app. */
     fun overlay(ctx: Context): Boolean = Settings.canDrawOverlays(ctx)
 }

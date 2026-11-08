@@ -378,9 +378,29 @@ void main() {
   });
 
   group('phone-free blocks', () {
-    // Focus E: no phone for 20 minutes after waking.
-    test('only the longest single block counts', () async {
+    // Focus B: one 2-hour phone-free block a day.
+    Future<GameService> focusB() async {
       final g = await awaken(SystemKind.focus);
+      await store.save(
+        g.game.copyWith(
+          systems: g.systems!.copyWith(
+            progress: const SystemProgress(
+              active: SystemKind.focus,
+              ranks: {SystemKind.focus: Rank.b},
+            ),
+            issued: const {},
+          ),
+        ),
+      );
+      return (await GameService.load(
+        store: store,
+        clock: clock,
+        meter: meter,
+      ))!;
+    }
+
+    test('only the longest single block counts', () async {
+      final g = await focusB();
       final t = g.todaysTasks.single;
       expect(t.type, TaskType.phoneFree);
       await g.startTimer(t.id);
@@ -394,12 +414,12 @@ void main() {
       expect(g.liveProgress(t.id), 15 * 60);
       expect(t.isComplete(g.liveProgress(t.id)), isFalse);
       await g.startTimer(t.id);
-      clock.advance(const Duration(minutes: 20));
+      clock.advance(const Duration(minutes: 120));
       expect(t.isComplete(g.liveProgress(t.id)), isTrue);
     });
 
     test('a running block locks the chosen apps on the phone', () async {
-      final g = await awaken(SystemKind.focus);
+      final g = await focusB();
       final blocker = FakeBlocker();
       final enforcer = PenaltyEnforcer(blocker, clock: clock);
       await g.startTimer(g.todaysTasks.single.id);
@@ -408,6 +428,13 @@ void main() {
       await g.stopTimer();
       await enforcer.sync(g);
       expect(blocker.focus, isNull);
+    });
+
+    test('Focus E is measured by the phone, never on your word', () async {
+      final g = await awaken(SystemKind.focus);
+      final t = g.todaysTasks.single;
+      expect(t.type, TaskType.screenCap);
+      expect(t.target, 90);
     });
   });
 
@@ -456,7 +483,7 @@ void main() {
       expect(g.game.log.last.type, 'system_switched');
       expect(g.game.log.last.data['from'], 'fitness');
       await nextDay(g);
-      expect(g.todaysTasks.map((t) => t.id), contains('morning'));
+      expect(g.todaysTasks.map((t) => t.id), contains('social'));
     });
   });
 
@@ -737,6 +764,33 @@ void main() {
       final days = g.systems!.issued.keys.toList()..sort();
       expect(days.length, lessThanOrEqualTo(41));
       expect(days.last, g.today);
+    });
+  });
+  group('the simple game (milestones, no Gates)', () {
+    test('5 cleared days earn rank D directly; no Gate ever opens', () async {
+      final g = await GameService.awaken(
+        store: store,
+        system: SystemKind.focus,
+        placement: Rank.e,
+        blockedPackages: blocked,
+        dryRunDays: 0,
+        simple: true,
+        clock: clock,
+        random: Random(3),
+        meter: meter,
+      );
+      meter.minutes = 20; // under the 90-minute cap every day
+      final events = <SystemEvent>[];
+      for (var i = 1; i <= 5; i++) {
+        clock.set(day1.addDays(i).at(9 * 60));
+        await g.tick();
+        events.addAll(g.takeSystemEvents());
+      }
+      expect(events.whereType<RankEarned>().single.newRank, Rank.d);
+      expect(events.whereType<GateOpened>(), isEmpty);
+      expect(g.systems!.rank, Rank.d);
+      expect(g.systems!.gate, isNull);
+      expect(g.game.log.any((e) => e.type == 'rank_earned'), isTrue);
     });
   });
 }

@@ -10,7 +10,7 @@ import '../theme.dart';
 import 'awakening_art.dart';
 
 /// How the sigil is drawn: which System's emblem, the glow colour, and an
-/// optional tint (red in a Penalty Zone).
+/// optional tint (red in a Lockdown).
 class SigilLook {
   const SigilLook({
     required this.glow,
@@ -25,7 +25,7 @@ class SigilLook {
   final SystemKind? system;
   final Color? tint;
 
-  /// A short glitch twice per loop (Penalty Zone).
+  /// A short glitch twice per loop (Lockdown).
   final bool glitch;
 }
 
@@ -43,7 +43,7 @@ Color systemAura(SystemKind k) => switch (k) {
 SigilLook systemLook(SystemKind k) => SigilLook(glow: systemAura(k), system: k);
 
 /// The Player's sigil today: the active System's emblem; red and glitching
-/// in a Penalty Zone, crimson in a Dungeon Penalty, gold on a Dungeon floor,
+/// in a Lockdown, crimson in a Dungeon Penalty, gold on a Dungeon floor,
 /// otherwise the System's colour.
 SigilLook playerLook(GameModel m) {
   final system = m.systems?.progress.active;

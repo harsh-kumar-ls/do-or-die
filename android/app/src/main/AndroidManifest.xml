@@ -7,13 +7,13 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <!-- Re-schedules pending notices after a reboot. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <!-- The Penalty Zone watcher. No accessibility service is used: payment and
+    <!-- The Lockdown watcher. No accessibility service is used: payment and
          banking apps refuse to run while any accessibility service is on. -->
     <!-- "Usage access": see which app is in front. Granted by the user in Settings. -->
     <uses-permission
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
-    <!-- "Display over other apps": show the Penalty Zone over a locked app. -->
+    <!-- "Display over other apps": show the Lockdown over a locked app. -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />

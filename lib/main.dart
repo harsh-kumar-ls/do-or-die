@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'app/build_flags.dart';
 import 'app/game_service.dart';
 import 'app/penalty_enforcer.dart';
 import 'app/trusted_clock.dart';
@@ -186,6 +187,8 @@ class _DoOrDieAppState extends State<DoOrDieApp> {
       blockedPackages: r.blocked,
       sleep: r.sleep,
       dryRunDays: dryRun ? 3 : 0,
+      // The default build is the simple game (DOD_FULL=true for the rest).
+      simple: BuildFlags.simple,
       // No dry run: the first live quest starts tomorrow.
       startTomorrow: !dryRun,
       clock: widget.platform.clock,
@@ -227,6 +230,7 @@ class _DoOrDieAppState extends State<DoOrDieApp> {
                     blocker: blocker,
                     onDone: _onboard,
                     dryRun: _dryRunAvailable,
+                    simple: BuildFlags.simple,
                   ),
                 ),
               ),

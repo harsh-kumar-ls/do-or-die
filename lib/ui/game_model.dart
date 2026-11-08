@@ -261,6 +261,17 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   GameState get state => service.state;
+
+  /// The simple game: no levels, XP or stat points on screen; ranks come
+  /// from milestones.
+  bool get simple => service.game.simple;
+
+  /// Cleared days needed for the next rank (milestone or Gate).
+  int get nextRankNeeds {
+    final r = rank;
+    return simple ? SystemsState.milestoneFor(r) : DungeonRules.clearedNeeded;
+  }
+
   List<TaskDefinition> get tasks => service.todaysTasks;
 
   /// Progress for display; 0 when nothing is recorded yet.
@@ -639,7 +650,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
                 '${clearedInWindow + 1} / ${DungeonRules.clearedNeeded} for the Gate',
               ),
             NoticeRow(
-              floorToday > 0 ? 'Dungeon Penalty' : 'Penalty Zone',
+              floorToday > 0 ? 'Dungeon Penalty' : 'Lockdown',
               'Avoided',
               RowTone.ok,
             ),
@@ -681,7 +692,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
               xp: xpGained,
               xpFrom: max(0, state.xp - xpGained),
               xpMax: xpToNext,
-              rows: const [NoticeRow('Penalty Zone', 'Avoided', RowTone.ok)],
+              rows: const [NoticeRow('Lockdown', 'Avoided', RowTone.ok)],
               note: 'Reward granted.',
             ),
           );
@@ -693,18 +704,19 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
               kicker: _dayName(e),
               lines: [
                 '$percentDone% of the quest was done.',
-                'No penalty. No reward. The streak resets.',
+                'No penalty. No reward. It does not count toward the next rank.',
                 if (service.nearMissStreak >= 3)
                   'Three near misses in a row. Lower the quest by 10-20% in '
                       'Status and clear it in full.',
               ],
               rows: [
                 NoticeRow('Objectives missed', '${failedTaskIds.length}'),
-                const NoticeRow('Penalty Zone', 'Not entered', RowTone.ok),
+                const NoticeRow('Lockdown', 'Not entered', RowTone.ok),
               ],
             ),
           );
         case LevelUp(:final newLevel):
+          if (simple) break; // levels are not shown in the simple game
           batch.add(
             SystemNotice(
               kind: NoticeKind.levelUp,
@@ -774,7 +786,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
                 kicker: _dayName(e),
                 lines: const [
                   'The daily quest was not completed.',
-                  'The Penalty Zone is now active.',
+                  'The Lockdown is now active.',
                 ],
                 rows: [
                   NoticeRow('Objectives missed', '${failedTaskIds.length}'),
@@ -860,6 +872,15 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
             rankTo: newRank,
             rankTitle: title,
             points: DungeonRules.clearStatPoints,
+            note: 'Rank ${_r(newRank)} quests begin tomorrow.',
+          ),
+          RankEarned(:final newRank, :final title) => SystemNotice(
+            kind: NoticeKind.rankUp,
+            title: '[ RANK UP ]',
+            kicker: 'MILESTONE REACHED',
+            rankFrom: Rank.values[max(0, newRank.index - 1)],
+            rankTo: newRank,
+            rankTitle: title,
             note: 'Rank ${_r(newRank)} quests begin tomorrow.',
           ),
           DungeonFailed(:final floor) => _dungeonFailed(e, floor, gameEvents),

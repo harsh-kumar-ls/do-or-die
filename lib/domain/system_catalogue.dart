@@ -170,7 +170,8 @@ final focusSystem = SystemSpec(
   const [Stat.discipline],
   {
     Rank.e: RankSpec(
-      [_free('morning', 'No phone after waking (minutes)', 20)],
+      // Measured by the phone (usage access), never on your word.
+      [_cap('social', 'Social media (max minutes)', 90)],
       RankTrial('A 3-hour phone-free block', [
         _free('block_180', 'Phone-free block', 180),
       ]),

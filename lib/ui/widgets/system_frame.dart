@@ -365,9 +365,18 @@ class _ChargeButtonState extends State<ChargeButton>
       button: true,
       enabled: widget.enabled,
       label: widget.label,
+      hint: 'Double-tap and hold to confirm',
       onTap: ChargeButton._clickConfirms && widget.enabled && !_done
           ? () {
               _done = true;
+              widget.onConfirmed();
+            }
+          : null,
+      // Screen readers and switch access confirm with a long press.
+      onLongPress: widget.enabled && !_done
+          ? () {
+              _done = true;
+              setState(() {});
               widget.onConfirmed();
             }
           : null,

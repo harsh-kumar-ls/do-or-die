@@ -3,7 +3,7 @@
 Usage: python3 -I tools/check_release.py dist/DoOrDie-0.9.1.aab [more files]
 
 For each .apk or .aab it checks, and fails loudly if any check fails:
-- versionCode is above every build ever published (13 was 0.9.0, 14 was 0.9.1);
+- versionCode is above every build ever published (13 was 0.9.0, 14 was 0.9.1, 15 was 0.9.2);
 - targetSdkVersion meets Google Play's current minimum (36);
 - android:allowBackup is false (the privacy policy says nothing is backed up);
 - the compiled Dart code is the safe rules engine: it contains
@@ -17,7 +17,7 @@ import subprocess
 import sys
 import zipfile
 
-MIN_VERSION_CODE = 15
+MIN_VERSION_CODE = 16
 MIN_TARGET_SDK = 36
 MUST_CONTAIN = [b"penalty_expired", b"I AM 18 OR OLDER"]
 MUST_NOT_CONTAIN = [b"carried_over"]

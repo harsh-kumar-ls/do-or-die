@@ -258,6 +258,7 @@ class _HoldSquareState extends State<HoldSquare>
       container: true,
       button: true,
       label: widget.semanticLabel,
+      hint: 'Double-tap and hold to confirm',
       onTap: HoldSquare._clickConfirms
           ? () {
               if (_done) return;
@@ -265,6 +266,13 @@ class _HoldSquareState extends State<HoldSquare>
               widget.onConfirmed();
             }
           : null,
+      // Screen readers and switch access confirm with a long press.
+      onLongPress: _done
+          ? null
+          : () {
+              _done = true;
+              widget.onConfirmed();
+            },
       child: Listener(
         onPointerDown: (_) {
           if (_done) return;
