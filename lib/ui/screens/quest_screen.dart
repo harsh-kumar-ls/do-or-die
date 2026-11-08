@@ -369,7 +369,7 @@ class _QuestWindow extends StatelessWidget {
               : 'Penalty avoided. The next quest issues at 00:00.')
         : floor > 0
         ? 'Fail this floor and the Dungeon Penalty follows.'
-        : 'Failure to complete will result in a penalty.';
+        : 'Under 80% done at 23:59 brings the Penalty Zone.';
     final s = model.state;
     return HudFrame(
       padding: EdgeInsets.zero,

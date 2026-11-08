@@ -14,6 +14,7 @@ import 'package:do_or_die/ui/screens/app_picker_screen.dart';
 import 'package:do_or_die/ui/screens/settings_screen.dart';
 import 'package:do_or_die/ui/screens/system_check_screen.dart';
 import 'package:do_or_die/ui/theme.dart';
+import 'package:do_or_die/ui/widgets/hud_controls.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -213,6 +214,49 @@ void main() {
     );
     expect(find.text('Instagram'), findsOneWidget);
     expect(find.text('Maps'), findsNothing);
+  });
+
+  testWidgets('hold buttons are at least 48 dp tall', (tester) async {
+    await pump(
+      tester,
+      Scaffold(
+        body: Center(
+          child: HoldButton(
+            label: 'HOLD',
+            doneLabel: 'DONE',
+            onConfirmed: () {},
+          ),
+        ),
+      ),
+    );
+    expect(
+      tester.getSize(find.byType(HoldButton)).height,
+      greaterThanOrEqualTo(48),
+    );
+  });
+
+  testWidgets('settings: old trials can be deleted after a confirmation', (
+    tester,
+  ) async {
+    final clock = FixedClock(DateTime(2026, 10, 19, 9));
+    final store = MemoryGameStore();
+    final g = await GameService.awaken(
+      store: store,
+      system: SystemKind.focus,
+      placement: Rank.e,
+      blockedPackages: const {'com.instagram.android'},
+      clock: clock,
+    );
+    await store.archive(g.game);
+    final m = GameModel(g, pollEvery: null);
+    addTearDown(m.dispose);
+    await pump(tester, SettingsScreen(model: m));
+    await tapIt(tester, find.text('DELETE OLD TRIALS (1)'));
+    expect(find.text('Delete old trials?'), findsOneWidget);
+    await tapIt(tester, find.text('DELETE'));
+    await pumpFor(tester, 300);
+    expect(store.archived, isEmpty);
+    expect(find.text('NO OLD TRIALS STORED'), findsOneWidget);
   });
 }
 

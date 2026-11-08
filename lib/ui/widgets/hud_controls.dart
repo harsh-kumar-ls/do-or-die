@@ -175,7 +175,8 @@ class _HoldButtonState extends State<HoldButton>
         onTapUp: (_) => _up(),
         onTapCancel: _up,
         child: Container(
-          height: 36,
+          // 48 dp: the minimum comfortable touch target.
+          height: 48,
           decoration: BoxDecoration(
             color: p.sys.withValues(alpha: .06),
             border: Border.all(

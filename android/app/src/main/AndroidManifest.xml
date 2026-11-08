@@ -49,6 +49,15 @@
         <receiver
             android:name=".blocker.WakeReceiver"
             android:exported="false" />
+        <!-- The clock or zone was changed by hand: reschedule at once. -->
+        <receiver
+            android:name=".blocker.TimeChangeReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
         <receiver
             android:name=".blocker.BootReceiver"
             android:exported="false">

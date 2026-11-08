@@ -181,6 +181,8 @@ class SettingsScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 8),
+              _DeleteArchives(model: model),
+              const SizedBox(height: 8),
               CutButton(
                 'PRIVACY POLICY',
                 onPressed: () => Navigator.of(context).push(
@@ -266,6 +268,13 @@ class PrivacyScreen extends StatelessWidget {
           'data.',
     ),
     (
+      'TEXT YOU WRITE',
+      'Your plans for tomorrow (a Personality penalty), the reasons you give '
+          'for an emergency exit or a contested verdict, and your placement '
+          'answers are kept in the log on this phone, and in any export you '
+          'choose to make. Old trials can be deleted in Settings.',
+    ),
+    (
       'USAGE ACCESS',
       'Used to see which app is in front, so a locked app can be covered '
           'during a lock, and to measure screen-time limits on the apps you '
@@ -346,4 +355,65 @@ class PrivacyScreen extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// Deletes old trials (archived games) after a confirmation. The current
+/// game and its log are kept.
+class _DeleteArchives extends StatefulWidget {
+  const _DeleteArchives({required this.model});
+  final GameModel model;
+
+  @override
+  State<_DeleteArchives> createState() => _DeleteArchivesState();
+}
+
+class _DeleteArchivesState extends State<_DeleteArchives> {
+  int? _count;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final n = await widget.model.service.archiveCount();
+    if (mounted) setState(() => _count = n);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final n = _count ?? 0;
+    return CutButton(
+      n == 0 ? 'NO OLD TRIALS STORED' : 'DELETE OLD TRIALS ($n)',
+      onPressed: n == 0
+          ? null
+          : () async {
+              final ok = await showDialog<bool>(
+                context: context,
+                builder: (c) => AlertDialog(
+                  title: const Text('Delete old trials?'),
+                  content: Text(
+                    '$n old trial${n == 1 ? '' : 's'} and their logs will be '
+                    'deleted from this phone for good. This cannot be undone. '
+                    'The current game is kept.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(c).pop(false),
+                      child: const Text('CANCEL'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(c).pop(true),
+                      child: const Text('DELETE'),
+                    ),
+                  ],
+                ),
+              );
+              if (ok != true) return;
+              await widget.model.service.deleteArchives();
+              await _load();
+            },
+    );
+  }
 }

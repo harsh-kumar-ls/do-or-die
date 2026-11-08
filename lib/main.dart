@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app/game_service.dart';
@@ -48,6 +49,15 @@ class Platform {
   final UsageMeter meter;
 }
 
+/// The phone's IANA time zone ("Europe/Berlin"), or null if unreadable.
+Future<String?> phoneZoneId() async {
+  try {
+    return (await FlutterTimezone.getLocalTimezone()).identifier;
+  } catch (_) {
+    return null;
+  }
+}
+
 Future<void> main() async {
   final binding = WidgetsFlutterBinding.ensureInitialized();
   // Flutter web draws to a canvas; the semantics tree gives screen readers
@@ -79,6 +89,7 @@ Future<void> main() async {
       store: store,
       clock: platform.clock,
       meter: platform.meter,
+      zoneId: phoneZoneId,
     );
     // A trial with its own written objectives is archived, with its full log,
     // and replaced by an Awakening. One with a penalty still in effect is kept
@@ -175,8 +186,11 @@ class _DoOrDieAppState extends State<DoOrDieApp> {
       blockedPackages: r.blocked,
       sleep: r.sleep,
       dryRunDays: dryRun ? 3 : 0,
+      // No dry run: the first live quest starts tomorrow.
+      startTomorrow: !dryRun,
       clock: widget.platform.clock,
       meter: widget.platform.meter,
+      zoneId: phoneZoneId,
     );
     await widget.store.markDryRunUsed();
     final model = _modelFor(service);

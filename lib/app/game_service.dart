@@ -27,7 +27,17 @@ class GameService {
     this.engine,
     this._game, {
     this.meter = const NoUsageMeter(),
+    this.zoneId = noZoneId,
   });
+
+  /// The phone's IANA time zone (e.g. "Europe/Berlin"), or null when it
+  /// can't be read. Tells a daylight-saving change (same zone) from travel.
+  final Future<String?> Function() zoneId;
+
+  static Future<String?> noZoneId() async => null;
+
+  /// The zone read at the last check.
+  String? _zoneIdNow;
 
   final GameStore _store;
   final Clock _clock;
@@ -45,11 +55,18 @@ class GameService {
   GameState get state => _game.state;
   DayKey get today => _dayOf(_clock.now());
 
-  /// The game's date for [now]. Normally the local date; after a move to a
-  /// zone further west it stays on the zone the open day was issued in, so
-  /// changing the time zone can never push a deadline later. (Moving east
-  /// ends the day early; a wrongful verdict from travel can be contested.)
-  DayKey _dayOf(DateTime now) => dayIn(now, _game.zoneOffsetMinutes);
+  /// The game's date for [now]: the local date, except after a move to
+  /// another time zone further west, when it stays on the zone the open day
+  /// was issued in, so travelling or changing the zone can never push a
+  /// deadline later. A daylight-saving change keeps the same zone, so it
+  /// never pins (the day ends at local midnight). Without a readable zone
+  /// id nothing is pinned: a wrongful penalty is worse than a late one.
+  DayKey _dayOf(DateTime now) {
+    final saved = _game.zoneId;
+    final current = _zoneIdNow;
+    final moved = saved != null && current != null && saved != current;
+    return dayIn(now, moved ? _game.zoneOffsetMinutes : null);
+  }
 
   /// [now]'s date, but never earlier than its date in [offsetMinutes].
   static DayKey dayIn(DateTime now, int? offsetMinutes) {
@@ -86,6 +103,7 @@ class GameService {
     Random? random,
     QuestEngine? engine,
     UsageMeter meter = const NoUsageMeter(),
+    Future<String?> Function() zoneId = noZoneId,
   }) async {
     final saved = await store.load();
     if (saved == null) return null;
@@ -96,6 +114,7 @@ class GameService {
       engine ?? QuestEngine(),
       saved,
       meter: meter,
+      zoneId: zoneId,
     );
     await service.tick();
     return service;
@@ -115,6 +134,7 @@ class GameService {
     Random? random,
     QuestEngine? engine,
     UsageMeter meter = const NoUsageMeter(),
+    Future<String?> Function() zoneId = noZoneId,
   }) async {
     final now = clock.now();
     final day = DayKey.fromDateTime(now);
@@ -145,6 +165,7 @@ class GameService {
       engine ?? QuestEngine(),
       game,
       meter: meter,
+      zoneId: zoneId,
     );
   }
 
@@ -158,17 +179,22 @@ class GameService {
     SleepWindow sleep = const SleepWindow(),
     int dryRunDays = 3,
     int lockStartMinute = defaultLockStart,
+    bool startTomorrow = false,
     Map<String, Object?> placementAnswers = const {},
     Clock clock = const SystemClock(),
     Random? random,
     QuestEngine? engine,
     UsageMeter meter = const NoUsageMeter(),
+    Future<String?> Function() zoneId = noZoneId,
   }) async {
     final now = clock.now();
     final day = DayKey.fromDateTime(now);
     final liveFrom = dryRunDays > 0 ? day.addDays(dryRunDays) : null;
+    // [startTomorrow] (a game without a dry run): the first quest starts
+    // tomorrow, so a game begun late in the evening is never judged on a
+    // day it had no chance at.
     final systems = const SystemsState(progress: SystemProgress())
-        .choose(system, placement, day);
+        .choose(system, placement, startTomorrow ? day.addDays(1) : day);
     final game = SavedGame(
       state: GameState.start(day),
       plan: QuestPlan.initial(day, const []),
@@ -200,6 +226,7 @@ class GameService {
       engine ?? QuestEngine(),
       game,
       meter: meter,
+      zoneId: zoneId,
     );
   }
 
@@ -252,6 +279,7 @@ class GameService {
       random: _random,
       engine: engine,
       meter: meter,
+      zoneId: zoneId,
     );
   }
 
@@ -322,6 +350,11 @@ class GameService {
   Future<List<GameEvent>> tick() => _serial(_tick);
 
   Future<List<GameEvent>> _tick() async {
+    try {
+      _zoneIdNow = await zoneId();
+    } catch (_) {
+      _zoneIdNow = null;
+    }
     final now = _clock.now();
     final today = _dayOf(now);
     // A timer left running past midnight counts only up to midnight, and
@@ -413,15 +446,22 @@ class GameService {
     }
     // The open day keeps the zone it was issued in until it is judged; the
     // next day follows the phone's current zone (logged when it changed).
+    // Within one zone (daylight saving) the offset simply follows.
     final offset = now.timeZoneOffset.inMinutes;
-    if (g.zoneOffsetMinutes != offset &&
-        (g.zoneOffsetMinutes == null ||
-            g.state.nextDayToClose != _game.state.nextDayToClose)) {
+    final zone = _zoneIdNow;
+    final sameZone = zone != null && zone == g.zoneId;
+    final newDay = g.state.nextDayToClose != _game.state.nextDayToClose;
+    final unset = g.zoneOffsetMinutes == null || g.zoneId == null;
+    if ((g.zoneOffsetMinutes != offset || g.zoneId != zone) &&
+        (unset || newDay || sameZone)) {
       g = g.copyWith(
         zoneOffsetMinutes: offset,
+        zoneId: zone,
         newLogEntries: [
-          if (g.zoneOffsetMinutes != null)
+          if (!unset && !sameZone)
             LogEntry(now, 'zone_changed', {
+              'from': g.zoneId,
+              'to': zone,
               'fromMinutes': g.zoneOffsetMinutes,
               'toMinutes': offset,
             }),
@@ -1339,6 +1379,25 @@ class GameService {
       ),
     );
   });
+
+  /// Old trials kept on the phone, and deleting them (the current game and
+  /// its log are kept).
+  Future<int> archiveCount() => _store.archiveCount();
+
+  Future<void> deleteArchives() => _serial(_store.deleteArchives);
+
+  /// Near misses in a row, up to the latest verdict.
+  int get nearMissStreak {
+    var n = 0;
+    for (final e in _game.log.reversed) {
+      if (e.type == 'quest_near_miss') {
+        n++;
+      } else if (e.type == 'quest_cleared' || e.type == 'quest_failed') {
+        break;
+      }
+    }
+    return n;
+  }
 
   /// Times the blocker was found switched off during this trial.
   int get blockerOfflineIncidents =>

@@ -10,11 +10,11 @@
 
 | | |
 |---|---|
-| **What** | The user chooses **one System** (Fitness, Personality or Focus). The System writes a daily quest for the user's **rank (E to S)** in that System. Clear **21 of the last 30 days** and a **Gate** opens; inside is a **Dungeon** of 3 floors ending in a **Rank Trial**. Clear it to rank up. Fail it and you enter the **Dungeon Penalty Zone**: double lock and double reps. Every 30 days the System issues a **report** of what you gained. |
+| **What** | The user chooses **one System** (Fitness, Personality or Focus). The System writes a daily quest for the user's **rank (E to S)** in that System. Clear **21 of the last 30 days** and a **Gate** opens; inside is a **Dungeon** of 3 floors ending in a **Rank Trial**. Clear it to rank up. Fail it and you enter the **Dungeon Penalty Zone** (as of v0.9: the normal lock, a doubled reading or phone-free penalty, Gate shut 7 days). Every 30 days the System issues a **report** of what you gained. |
 | **Who** | People who want a guided path, not a blank to-do list: fitness beginners, people trying to grow socially or intellectually, and people trying to beat phone addiction. |
 | **Why** | User-written quests stall: people set them too easy or too hard and never change them. A System that sets the quest, scales it by rank, and makes rank-ups a real fight gives structure and a reason to keep going. |
 | **Differentiator** | Rank-ups are earned by clearing a **Dungeon with a boss trial**, and failure has a real cost. Competitors are fitness-only and rank by streak or XP. |
-| **Decided** | One active System per user, no switching, next System only after completing the current one; System-written quests replace user-written ones; 21/30 opens a Gate; Dungeon failure = double lock + double reps in a separate zone, Gate closed 7 days; **no rank loss**. |
+| **Decided** | One active System per user (switching allowed since v0.8); System-written quests replace user-written ones; 21/30 opens a Gate; Dungeon failure = Dungeon Penalty (normal lock and doubled reading or phone-free penalty since v0.9), Gate closed 7 days; **no rank loss**. |
 | **Biggest risks** | Quest difficulty wrong for a user; physical safety at higher Fitness ranks; automatic checks (Health Connect, usage access) being unreliable on some Android vendor skins. |
 
 ---
@@ -91,7 +91,7 @@ A System that **writes the quest**, **raises it with rank**, and makes each rank
 | **Dungeon** | 3 floors on consecutive days: Floor 1, Floor 2, Boss (Rank Trial). |
 | **Rank Trial** | The boss: one specific test for that rank-up. |
 | **Penalty Zone** | Existing daily penalty (push-ups/squats + random lock), unchanged. |
-| **Dungeon Penalty Zone** | New, separate: **double lock + double reps**, its own look and sound; Gate closed for **7 days**. |
+| **Dungeon Penalty Zone** | Separate, with its own look and sound: the normal lock, a doubled reading or phone-free penalty (v0.9; originally double lock + double reps); Gate closed for **7 days**. |
 | **Level / XP** | Unchanged and global: XP from cleared days and Dungeons; level drives penalty scaling. |
 
 ---
@@ -285,6 +285,7 @@ Generated every 30 days and at the end of each Dungeon:
 ---
 
 ## Changelog
+- **v0.10 (2026-11-08, iteration 3):** the day boundary follows the phone's zone id, so daylight saving never ends a day early; a game started without a dry run issues its first quest the next day; three near misses in a row bring a notice suggesting the reduction valve; old trials can be deleted.
 - **v0.9 (2026-11-08, iteration 2 of the audit loop):** a day at least 80% done is a near miss (no penalty, no XP, not counted toward a Gate; never on a Dungeon floor); the Dungeon Penalty doubles a reading or phone-free penalty only, not the lock; settings changes (rest period, lock time) take effect two days later and the rest period must leave 12 waking hours; a cap unreadable at judging is excused unless the last reading was from 20:00 on; switching keeps that day's penalty; restart is refused after 18:00 on an unfinished live day; one dry run per install; the Personality reflection is a plan for tomorrow.
 - **v0.8 (2026-11-07, iteration 1 of the audit loop; user decisions):** Focus is the core System and comes first; Fitness and Personality are optional packs; switching System is allowed at any time outside a Dungeon (starts tomorrow, ranks kept, the Gate count restarts). Fitness owes no penalty besides the lock. The lock lasts a fixed 4 hours from a time the user chose (default 18:00). Each lock allows 2 releases; an emergency exit always ends it (logged). One verdict in any 14 days can be contested. Removing an app from the lock list takes effect after 7 days and the list can't be emptied. Settings screen (rest period, lock time, switching, log export, in-app privacy policy). Supersedes 5.4 (no switching) and 5.5 (unlimited free release).
 - **v0.7 (2026-11-07, independent audit P0 fixes):** the exercise penalty is the push-ups and squats of the user's own daily quest for that day (reduction valve applied; never scaled by level, never doubled by the Dungeon Penalty; rank S Fitness owes none); unpaid penalties expire at midnight and are logged, never carried or doubled; the Dungeon Penalty doubles the lock and a reading or phone-free penalty only; the terms add the health notice, a stop rule and an 18+ confirmation; app data is excluded from backup and device transfer. Supersedes the exercise lines in 6.5 and 6.6. See audit/AUDIT_REPORT_2026-11-07.md.

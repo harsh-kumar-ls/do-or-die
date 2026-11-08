@@ -21,8 +21,8 @@ The detailed records stay where they are. This file summarises them and points t
 
 | | |
 |---|---|
-| **Version** | 0.9.1 (build 14): audit-loop build; internal testing only after the device checks (see BUILD_LOOP.md) |
-| **Play bundle** | `dist/DoOrDie-0.9.1.aab`, signed with the upload key; `tools/check_release.py` must pass before upload. 0.9.0 builds are in `dist/superseded/` (pre-fix, do not use) |
+| **Version** | 0.9.2 (build 15): audit-loop build; internal testing only after the device checks (see BUILD_LOOP.md) |
+| **Play bundle** | `dist/DoOrDie-0.9.2.aab`, signed with the upload key; `tools/check_release.py` must pass before upload. Older builds are in `dist/superseded/` (do not use) |
 | **Phone** | Same code installed (`dist/DoOrDie-0.9.0-device.apk`, development-signed so the trial data is kept); no crashes, watcher running, System Check 7/7 |
 | **Current run** | Personality System, rank E, day 8 of 30, live. 2 of 21 days toward the Gate, streak 1 (best 2) |
 | **Tests** | Format and analyze clean; 205/205 automated tests; TestSprite 14/14 in one batch on the final build |
@@ -109,6 +109,7 @@ Changes from the first live days:
 |---|---|
 | 2026-10-20 | Trial first, launch only if it works. Android only for now |
 | 2026-10-20 | Penalty rules: next-day penalty, random lock in waking hours, push-up cap 150 then squats, unpaid doubles. Exercise does not end the lock early |
+| 2026-11-08 | Audit loop iteration 3 (0.9.2): DST-safe day boundary (zone id), first quest tomorrow without a dry run, alarms on trusted elapsed time, near-miss wording and streak notice, delete old trials, 48 dp holds. See BUILD_LOOP.md |
 | 2026-11-08 | Audit loop iteration 2 (0.9.1): near misses, two-day settings delay, excused unmeasured caps, no doubled Dungeon lock, quiet nights, start-failure notice, 200% text support, release check script, rebuilt artefacts. See BUILD_LOOP.md |
 | 2026-11-07 | Audit loop iteration 1: Focus core (Fitness and Personality optional, switching allowed), lock at a chosen time with 2 releases and an emergency exit, contest a verdict, Settings, watcher only while needed, trusted time, blocker reset, disclosure. See BUILD_LOOP.md |
 | 2026-11-07 | Audit P0 fixes: the exercise penalty is the push-ups and squats of the user's own daily quest (no level scaling, no doubling); nothing carries over or doubles; game changes are serialised (fixes a lost-update bug); 18+ confirmation, health notice and stop rule in the terms; backup and device transfer off. See audit/AUDIT_REPORT_2026-11-07.md |

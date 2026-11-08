@@ -694,6 +694,9 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
               lines: [
                 '$percentDone% of the quest was done.',
                 'No penalty. No reward. The streak resets.',
+                if (service.nearMissStreak >= 3)
+                  'Three near misses in a row. Lower the quest by 10-20% in '
+                      'Status and clear it in full.',
               ],
               rows: [
                 NoticeRow('Objectives missed', '${failedTaskIds.length}'),

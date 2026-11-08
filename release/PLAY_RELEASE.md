@@ -1,25 +1,25 @@
 # Do or Die: Google Play internal testing release
 
-Version **0.9.1 (build 14)**. Track: **Internal testing** (up to 100 testers you invite by email; available minutes after upload, light review).
+Version **0.9.2 (build 15)**. Track: **Internal testing** (up to 100 testers you invite by email; available minutes after upload, light review).
 
 ## 1. What to upload
 
 | File | Use |
 |---|---|
-| `dist/DoOrDie-0.9.1.aab` | The App Bundle for Play Console. Signed with the upload key. |
+| `dist/DoOrDie-0.9.2.aab` | The App Bundle for Play Console. Signed with the upload key. |
 | `design/brand/play_icon.png` | Store icon, 512 x 512. |
 | `design/brand/feature_graphic.png` | Feature graphic, 1024 x 500. |
 | `release/screenshots/*.png` | Phone screenshots, 1080 x 2400 (Quest, Status, Penalty Zone, System Check). |
 
-`dist/DoOrDie-0.9.1-device.apk` is the same code signed with the development key, for the test phone only. Do not upload it.
+`dist/DoOrDie-0.9.2-device.apk` is the same code signed with the development key, for the test phone only. Do not upload it.
 
 **Before any upload or install, run the release check** (it fails a stale or unsafe build):
 
 ```bash
-python3 -I tools/check_release.py dist/DoOrDie-0.9.1.aab dist/DoOrDie-0.9.1-device.apk
+python3 -I tools/check_release.py dist/DoOrDie-0.9.2.aab dist/DoOrDie-0.9.2-device.apk
 ```
 
-It checks the version code, target SDK, `allowBackup=false`, and that the compiled code is the current rules engine. The 0.9.0 builds are in `dist/superseded/` and must not be used: they predate the safety fixes.
+It checks the version code, target SDK, `allowBackup=false`, and that the compiled code is the current rules engine. Older builds are in `dist/superseded/` and must not be used.
 
 A Focus-only tester build (Fitness and Personality hidden): `flutter build appbundle --release --dart-define=DOD_FOCUS_ONLY=true`.
 
@@ -45,7 +45,7 @@ The first is for Play. The second signs with the development key so it can updat
 ## 3. Play Console steps (you do these; they are outward-facing)
 
 1. Create the app: name **Do or Die**, default language English, App, Free.
-2. **Testing → Internal testing → Create new release**, upload `DoOrDie-0.9.1.aab` (after the release check passes), release notes from section 6.
+2. **Testing → Internal testing → Create new release**, upload `DoOrDie-0.9.2.aab` (after the release check passes), release notes from section 6.
 3. **Testers**: create an email list, add testers, copy the opt-in link and send it to them.
 4. Complete **App content** (section 5) and the **Store listing** (section 4). Internal testing can start before the listing is complete, but Play asks for most of App content first.
 5. Testers open the opt-in link, accept, then install from the Play Store.
@@ -69,7 +69,7 @@ A daily quest you cannot skip. Fail it, and the System locks your apps.
 >
 > Clear it before midnight and you earn XP. Fail it and the Penalty Zone follows: the apps you chose lock for 4 hours the next day, at a time you picked, and Focus and Personality add a short penalty (a phone-free block, or reading and a plan for tomorrow); a day at least 80% done costs nothing. Fitness never uses exercise as a punishment. Anything unpaid expires at midnight and is logged; nothing carries over.
 >
-> Clear 21 of 30 days and a Gate opens. Enter it for a three-day Dungeon that ends in a Rank Trial. Clear it to rank up. Fail it, and the Dungeon Penalty doubles the lock.
+> Clear 21 of 30 days and a Gate opens. Enter it for a three-day Dungeon that ends in a Rank Trial. Clear it to rank up. Fail it, and the Dungeon Penalty follows: the normal lock, a doubled reading or phone-free penalty, and the Gate shut for 7 days.
 >
 > Built to be fair:
 > - Calls, messages, maps, settings, and banking and payment apps are never locked.

@@ -289,6 +289,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 lockTargets: _blocked.length,
                 sleepStart: _sleepStart,
                 sleepEnd: _sleepEnd,
+                dryRun: widget.dryRun,
                 onEnter: _finish,
               ),
             ),
@@ -2220,7 +2221,7 @@ class _TermsStepState extends State<_TermsStep> {
   final _seen = <int>{};
   late final List<(String, bool)> _lines = [
     (
-      'Clear every objective of the daily quest before 23:59. Partial completion is failure.',
+      'Clear every objective of the daily quest before 23:59. A day at least 80% done is a near miss: no penalty, and no reward.',
       false,
     ),
     ('Failure opens the Penalty Zone the next day.', true),
@@ -2433,6 +2434,7 @@ class _Registered extends StatelessWidget {
     required this.sleepStart,
     required this.sleepEnd,
     required this.onEnter,
+    this.dryRun = true,
   });
 
   final SystemKind kind;
@@ -2441,6 +2443,7 @@ class _Registered extends StatelessWidget {
   final int sleepStart;
   final int sleepEnd;
   final VoidCallback onEnter;
+  final bool dryRun;
 
   @override
   Widget build(BuildContext context) {
@@ -2476,7 +2479,10 @@ class _Registered extends StatelessWidget {
                     '$lockTargets app${lockTargets == 1 ? '' : 's'}',
                   ),
                   row('REST', '${_hm(sleepStart)} – ${_hm(sleepEnd)}'),
-                  row('FIRST QUEST', 'Today, 23:59'),
+                  row(
+                    'FIRST QUEST',
+                    dryRun ? 'Today, 23:59' : 'Tomorrow, 00:00',
+                  ),
                   const SizedBox(height: 14),
                   Text(
                     'The first daily quest is active. The System is watching.',

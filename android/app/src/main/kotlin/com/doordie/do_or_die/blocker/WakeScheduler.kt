@@ -6,6 +6,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.SystemClock
 import com.doordie.do_or_die.TrustedTime
 import java.util.Calendar
 
@@ -34,23 +35,29 @@ object WakeScheduler {
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
 
-    /** Schedules the next wake-ups. Returns false if exact alarms aren't allowed. */
+    /**
+     * Schedules the next wake-ups on the elapsed clock, from trusted time:
+     * setting the device clock back or forward can't delay or skip them.
+     * Returns false if exact alarms aren't allowed.
+     */
     fun schedule(ctx: Context): Boolean {
         if (!canScheduleExact(ctx)) return false
         val am = ctx.getSystemService(AlarmManager::class.java) ?: return false
         val now = TrustedTime.nowMillis(ctx)
         val midnight = Calendar.getInstance().apply {
+            timeInMillis = now
             add(Calendar.DAY_OF_YEAR, 1)
             set(Calendar.HOUR_OF_DAY, 0)
             set(Calendar.MINUTE, 0)
             set(Calendar.SECOND, 10)
             set(Calendar.MILLISECOND, 0)
         }.timeInMillis
+        val (toMidnight, toLock) = UsageLogic.wakeDelays(now, midnight, BlockerState.lockStartsAt(ctx), LEAD_MS)
+        val elapsed = SystemClock.elapsedRealtime()
         return try {
-            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, midnight, intent(ctx, MIDNIGHT))
-            val start = BlockerState.lockStartsAt(ctx)
-            if (start - LEAD_MS > now) {
-                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, start - LEAD_MS, intent(ctx, LOCK))
+            am.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, elapsed + toMidnight, intent(ctx, MIDNIGHT))
+            if (toLock != null) {
+                am.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, elapsed + toLock, intent(ctx, LOCK))
             } else {
                 am.cancel(intent(ctx, LOCK))
             }
@@ -71,5 +78,17 @@ object WakeScheduler {
 class WakeReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         WatcherService.sync(context)
+    }
+}
+
+/**
+ * The device clock or time zone was changed: re-check at once and
+ * reschedule the wake-ups (a lock due now must not wait for an old alarm).
+ */
+class TimeChangeReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        when (intent.action) {
+            Intent.ACTION_TIME_CHANGED, Intent.ACTION_TIMEZONE_CHANGED -> WatcherService.sync(context)
+        }
     }
 }

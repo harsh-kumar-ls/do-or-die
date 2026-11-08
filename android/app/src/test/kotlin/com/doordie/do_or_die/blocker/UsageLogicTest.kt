@@ -93,4 +93,19 @@ class UsageLogicTest {
         // Two days unjudged: the older one was never seen cleared.
         assertTrue(UsageLogic.verdictDue("2026-11-05", "2026-11-07", questDoneFor = "2026-11-05"))
     }
+
+    @Test
+    fun `wake-ups are delays from trusted now, not device-clock times`() {
+        val now = 1_000_000L
+        val (mid, lock) = UsageLogic.wakeDelays(now, nextMidnight = now + 3_600_000, lockStartsAt = now + 600_000, leadMs = 60_000)
+        assertEquals(3_600_000L, mid)
+        assertEquals(540_000L, lock)
+    }
+
+    @Test
+    fun `no lock wake-up for a lock already started or none`() {
+        val now = 1_000_000L
+        assertNull(UsageLogic.wakeDelays(now, now + 10, lockStartsAt = now - 1, leadMs = 60_000).second)
+        assertNull(UsageLogic.wakeDelays(now, now + 10, lockStartsAt = 0, leadMs = 60_000).second)
+    }
 }

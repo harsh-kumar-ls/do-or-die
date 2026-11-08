@@ -37,6 +37,7 @@ class SavedGame {
     this.systems,
     this.lockStartMinute,
     this.zoneOffsetMinutes,
+    this.zoneId,
     this.pendingSleep,
     this.pendingLockStart,
     this.capReadAt,
@@ -63,6 +64,7 @@ class SavedGame {
         : systemsFromJson((j['systems'] as Map).cast<String, Object?>()),
     lockStartMinute: j['lockStartMinute'] as int?,
     zoneOffsetMinutes: j['zoneOffsetMinutes'] as int?,
+    zoneId: j['zoneId'] as String?,
     pendingSleep: j['pendingSleep'] == null
         ? null
         : (
@@ -112,6 +114,9 @@ class SavedGame {
   /// A time-zone change can't move that day's deadline later.
   final int? zoneOffsetMinutes;
 
+  /// The IANA zone the open day was issued in (null if unknown).
+  final String? zoneId;
+
   /// A rest-period change waiting to take effect (from that day on).
   final (DayKey, SleepWindow)? pendingSleep;
 
@@ -149,6 +154,7 @@ class SavedGame {
     'systems': systems == null ? null : systemsToJson(systems!),
     'lockStartMinute': lockStartMinute,
     'zoneOffsetMinutes': zoneOffsetMinutes,
+    'zoneId': zoneId,
     'capReadAt': capReadAt == null ? null : instantToJson(capReadAt!),
     'pendingSleep': pendingSleep == null
         ? null
@@ -176,6 +182,7 @@ class SavedGame {
     SystemsState? systems,
     int? lockStartMinute,
     int? zoneOffsetMinutes,
+    String? zoneId,
     (DayKey, SleepWindow)? Function()? pendingSleep,
     (DayKey, int)? Function()? pendingLockStart,
     DateTime? capReadAt,
@@ -191,6 +198,7 @@ class SavedGame {
     systems: systems ?? this.systems,
     lockStartMinute: lockStartMinute ?? this.lockStartMinute,
     zoneOffsetMinutes: zoneOffsetMinutes ?? this.zoneOffsetMinutes,
+    zoneId: zoneId ?? this.zoneId,
     pendingSleep: pendingSleep != null ? pendingSleep() : this.pendingSleep,
     pendingLockStart: pendingLockStart != null
         ? pendingLockStart()

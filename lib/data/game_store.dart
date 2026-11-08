@@ -20,6 +20,12 @@ abstract class GameStore {
   Future<bool> dryRunUsed();
 
   Future<void> markDryRunUsed();
+
+  /// Archived (finished, restarted or unreadable) games kept on the phone.
+  Future<int> archiveCount();
+
+  /// Permanently deletes every archived game. The current game is kept.
+  Future<void> deleteArchives();
 }
 
 /// Stores the game as a JSON string. Works on Android and web.
@@ -56,6 +62,22 @@ class PrefsGameStore implements GameStore {
 
   @override
   Future<void> markDryRunUsed() => _prefs.setBool(_dryRunKey, true);
+
+  static bool _isArchive(String k) =>
+      k.startsWith('doordie.archive.') || k.startsWith('doordie.unreadable.');
+
+  @override
+  Future<int> archiveCount() async =>
+      (await _prefs.getKeys()).where(_isArchive).length;
+
+  @override
+  Future<void> deleteArchives() async {
+    // The dry run stays used: deleting old trials can't buy a new one.
+    await markDryRunUsed();
+    for (final k in (await _prefs.getKeys()).where(_isArchive)) {
+      await _prefs.remove(k);
+    }
+  }
 
   /// The saved game exactly as stored, for export when it can't be read.
   Future<String?> raw() => _prefs.getString(_key);
@@ -113,6 +135,15 @@ class MemoryGameStore implements GameStore {
 
   @override
   Future<void> markDryRunUsed() async => _dryRunUsed = true;
+
+  @override
+  Future<int> archiveCount() async => archived.length;
+
+  @override
+  Future<void> deleteArchives() async {
+    if (archived.isNotEmpty) _dryRunUsed = true;
+    archived.clear();
+  }
 
   @override
   Future<void> archive(SavedGame game) async => archived.add(

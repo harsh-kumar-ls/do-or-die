@@ -88,6 +88,18 @@ object UsageLogic {
     private val ISO_DAY = Regex("""\d{4}-\d{2}-\d{2}""")
 
     /**
+     * Delays (ms from now) for the watcher's wake-ups, all in trusted time:
+     * just after [nextMidnight], and [leadMs] before a lock that starts
+     * after now (null when none). Scheduled on the elapsed clock, so moving
+     * the device clock can't move them.
+     */
+    fun wakeDelays(now: Long, nextMidnight: Long, lockStartsAt: Long, leadMs: Long): Pair<Long, Long?> {
+        val midnight = maxOf(0L, nextMidnight - now)
+        val lock = lockStartsAt - leadMs - now
+        return midnight to (if (lock > 0L) lock else null)
+    }
+
+    /**
      * Whether the watcher must run now: a lock or block is on, a verdict is
      * due, a lock starts within [soonMs], or exact alarms can't wake it in
      * time (then it never stops).

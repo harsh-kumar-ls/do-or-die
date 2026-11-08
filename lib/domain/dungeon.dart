@@ -357,6 +357,9 @@ class SystemsState {
     }
 
     if (dryRun) return (this, const []);
+    // A day before the System began had no quest: it never counts.
+    final start = systemStartedOn;
+    if (start != null && day.isBefore(start)) return (this, const []);
 
     var s = copyWith(history: {...history, day: cleared});
 

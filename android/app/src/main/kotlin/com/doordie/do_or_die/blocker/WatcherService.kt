@@ -59,7 +59,10 @@ class WatcherService : Service() {
                     return
                 }
             }
-            handler.postDelayed(this, if (busy) FAST_MS else IDLE_MS)
+            // Fast only while a lock or block is on; a verdict merely due
+            // needs a slower check (it acts when a locked app is opened).
+            val locked = BlockerState.isLocked(ctx)
+            handler.postDelayed(this, if (locked) FAST_MS else if (busy) VERDICT_MS else IDLE_MS)
         }
     }
 
@@ -168,6 +171,7 @@ class WatcherService : Service() {
         private const val CHANNEL = "penalty_watcher"
         private const val NOTICE_ID = 4471
         private const val FAST_MS = 700L
+        private const val VERDICT_MS = 2_000L
         private const val IDLE_MS = 5_000L
         private const val DEBOUNCE_MS = 1500L
         private const val HEARTBEAT_MS = 10_000L
