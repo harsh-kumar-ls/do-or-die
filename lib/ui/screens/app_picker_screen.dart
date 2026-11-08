@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../domain/block_list.dart';
 import '../../platform/blocker.dart';
 import '../game_model.dart';
 import '../theme.dart';
@@ -29,7 +30,17 @@ class AppPickerList extends StatefulWidget {
 }
 
 class _AppPickerListState extends State<AppPickerList> {
-  late final Future<List<InstalledApp>> _apps = widget.blocker.installedApps();
+  /// The phone's own never-lock list is applied natively; the app's list
+  /// (banking, maps, ...) is applied here too, so nothing appears that would
+  /// be dropped silently.
+  late final Future<List<InstalledApp>> _apps = widget.blocker
+      .installedApps()
+      .then(
+        (apps) => [
+          for (final a in apps)
+            if (!neverBlockPackages.contains(a.package)) a,
+        ],
+      );
   String _query = '';
 
   @override

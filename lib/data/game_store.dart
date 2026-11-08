@@ -14,6 +14,12 @@ abstract class GameStore {
 
   /// Removes the current game (after it has been archived).
   Future<void> clear();
+
+  /// Whether this install already had its 3-day dry run (kept outside the
+  /// game, so restarting can't grant another one).
+  Future<bool> dryRunUsed();
+
+  Future<void> markDryRunUsed();
 }
 
 /// Stores the game as a JSON string. Works on Android and web.
@@ -37,6 +43,19 @@ class PrefsGameStore implements GameStore {
 
   @override
   Future<void> clear() => _prefs.remove(_key);
+
+  static const _dryRunKey = 'doordie.dryRunUsed';
+
+  @override
+  Future<bool> dryRunUsed() async {
+    if (await _prefs.getBool(_dryRunKey) ?? false) return true;
+    // Installs from before this flag: any archived game had its dry run.
+    final keys = await _prefs.getKeys();
+    return keys.any((k) => k.startsWith('doordie.archive.'));
+  }
+
+  @override
+  Future<void> markDryRunUsed() => _prefs.setBool(_dryRunKey, true);
 
   /// The saved game exactly as stored, for export when it can't be read.
   Future<String?> raw() => _prefs.getString(_key);
@@ -86,6 +105,14 @@ class MemoryGameStore implements GameStore {
 
   /// Archived games, oldest first.
   final archived = <SavedGame>[];
+
+  bool _dryRunUsed = false;
+
+  @override
+  Future<bool> dryRunUsed() async => _dryRunUsed || archived.isNotEmpty;
+
+  @override
+  Future<void> markDryRunUsed() async => _dryRunUsed = true;
 
   @override
   Future<void> archive(SavedGame game) async => archived.add(

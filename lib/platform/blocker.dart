@@ -71,6 +71,7 @@ class SystemStatus {
     this.exactAlarms = true,
     this.watcherNeeded = false,
     this.lastHeartbeatAt,
+    this.lastStartFailureAt,
   });
 
   factory SystemStatus.fromMap(Map<Object?, Object?> m) => SystemStatus(
@@ -84,6 +85,10 @@ class SystemStatus {
     exactAlarms: m['exactAlarms'] as bool? ?? true,
     watcherNeeded: m['watcherNeeded'] as bool? ?? false,
     lastHeartbeatAt: switch (m['lastHeartbeatAt']) {
+      final int ms when ms > 0 => DateTime.fromMillisecondsSinceEpoch(ms),
+      _ => null,
+    },
+    lastStartFailureAt: switch (m['lastStartFailureAt']) {
       final int ms when ms > 0 => DateTime.fromMillisecondsSinceEpoch(ms),
       _ => null,
     },
@@ -121,6 +126,9 @@ class SystemStatus {
   /// When the watcher last reported in (every 10 s while it runs), so the
   /// length of an outage can be measured. Null if it never ran.
   final DateTime? lastHeartbeatAt;
+
+  /// When Android last refused to start the watcher from the background.
+  final DateTime? lastStartFailureAt;
 }
 
 /// What the block screen says during a lock.
@@ -128,7 +136,7 @@ enum LockMode {
   /// A failed daily quest.
   penalty,
 
-  /// The day after a failed Dungeon floor: double lock, its own look.
+  /// The day after a failed Dungeon floor: its own look.
   dungeon,
 }
 
@@ -173,6 +181,10 @@ abstract class AppBlocker {
   /// First day not yet judged, as yyyy-MM-dd. If it's before today, opening
   /// a locked app sends the user to Do or Die to get the verdict first.
   Future<void> setJudgeDueFrom(String isoDay);
+
+  /// The day (yyyy-MM-dd) whose quest is fully cleared with nothing left to
+  /// measure, or null. After midnight that day needs no redirect.
+  Future<void> setQuestDoneFor(String? isoDay);
 
   /// Launchable apps, excluding ones that must never be locked.
   Future<List<InstalledApp>> installedApps();
@@ -231,6 +243,9 @@ class NoopAppBlocker implements AppBlocker {
 
   @override
   Future<void> setJudgeDueFrom(String isoDay) async {}
+
+  @override
+  Future<void> setQuestDoneFor(String? isoDay) async {}
 
   @override
   Future<List<InstalledApp>> installedApps() async => const [];
@@ -306,6 +321,10 @@ class AndroidAppBlocker implements AppBlocker {
   @override
   Future<void> setJudgeDueFrom(String isoDay) =>
       _channel.invokeMethod('setJudgeDueFrom', {'day': isoDay});
+
+  @override
+  Future<void> setQuestDoneFor(String? isoDay) =>
+      _channel.invokeMethod('setQuestDoneFor', {'day': isoDay});
 
   @override
   Future<List<InstalledApp>> installedApps() async {

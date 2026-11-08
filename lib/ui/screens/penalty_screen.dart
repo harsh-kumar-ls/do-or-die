@@ -76,7 +76,7 @@ class PenaltyScreen extends StatelessWidget {
                       !any
                           ? 'No penalty is in effect.'
                           : dungeon
-                          ? 'The Dungeon was not cleared. The lock is doubled.'
+                          ? 'The Dungeon was not cleared. The Gate is shut for 7 days.'
                           : failedDay == null
                           ? 'A penalty is in effect today.'
                           : 'Daily quest failed · ${dayLabel(DateTime(failedDay.year, failedDay.month, failedDay.day))}',
@@ -315,7 +315,6 @@ class _LockPanelState extends State<_LockPanel> {
   /// The phone's app names have arrived (or failed to); until then the chips
   /// stay hidden so a short fallback name never flashes first.
   bool _labelsLoaded = false;
-  final _rand = Random();
 
   static const _fallback = {
     'com.instagram.android': 'Instagram',
@@ -362,20 +361,21 @@ class _LockPanelState extends State<_LockPanel> {
       cap =
           'RELEASED · LOCK RESUMES IN ${r.inMinutes.toString().padLeft(2, '0')}:${(r.inSeconds % 60).toString().padLeft(2, '0')}';
     } else if (m.lockPending) {
-      // The start is withheld: scrambled digits that never resolve.
-      String two() => '${_rand.nextInt(10)}${_rand.nextInt(10)}';
-      big = '${two()}:${two()}:${two()}';
-      cap = 'THE LOCK WILL BEGIN WITHOUT WARNING';
+      // The user chose the lock time, so it is shown: a countdown to it.
+      big = hms(lock!.start.difference(now));
+      final st = lock.start;
+      cap =
+          'LOCK BEGINS AT ${st.hour.toString().padLeft(2, '0')}:${st.minute.toString().padLeft(2, '0')}';
       dimBig = true;
     } else if (lock != null &&
         !now.isBefore(lock.effectiveEnd) &&
         DayKey.fromDateTime(lock.start) == m.service.today) {
       // Only on the day the lock ran; the record stays in state afterwards.
-      big = '00:00:00';
+      big = '--:--:--';
       cap = 'LOCK SERVED · ACCESS RESTORED';
       dimBig = true;
     } else {
-      big = '00:00:00';
+      big = '--:--:--';
       cap = 'NO LOCK TODAY';
       dimBig = true;
     }
@@ -1020,12 +1020,12 @@ class _ReflectionDebtState extends State<_ReflectionDebt> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _DebtHeader(
-          'REFLECTION OWED',
+          'PLAN FOR TOMORROW OWED',
           '${d.secondaryDone}',
           '${d.secondaryOwed}',
         ),
         if (paid)
-          const _Cleared('REFLECTION')
+          const _Cleared('PLAN FOR TOMORROW')
         else ...[
           TextField(
             controller: _c,
@@ -1038,7 +1038,7 @@ class _ReflectionDebtState extends State<_ReflectionDebt> {
               isDense: true,
               filled: true,
               fillColor: Colors.black38,
-              hintText: 'Why did the quest fail? What will you change tomorrow? One thought per line.',
+              hintText: 'Plan tomorrow: when, where and how you will do each objective. One step per line.',
               hintStyle: Hud.mono(12, p.dim),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.zero,

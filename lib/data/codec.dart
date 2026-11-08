@@ -222,6 +222,7 @@ Map<String, Object?> systemsToJson(SystemsState s) => {
   'systemStartedOn': s.systemStartedOn == null
       ? null
       : dayToJson(s.systemStartedOn!),
+  'previous': s.previous?.name,
   'issued': {
     for (final e in s.issued.entries)
       dayToJson(e.key): [for (final q in e.value) questItemToJson(q)],
@@ -278,6 +279,9 @@ SystemsState systemsFromJson(Map<String, Object?> j) {
     titles: (j['titles'] as List).cast<String>(),
     sHold: j['sHold'] as int,
     systemStartedOn: day('systemStartedOn'),
+    previous: j['previous'] == null
+        ? null
+        : SystemKind.values.byName(j['previous'] as String),
     issued: {
       for (final e in ((j['issued'] as Map?) ?? const {}).entries)
         dayFromJson(e.key): [

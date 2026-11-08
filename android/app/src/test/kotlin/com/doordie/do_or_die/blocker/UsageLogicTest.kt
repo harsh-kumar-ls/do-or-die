@@ -83,4 +83,14 @@ class UsageLogicTest {
         val now = 10_000_000L
         assertTrue(UsageLogic.watcherNeeded(false, false, now, now - 60_000, now + 3_600_000, true))
     }
+
+    @Test
+    fun `a day already seen cleared needs no redirect after midnight`() {
+        assertFalse(UsageLogic.verdictDue("2026-11-06", "2026-11-07", questDoneFor = "2026-11-06"))
+        assertTrue(UsageLogic.verdictDue("2026-11-06", "2026-11-07", questDoneFor = "2026-11-05"))
+        assertTrue(UsageLogic.verdictDue("2026-11-06", "2026-11-07", questDoneFor = null))
+        assertFalse(UsageLogic.verdictDue("2026-11-07", "2026-11-07", questDoneFor = null))
+        // Two days unjudged: the older one was never seen cleared.
+        assertTrue(UsageLogic.verdictDue("2026-11-05", "2026-11-07", questDoneFor = "2026-11-05"))
+    }
 }

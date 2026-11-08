@@ -30,6 +30,8 @@ object BlockerState {
     private const val KEY_LAST_BLOCK_AT = "lastBlockAt"
     private const val KEY_EMERGENCY_STOPS = "emergencyStops"
     private const val KEY_JUDGE_REDIRECTS = "judgeRedirects"
+    private const val KEY_QUEST_DONE = "questDoneFor"
+    private const val KEY_START_FAILED_AT = "startFailedAt"
 
     private fun prefs(ctx: Context): SharedPreferences =
         ctx.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -138,10 +140,27 @@ object BlockerState {
     }
 
     fun needsJudgement(ctx: Context): Boolean {
-        val due = prefs(ctx).getString(KEY_JUDGE_DUE_FROM, null) ?: return false
+        val p = prefs(ctx)
+        val due = p.getString(KEY_JUDGE_DUE_FROM, null) ?: return false
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(TrustedTime.nowMillis(ctx)))
-        return UsageLogic.dayBefore(due, today)
+        return UsageLogic.verdictDue(due, today, p.getString(KEY_QUEST_DONE, null))
     }
+
+    /**
+     * The day (yyyy-MM-dd) whose quest the app last saw fully cleared, with
+     * nothing measured still able to fail it. That day's verdict is known,
+     * so after midnight nothing needs to be redirected or watched.
+     */
+    fun setQuestDoneFor(ctx: Context, isoDay: String?) {
+        prefs(ctx).edit().putString(KEY_QUEST_DONE, isoDay).commit()
+    }
+
+    /** The watcher couldn't be started from the background (Android 15+ may refuse). */
+    fun recordStartFailure(ctx: Context) {
+        prefs(ctx).edit().putLong(KEY_START_FAILED_AT, System.currentTimeMillis()).apply()
+    }
+
+    fun lastStartFailure(ctx: Context): Long = prefs(ctx).getLong(KEY_START_FAILED_AT, 0L)
 
     /**
      * No game any more (abandoned, migrated, or an unreadable save was
@@ -152,6 +171,7 @@ object BlockerState {
         prefs(ctx).edit()
             .remove(KEY_PACKAGES)
             .remove(KEY_JUDGE_DUE_FROM)
+            .remove(KEY_QUEST_DONE)
             .putString(KEY_MODE, "penalty")
             .putLong(KEY_LOCK_STARTS_AT, 0L)
             .putLong(KEY_LOCK_ENDS_AT, 0L)

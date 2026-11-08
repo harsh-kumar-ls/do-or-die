@@ -188,6 +188,8 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       }
       _blockerWasOn = status.serviceEnabled;
       system = status;
+      final failed = status.lastStartFailureAt;
+      if (failed != null) await service.recordWatcherStartFailure(failed);
     } catch (e) {
       debugPrint('System check failed: $e');
     }
@@ -347,8 +349,8 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
       !(state.debt?.isPaid ?? true) && state.debt!.dueDay == service.today;
   bool get lockActive => service.isLockActive();
 
-  /// A lock is scheduled for today but hasn't started. Its start time is
-  /// deliberately not shown.
+  /// A lock is scheduled for today but hasn't started (at the time the user
+  /// chose).
   bool get lockPending {
     final lock = state.lock;
     if (lock == null || lock.day != service.today || lock.cancelled) {
@@ -448,8 +450,12 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
     await _sync();
   }
 
-  Future<void> setSleepWindow(SleepWindow sleep) =>
-      _run(() => service.setSleepWindow(sleep));
+  /// False when refused (fewer than 12 waking hours).
+  Future<bool> setSleepWindow(SleepWindow sleep) async {
+    var ok = false;
+    await _run(() async => ok = await service.setSleepWindow(sleep));
+    return ok;
+  }
 
   Future<void> setLockStart(int minute) =>
       _run(() => service.setLockStart(minute));
@@ -503,6 +509,9 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
   String? get restartBlockedReason {
     if (service.dungeonInProgress && !service.penaltyInEffect) {
       return 'Restart unlocks after the Dungeon ends.';
+    }
+    if (service.verdictPending && !service.penaltyInEffect) {
+      return "Restart unlocks after tonight's verdict.";
     }
     if (!service.penaltyInEffect) return null;
     final parts = <String>[];
@@ -676,6 +685,22 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
               note: 'Reward granted.',
             ),
           );
+        case QuestNearMiss(:final percentDone, :final failedTaskIds):
+          batch.add(
+            SystemNotice(
+              kind: NoticeKind.info,
+              title: '[ NEAR MISS ]',
+              kicker: _dayName(e),
+              lines: [
+                '$percentDone% of the quest was done.',
+                'No penalty. No reward. The streak resets.',
+              ],
+              rows: [
+                NoticeRow('Objectives missed', '${failedTaskIds.length}'),
+                const NoticeRow('Penalty Zone', 'Not entered', RowTone.ok),
+              ],
+            ),
+          );
         case LevelUp(:final newLevel):
           batch.add(
             SystemNotice(
@@ -753,7 +778,7 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
                   if (hours != null)
                     NoticeRow(
                       'App lock',
-                      '$hours h · time withheld',
+                      '$hours h · from ${_hm(lock!.window.start)}',
                       RowTone.bad,
                     ),
                   if (owed != null) NoticeRow('Penalty debt', owed),
@@ -878,13 +903,13 @@ class GameModel extends ChangeNotifier with WidgetsBindingObserver {
         'Floor $floor was not cleared.',
         dry
             ? 'Dry run: no penalty is enforced.'
-            : 'Dungeon Penalty today: double lock.',
+            : 'Dungeon Penalty today. The Gate is shut for 7 days.',
       ],
       rows: [
         if (lock != null)
           NoticeRow(
             'App lock',
-            '×2 · ${(lock.window.end.difference(lock.window.start).inMinutes / 60).round()} h',
+            '${(lock.window.end.difference(lock.window.start).inMinutes / 60).round()} h · from ${_hm(lock.window.start)}',
             RowTone.bad,
           ),
         if (penalty != null && penalty.primary + penalty.secondary > 0)

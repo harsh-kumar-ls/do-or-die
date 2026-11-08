@@ -90,6 +90,18 @@ void main() {
       expect(at(18 * 60, notBefore: day.at(22 * 60 + 5)), isNull);
     });
 
+    test('a night owl: 00:30 inside the waking day means after midnight', () {
+      final w = scheduler.schedule(
+        day: day,
+        durationMinutes: 120,
+        sleep: const SleepWindow(startMinute: 3 * 60, endMinute: 11 * 60),
+        random: Random(1),
+        startMinute: 30,
+      )!;
+      expect(w.start, day.addDays(1).at(30));
+      expect(w.end, day.addDays(1).at(150));
+    });
+
     test('a lock longer than the waking day is clamped to it', () {
       final w = at(18 * 60, minutes: 20 * 60)!;
       expect(w.start, day.at(7 * 60));

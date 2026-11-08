@@ -195,7 +195,13 @@ class WatcherService : Service() {
                 ctx.startForegroundService(Intent(ctx, WatcherService::class.java))
                 true
             } catch (e: Exception) {
+                // Android may refuse a start from the background. Never fail
+                // silently: say so, so the user can open the app (a start
+                // from the foreground is always allowed), and record it for
+                // the trial log.
                 Log.w(TAG, "could not start watcher: $e")
+                BlockerState.recordStartFailure(ctx)
+                StartFailureNotice.show(ctx)
                 false
             }
         }

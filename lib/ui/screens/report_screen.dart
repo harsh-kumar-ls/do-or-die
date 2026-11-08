@@ -640,6 +640,25 @@ class _Honesty extends StatelessWidget {
         r.contests > 0,
       ),
       (
+        'RULE CHANGES',
+        '${r.ruleChanges}',
+        'rest, lock time, System, apps',
+        r.ruleChanges > 0,
+      ),
+      (
+        'UNMEASURED LIMITS',
+        '${r.unmeasuredCaps}',
+        'excused, no XP',
+        r.unmeasuredCaps > 0,
+      ),
+      ('NEAR MISSES', '${r.nearMisses}', '80% done, no penalty', false),
+      (
+        'UNPAID PENALTIES',
+        '${r.expiredPenalties}',
+        'expired at midnight',
+        r.expiredPenalties > 0,
+      ),
+      (
         'BLOCKER OUTAGES',
         '${r.watcherOutages}',
         'the lock was down',

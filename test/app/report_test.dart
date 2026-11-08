@@ -8,6 +8,7 @@ import 'package:do_or_die/domain/day.dart';
 import 'package:do_or_die/domain/progression.dart';
 import 'package:do_or_die/domain/system_catalogue.dart';
 import 'package:do_or_die/domain/systems.dart';
+import 'package:do_or_die/domain/penalty.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -120,4 +121,18 @@ void main() {
     await g.markReportIssued();
     expect(g.reportDue, isFalse);
   });
+
+  test(
+    'every change that can soften the game is counted in the report',
+    () async {
+      final g = await awaken();
+      await g.setLockStart(20 * 60);
+      await g.setSleepWindow(
+        const SleepWindow(startMinute: 22 * 60, endMinute: 6 * 60),
+      );
+      await g.setReduction(10);
+      final r = TrialReport.from(g.game, g.today, systemCatalogue);
+      expect(r.ruleChanges, 3);
+    },
+  );
 }

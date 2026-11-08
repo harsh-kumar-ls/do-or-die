@@ -31,6 +31,11 @@ class LogEntry {
         'day': day,
         'xp': xpGained,
       }),
+      QuestNearMiss(:final failedTaskIds, :final percentDone) => LogEntry(
+        at,
+        'quest_near_miss',
+        {'day': day, 'failedTaskIds': failedTaskIds, 'percent': percentDone},
+      ),
       QuestFailed(:final failedTaskIds) => LogEntry(at, 'quest_failed', {
         'day': day,
         'failedTaskIds': failedTaskIds,

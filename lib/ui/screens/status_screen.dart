@@ -90,12 +90,14 @@ class StatusScreen extends StatelessWidget {
     final trainedStats = spec?.stats.toSet() ?? Stat.values.toSet();
 
     final look = playerLook(model);
-    final hero = SizedBox(
-      height: 150,
+    // At least 150 tall; taller when a large font needs the room.
+    final hero = ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 150),
       child: Row(
         children: [
           SizedBox(
             width: 124,
+            height: 150,
             child: Stack(
               fit: StackFit.expand,
               children: [SystemSigil(look: look, rank: model.rank)],
@@ -409,24 +411,33 @@ class _GateRingState extends State<_GateRing>
                 .floor()
                 .clamp(0, widget.of),
           ),
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text.rich(
-                  TextSpan(
-                    text: '${widget.cleared}',
-                    style: Hud.mono(22, Colors.white, weight: FontWeight.w700),
-                    children: [
-                      TextSpan(
-                        text: ' / ${widget.of}',
-                        style: Hud.mono(13, p.dim, weight: FontWeight.w700),
+          // The ring is a fixed size: its text scales down to fit.
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text.rich(
+                    TextSpan(
+                      text: '${widget.cleared}',
+                      style: Hud.mono(
+                        22,
+                        Colors.white,
+                        weight: FontWeight.w700,
                       ),
-                    ],
+                      children: [
+                        TextSpan(
+                          text: ' / ${widget.of}',
+                          style: Hud.mono(13, p.dim, weight: FontWeight.w700),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                Text('CLEARED', style: Hud.mono(8, p.dim, spacing: .18)),
-              ],
+                  Text('CLEARED', style: Hud.mono(8, p.dim, spacing: .18)),
+                ],
+              ),
             ),
           ),
         ),

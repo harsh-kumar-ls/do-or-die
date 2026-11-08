@@ -4,6 +4,7 @@ import 'package:do_or_die/app/game_service.dart';
 import 'package:do_or_die/data/game_store.dart';
 import 'package:do_or_die/domain/clock.dart';
 import 'package:do_or_die/domain/day.dart';
+import 'package:do_or_die/domain/penalty.dart';
 import 'package:do_or_die/domain/progression.dart';
 import 'package:do_or_die/domain/systems.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -39,12 +40,48 @@ void main() {
       expect(lock.duration, const Duration(hours: 4));
     });
 
-    test('a new lock time applies to locks scheduled after it', () async {
+    test('a new lock time applies from the day after tomorrow', () async {
       final g = await focus();
       await g.setLockStart(12 * 60);
+      clock.set(day1.addDays(1).at(8 * 60)); // day 1 failed
+      await g.tick();
+      expect(
+        g.state.lock!.start,
+        day1.addDays(1).at(18 * 60),
+        reason: 'tomorrow keeps the old time',
+      );
+      clock.set(day1.addDays(2).at(8 * 60)); // day 2 failed
+      await g.tick();
+      expect(g.state.lock!.start, day1.addDays(2).at(12 * 60));
+      expect(g.lockStartMinute, 12 * 60);
+    });
+
+    test('a rest period changed on a failing evening never shrinks the '
+        'next lock', () async {
+      final g = await focus();
+      clock.set(day1.at(22 * 60));
+      // Rest from 17:00 would leave no room for an 18:00 lock tomorrow.
+      expect(
+        await g.setSleepWindow(
+          const SleepWindow(startMinute: 17 * 60, endMinute: 5 * 60),
+        ),
+        isTrue,
+      );
       clock.set(day1.addDays(1).at(8 * 60));
       await g.tick();
-      expect(g.state.lock!.start, day1.addDays(1).at(12 * 60));
+      expect(g.state.lock!.duration, const Duration(hours: 4));
+      expect(g.state.lock!.start, day1.addDays(1).at(18 * 60));
+    });
+
+    test('a rest period leaving under 12 waking hours is refused', () async {
+      final g = await focus();
+      expect(
+        await g.setSleepWindow(
+          const SleepWindow(startMinute: 18 * 60, endMinute: 7 * 60),
+        ),
+        isFalse,
+      );
+      expect(g.game.pendingSleep, isNull);
     });
   });
 
@@ -137,6 +174,39 @@ void main() {
       expect((raw['lock'] as Map)['start'], endsWith('Z'));
       final h = (await GameService.load(store: store, clock: clock))!;
       expect(h.state.lock!.start, lock.start);
+    });
+  });
+
+  group('no easy escapes', () {
+    test(
+      'switching System on a failing evening keeps that day\'s penalty',
+      () async {
+        final g = await focus();
+        clock.set(day1.at(22 * 60));
+        expect(await g.chooseSystem(SystemKind.fitness, Rank.e), isTrue);
+        clock.set(day1.addDays(1).at(8 * 60));
+        await g.tick();
+        // Day 1 was a Focus day: its phone-free block is still owed.
+        expect(g.state.debt!.kind, PenaltyKind.focus);
+        expect(g.state.debt!.primaryOwed, 60);
+      },
+    );
+
+    test('an unfinished live day can not be escaped by restarting after '
+        '18:00', () async {
+      final g = await focus();
+      clock.set(day1.at(19 * 60));
+      expect(g.verdictPending, isTrue);
+      expect(await g.abandon(), isFalse);
+      clock.set(day1.at(10 * 60));
+      expect(await g.abandon(), isTrue);
+    });
+
+    test('one dry run per install: a restarted game gets none', () async {
+      expect(await store.dryRunUsed(), isFalse);
+      final g = await focus();
+      await g.abandon();
+      expect(await store.dryRunUsed(), isTrue);
     });
   });
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../app/build_flags.dart';
 import '../../domain/penalty.dart';
 import '../../platform/share_file.dart';
 import '../game_model.dart';
@@ -47,44 +48,64 @@ class SettingsScreen extends StatelessWidget {
     ),
   );
 
+  /// The rest period must leave at least 12 waking hours.
+  Future<void> _setSleep(BuildContext context, SleepWindow next) async {
+    if (next.startMinute == next.endMinute) return;
+    final ok = await model.setSleepWindow(next);
+    if (!ok && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('The rest period must leave at least 12 waking hours.'),
+        ),
+      );
+    }
+  }
+
   Widget _body(BuildContext context) {
     final p = HudScope.of(context);
     final g = model.service;
-    final sleep = g.game.sleep;
+    final sleep = g.plannedSleep;
+    final from = g.pendingSettingsFrom;
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
       children: [
         SystemWindow(
           title: '[ SETTINGS ]',
-          subtitle: 'Changes apply to locks scheduled after them.',
+          subtitle:
+              'Changes take effect in two days, so they never soften a lock '
+              'that is already coming.',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _TimeRow(
                 label: 'REST PERIOD STARTS',
                 minute: sleep.startMinute,
-                onChanged: (m) {
-                  if (m == sleep.endMinute) return;
-                  model.setSleepWindow(
-                    SleepWindow(startMinute: m, endMinute: sleep.endMinute),
-                  );
-                },
+                onChanged: (m) => _setSleep(
+                  context,
+                  SleepWindow(startMinute: m, endMinute: sleep.endMinute),
+                ),
               ),
               _TimeRow(
                 label: 'REST PERIOD ENDS',
                 minute: sleep.endMinute,
-                onChanged: (m) {
-                  if (m == sleep.startMinute) return;
-                  model.setSleepWindow(
-                    SleepWindow(startMinute: sleep.startMinute, endMinute: m),
-                  );
-                },
+                onChanged: (m) => _setSleep(
+                  context,
+                  SleepWindow(startMinute: sleep.startMinute, endMinute: m),
+                ),
               ),
               _TimeRow(
                 label: 'LOCK STARTS',
-                minute: g.lockStartMinute,
+                minute: g.plannedLockStart,
                 onChanged: model.setLockStart,
               ),
+              if (from != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  'These settings take effect on ${from.day}/${from.month}. '
+                  'Until then the current ones apply.',
+                  style: Hud.mono(12, Hud.gold).copyWith(height: 1.5),
+                ),
+              ],
               const SizedBox(height: 6),
               Text(
                 'A lock lasts 4 hours from this time, moved inside your '
@@ -95,29 +116,31 @@ class SettingsScreen extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 14),
-        SystemWindow(
-          title: 'SYSTEM',
-          delay: const Duration(milliseconds: 120),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                g.dungeonInProgress
-                    ? 'Switching is unavailable during a Dungeon.'
-                    : 'Switch to another System. It starts tomorrow; every '
-                          'rank you earned is kept. An open Gate closes and '
-                          'the 21-of-30 count starts again.',
-                style: Hud.mono(12, p.dim).copyWith(height: 1.5),
-              ),
-              const SizedBox(height: 10),
-              CutButton(
-                'SWITCH SYSTEM',
-                onPressed: g.dungeonInProgress ? null : onSwitchSystem,
-              ),
-            ],
+        if (!BuildFlags.focusOnly) ...[
+          const SizedBox(height: 14),
+          SystemWindow(
+            title: 'SYSTEM',
+            delay: const Duration(milliseconds: 120),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  g.dungeonInProgress
+                      ? 'Switching is unavailable during a Dungeon.'
+                      : 'Switch to another System. It starts tomorrow; every '
+                            'rank you earned is kept. An open Gate closes and '
+                            'the 21-of-30 count starts again.',
+                  style: Hud.mono(12, p.dim).copyWith(height: 1.5),
+                ),
+                const SizedBox(height: 10),
+                CutButton(
+                  'SWITCH SYSTEM',
+                  onPressed: g.dungeonInProgress ? null : onSwitchSystem,
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
         const SizedBox(height: 14),
         SystemWindow(
           title: 'YOUR DATA',

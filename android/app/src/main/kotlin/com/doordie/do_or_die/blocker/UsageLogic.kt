@@ -72,6 +72,19 @@ object UsageLogic {
         return due < today
     }
 
+    /**
+     * A verdict is due when the first unjudged day is before today, unless
+     * the app last saw that day fully cleared ([questDoneFor]): then its
+     * verdict is already known and nothing needs to be redirected.
+     */
+    fun verdictDue(due: String?, today: String, questDoneFor: String?): Boolean {
+        if (!dayBefore(due, today)) return false
+        // The waiver covers only yesterday: an older unjudged day was never
+        // seen to the end, so its verdict is still unknown.
+        val yesterday = java.time.LocalDate.parse(today).minusDays(1).toString()
+        return !(due == questDoneFor && due == yesterday)
+    }
+
     private val ISO_DAY = Regex("""\d{4}-\d{2}-\d{2}""")
 
     /**

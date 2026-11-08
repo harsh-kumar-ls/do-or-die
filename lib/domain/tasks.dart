@@ -52,6 +52,21 @@ class TaskDefinition {
     if (isCap) return progress != null && progress <= target;
     return (progress ?? 0) >= goal;
   }
+
+  /// How much of this item was done, 0.0 to 1.0. A cap is 1.0 when kept and
+  /// loses twice the share it was exceeded by (10% over is 0.8), 0.0 when
+  /// unmeasured.
+  double completion(int? progress) {
+    if (isCap) {
+      if (progress == null) return 0;
+      if (progress <= target) return 1;
+      if (target <= 0) return 0;
+      final left = 1 - 2 * (progress - target) / target;
+      return left < 0 ? 0 : left;
+    }
+    final done = (progress ?? 0) / goal;
+    return done > 1 ? 1 : done;
+  }
 }
 
 /// Progress for one day, keyed by task id.

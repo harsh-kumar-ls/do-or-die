@@ -70,7 +70,7 @@ class HudPalette {
     top: Color(0xFF2A070C),
     panel: Color(0xB81E060A),
     text: Color(0xFFFFE3E5),
-    dim: Color(0xFFA3646B),
+    dim: Color(0xFFB87C84),
     glow: 20,
     glowAlpha: .85,
     gridAlpha: .10,
@@ -88,7 +88,7 @@ class HudPalette {
     top: Color(0xFF22040A),
     panel: Color(0xC0180308),
     text: Color(0xFFFFEBD9),
-    dim: Color(0xFF9E6B5F),
+    dim: Color(0xFFAE7B70),
     glow: 22,
     glowAlpha: .9,
     gridAlpha: .08,
@@ -117,7 +117,7 @@ class Hud {
 
   /// The smallest text the HUD draws, in logical pixels. Smaller sizes asked
   /// for by a style are raised to this (legibility; audit iteration 1).
-  static const minText = 11.0;
+  static const minText = 12.0;
 
   static TextStyle head(double size, Color color, {double spacing = .26}) =>
       TextStyle(

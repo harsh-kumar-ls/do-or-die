@@ -28,8 +28,9 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         // Opening the app starts the watcher if it is needed now, or
-        // schedules its wake-ups.
+        // schedules its wake-ups. A start from here is always allowed.
         WatcherService.sync(this)
+        com.doordie.do_or_die.blocker.StartFailureNotice.cancel(this)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "doordie/blocker")
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -84,6 +85,7 @@ class MainActivity : FlutterActivity() {
                             "exactAlarms" to WakeScheduler.canScheduleExact(this),
                             "watcherNeeded" to WatcherService.needed(this),
                             "lastHeartbeatAt" to BlockerState.lastHeartbeat(this),
+                            "lastStartFailureAt" to BlockerState.lastStartFailure(this),
                         ),
                     )
                     "requestBatteryExemption" -> {
@@ -91,6 +93,11 @@ class MainActivity : FlutterActivity() {
                         // per-app request needs a permission Google Play
                         // restricts to a few app types, so it isn't used.
                         startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                        result.success(null)
+                    }
+                    "setQuestDoneFor" -> {
+                        BlockerState.setQuestDoneFor(this, call.argument<String>("day"))
+                        WatcherService.sync(this)
                         result.success(null)
                     }
                     "reset" -> {

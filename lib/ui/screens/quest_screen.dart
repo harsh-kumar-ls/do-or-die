@@ -42,10 +42,13 @@ class QuestScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final floor = model.floorToday;
+    // With a large system font the window no longer fits one screen: the
+    // whole quest scrolls instead of squeezing its list.
+    final scrolls = MediaQuery.textScalerOf(context).scale(10) > 13;
     final screen = Ticker1s(
       builder: (context) {
         model.checkCompletion();
-        return Padding(
+        final body = Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -62,8 +65,9 @@ class QuestScreen extends StatelessWidget {
                 _GateBanner(model: model),
                 const SizedBox(height: 10),
               ],
-              Expanded(
-                child: model.tasks.isEmpty && model.canChooseSystem
+              _fill(
+                scrolls,
+                model.tasks.isEmpty && model.canChooseSystem
                     ? HudFrame(
                         title: '[ SYSTEM COMPLETE ]',
                         child: Text(
@@ -75,17 +79,23 @@ class QuestScreen extends StatelessWidget {
                           ).copyWith(height: 1.5),
                         ),
                       )
-                    : _QuestWindow(model: model),
+                    : _QuestWindow(model: model, scrolls: scrolls),
               ),
             ],
           ),
         );
+        return scrolls ? SingleChildScrollView(child: body) : body;
       },
     );
     // Dungeon floors: crimson lines, gold titles.
     if (floor == 0) return screen;
     return HudScope(palette: HudPalette.dungeon, child: screen);
   }
+
+  /// The quest window fills the rest of the screen, or, when the screen
+  /// scrolls, takes its natural height.
+  static Widget _fill(bool scrolls, Widget child) =>
+      scrolls ? child : Expanded(child: child);
 
   List<Widget> _alerts(BuildContext context) {
     final items = <Widget>[];
@@ -323,8 +333,11 @@ class _PortalPainter extends CustomPainter {
 // Quest window
 
 class _QuestWindow extends StatelessWidget {
-  const _QuestWindow({required this.model});
+  const _QuestWindow({required this.model, this.scrolls = false});
   final GameModel model;
+
+  /// The screen scrolls (large text): no inner list, natural height.
+  final bool scrolls;
 
   @override
   Widget build(BuildContext context) {
@@ -360,7 +373,7 @@ class _QuestWindow extends StatelessWidget {
     final s = model.state;
     return HudFrame(
       padding: EdgeInsets.zero,
-      expand: true,
+      expand: !scrolls,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -383,20 +396,19 @@ class _QuestWindow extends StatelessWidget {
                 bottom: BorderSide(color: p.sys.withValues(alpha: .18)),
               ),
             ),
-            child: Row(
+            // Wraps to a second line rather than overflowing with large
+            // text.
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 4,
               children: [
-                Flexible(
-                  // A plain Spacer would claim half the row and cut the
-                  // System name short.
-                  flex: 12,
-                  child: Text(
-                    'RANK ${model.rank.name.toUpperCase()} · $sysName',
-                    overflow: TextOverflow.ellipsis,
-                    style: Hud.mono(10, p.dim, spacing: .16),
-                  ),
+                Text(
+                  'RANK ${model.rank.name.toUpperCase()} · $sysName',
+                  style: Hud.mono(10, p.dim, spacing: .16),
                 ),
-                if (floor == 1 || floor == 2) ...[
-                  const SizedBox(width: 6),
+                if (floor == 1 || floor == 2)
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 6,
@@ -410,8 +422,6 @@ class _QuestWindow extends StatelessWidget {
                       style: Hud.mono(9, const Color(0xFFFFB3BD)),
                     ),
                   ),
-                ],
-                const Spacer(),
                 Text(
                   '$cleared / ${goals.length} CLEARED',
                   style: Hud.mono(
@@ -440,15 +450,29 @@ class _QuestWindow extends StatelessWidget {
                 style: Hud.head(13, Hud.gold, spacing: .1),
               ),
             ),
-          Expanded(
-            child: ListView.separated(
+          if (scrolls)
+            Padding(
               padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-              itemCount: tasks.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 8),
-              itemBuilder: (context, i) =>
-                  _Objective(model: model, task: tasks[i], index: i),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < tasks.length; i++) ...[
+                    if (i > 0) const SizedBox(height: 8),
+                    _Objective(model: model, task: tasks[i], index: i),
+                  ],
+                ],
+              ),
+            )
+          else
+            Expanded(
+              child: ListView.separated(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                itemCount: tasks.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 8),
+                itemBuilder: (context, i) =>
+                    _Objective(model: model, task: tasks[i], index: i),
+              ),
             ),
-          ),
           Container(
             padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
             decoration: BoxDecoration(
@@ -460,23 +484,28 @@ class _QuestWindow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
                   children: [
                     Expanded(
                       child: Kicker(
                         floor == 2 ? 'Floor closes 18:00 in' : 'Time remaining',
                       ),
                     ),
-                    Text(
-                      hms(left),
-                      style: Hud.mono(
-                        24,
-                        !complete && left.inMinutes < 60
-                            ? Hud.warn
-                            : Colors.white,
-                        weight: FontWeight.w700,
-                      ).copyWith(shadows: p.textGlow(.6)),
+                    // Scales down rather than overflow with a large font.
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          hms(left),
+                          style: Hud.mono(
+                            24,
+                            !complete && left.inMinutes < 60
+                                ? Hud.warn
+                                : Colors.white,
+                            weight: FontWeight.w700,
+                          ).copyWith(shadows: p.textGlow(.6)),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -495,20 +524,29 @@ class _QuestWindow extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Text.rich(
-                      TextSpan(
-                        text: '${s.xp} / ${model.xpToNext}',
-                        style: Hud.mono(10, p.text, weight: FontWeight.w700),
-                        children: [
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text.rich(
                           TextSpan(
-                            text: ' +${model.xpReward}',
+                            text: '${s.xp} / ${model.xpToNext}',
                             style: Hud.mono(
                               10,
-                              Hud.gold,
+                              p.text,
                               weight: FontWeight.w700,
                             ),
+                            children: [
+                              TextSpan(
+                                text: ' +${model.xpReward}',
+                                style: Hud.mono(
+                                  10,
+                                  Hud.gold,
+                                  weight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   ],
@@ -607,16 +645,23 @@ class _Objective extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  _reading(v),
-                  style: Hud.mono(
-                    14,
-                    done
-                        ? gold
-                        : over
-                        ? const Color(0xFFFF3B4A)
-                        : Colors.white,
-                    weight: FontWeight.w700,
+                // Never pushes the row past the edge with a large font.
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 120),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      _reading(v),
+                      style: Hud.mono(
+                        14,
+                        done
+                            ? gold
+                            : over
+                            ? const Color(0xFFFF3B4A)
+                            : Colors.white,
+                        weight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                 ),
                 if (task.type == TaskType.checkbox && !done && !locked) ...[
@@ -845,15 +890,29 @@ class _TimerClock extends StatelessWidget {
               running,
             ),
             child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    mmss,
-                    style: Hud.mono(20, Colors.white, weight: FontWeight.w700),
+              // The ring is a fixed size: its text scales down to fit.
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        mmss,
+                        style: Hud.mono(
+                          20,
+                          Colors.white,
+                          weight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        'REMAINING',
+                        style: Hud.mono(8, p.dim, spacing: .12),
+                      ),
+                    ],
                   ),
-                  Text('REMAINING', style: Hud.mono(8, p.dim, spacing: .12)),
-                ],
+                ),
               ),
             ),
           ),
@@ -1023,7 +1082,7 @@ class _PresenceState extends State<_Presence> {
     return [
       if (m.inPenalty)
         m.dungeonPenalty
-            ? 'Dungeon Penalty in effect. The lock is doubled.'
+            ? 'Dungeon Penalty in effect. The Gate is shut for 7 days.'
             : 'Penalty in effect. Pay the debt before 23:59.'
       else if (m.isQuestComplete)
         'Quest cleared. The System has noted it.'
@@ -1052,12 +1111,14 @@ class _PresenceState extends State<_Presence> {
     final line = all[_line % all.length];
     final look = playerLook(m);
     final aura = look.glow;
-    return SizedBox(
-      height: 104,
+    // At least 104 tall; taller when a large font needs the room.
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 104),
       child: Row(
         children: [
           SizedBox(
             width: 92,
+            height: 104,
             child: SystemSigil(
               look: look,
               semanticLabel: 'System sigil. Tap for the next System line',

@@ -23,7 +23,8 @@ const tasks = [
 ];
 
 const allDone = {'breakfast': 1, 'study': 7200, 'read': 30};
-const oneMissed = {'breakfast': 1, 'study': 3600, 'read': 30};
+const oneMissed = {'breakfast': 1, 'study': 0, 'read': 30};
+const nearlyDone = {'breakfast': 1, 'study': 6000, 'read': 30};
 const nothingDone = <String, int>{};
 
 void main() {
@@ -94,6 +95,50 @@ void main() {
       expect(r.state.debt!.secondaryOwed, 15);
     },
   );
+
+  test('a near miss (80%+ done): no penalty, no lock, no XP', () {
+    final r = close(
+      GameState.start(monday),
+      tuesday,
+      progress: {monday: nearlyDone},
+    );
+    final miss = r.events.whereType<QuestNearMiss>().single;
+    expect(miss.percentDone, 94);
+    expect(miss.failedTaskIds, ['study']);
+    expect(r.state.debt, isNull);
+    expect(r.state.lock, isNull);
+    expect(r.state.xp, 0);
+    expect(r.events.whereType<QuestFailed>(), isEmpty);
+  });
+
+  test('no near miss where it is not allowed (Dungeon floors)', () {
+    final r = engine.closeDaysBefore(
+      state: GameState.start(monday),
+      today: tuesday,
+      plan: plan,
+      progressFor: (_) => nearlyDone,
+      sleep: sleep,
+      random: Random(7),
+      now: tuesday.at(0),
+      nearMissAllowed: (_) => false,
+    );
+    expect(r.events.whereType<QuestFailed>(), hasLength(1));
+    expect(r.state.lock, isNotNull);
+  });
+
+  test('a failed Dungeon floor never lengthens the lock', () {
+    final r = engine.closeDaysBefore(
+      state: GameState.start(monday),
+      today: tuesday,
+      plan: plan,
+      progressFor: (_) => oneMissed,
+      sleep: sleep,
+      random: Random(7),
+      now: tuesday.at(0),
+      penaltyMultiplier: (_) => 2,
+    );
+    expect(r.state.lock!.duration, const Duration(hours: 4));
+  });
 
   test('unpaid reps expire at midnight: nothing carries, nothing doubles', () {
     var s = close(
@@ -190,7 +235,7 @@ void main() {
     );
     expect(r.state.debt!.primaryOwed, 20);
     expect(r.state.debt!.secondaryOwed, 30);
-    expect(r.state.lock!.duration, const Duration(hours: 8));
+    expect(r.state.lock!.duration, const Duration(hours: 4));
   });
 
   test('exercise only counts on the day it is due', () {

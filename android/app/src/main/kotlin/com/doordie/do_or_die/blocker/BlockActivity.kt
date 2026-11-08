@@ -139,7 +139,7 @@ class BlockActivity : Activity() {
         ).apply { setPadding(0, dp(6f).toInt(), 0, 0) }
         val fine = tv(
             when (mode) {
-                "dungeon" -> "Double lock. Clear your Dungeon debt in Do or Die."
+                "dungeon" -> "The Dungeon was not cleared. Your debt is in Do or Die."
                 "focus" -> "Ending the block early stops your progress toward today's quest."
                 else -> "Emergency release is in Do or Die · Penalty."
             },

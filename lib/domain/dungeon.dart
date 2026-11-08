@@ -32,7 +32,8 @@ abstract final class DungeonRules {
   /// Stat points for clearing a Dungeon.
   static const clearStatPoints = 5;
 
-  /// Penalty multiplier for a failed Dungeon floor (double lock, double reps).
+  /// Multiplier for a failed floor's reading or focus penalty (the lock and
+  /// exercise are never multiplied).
   static const failMultiplier = 2;
 }
 
@@ -116,6 +117,7 @@ class SystemsState {
     this.sHold = 0,
     this.systemStartedOn,
     this.issued = const {},
+    this.previous,
   });
 
   final SystemProgress progress;
@@ -143,6 +145,19 @@ class SystemsState {
 
   final DayKey? systemStartedOn;
 
+  /// The System active before the last switch; days before
+  /// [systemStartedOn] are still judged and penalised under it.
+  final SystemKind? previous;
+
+  /// The System whose rules apply to [day].
+  SystemKind? systemOn(DayKey day) {
+    final start = systemStartedOn;
+    if (previous != null && start != null && day.isBefore(start)) {
+      return previous;
+    }
+    return active;
+  }
+
   /// The quest exactly as issued on each recent day. A day is judged against
   /// what it showed, so an app update (or anything else) can never change a
   /// quest after it was issued.
@@ -166,6 +181,7 @@ class SystemsState {
     int? sHold,
     DayKey? Function()? systemStartedOn,
     Map<DayKey, List<QuestItem>>? issued,
+    SystemKind? Function()? previous,
   }) => SystemsState(
     progress: progress ?? this.progress,
     history: history ?? this.history,
@@ -184,6 +200,7 @@ class SystemsState {
         ? systemStartedOn()
         : this.systemStartedOn,
     issued: issued ?? this.issued,
+    previous: previous != null ? previous() : this.previous,
   );
 
   /// Starts a System at its placement rank.
@@ -194,6 +211,9 @@ class SystemsState {
         titles: titles,
         systemStartedOn: today,
         issued: issued,
+        previous: active != null && !progress.completed.contains(active)
+            ? active
+            : null,
       );
 
   /// Cleared days in the window ending on [day].

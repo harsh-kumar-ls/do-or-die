@@ -264,13 +264,34 @@ class GameService {
     // Judge any finished day first, so a failure from just before midnight
     // can't be escaped in the seconds before the next check.
     await _tick();
-    if (penaltyInEffect || dungeonInProgress) return false;
+    if (penaltyInEffect || dungeonInProgress || verdictPending) return false;
     if (_game.timer != null) await _stopTimer();
     await _store.archive(
       _game.copyWith(newLogEntries: [LogEntry(now, reason)]),
     );
     await _store.clear();
     return true;
+  }
+
+  /// From this hour, an unfinished live day can't be escaped by restarting:
+  /// the restart waits for tonight's verdict.
+  static const restartCutoffHour = 18;
+
+  /// Today's quest is cleared and nothing in it can still change: no
+  /// screen-time cap (measured to midnight) and no running timer.
+  bool get questSettled {
+    final tasks = todaysTasks;
+    if (tasks.isEmpty || _game.timer != null) return false;
+    if (tasks.any((t) => t.isCap)) return false;
+    return tasks.every((t) => t.isComplete(todaysProgress[t.id]));
+  }
+
+  /// Today's live quest is unfinished and the evening has begun.
+  bool get verdictPending {
+    if (now.hour < restartCutoffHour || isDryRunToday) return false;
+    final tasks = todaysTasks;
+    if (tasks.isEmpty) return false;
+    return tasks.any((t) => !t.isComplete(liveProgress(t.id)));
   }
 
   /// A game from before Systems existed. It is archived (with its log) and
@@ -326,24 +347,28 @@ class GameService {
         plan: g.plan,
         tasksFor: (_) => tasks,
         progressFor: (d) => g.progress[d] ?? const {},
-        sleep: g.sleep,
+        // The lock falls on the day after [day]: settings in force then.
+        sleep: g.sleepOn(day.addDays(1)),
         random: _random,
         now: now,
         isEnforced: g.isEnforced,
-        // A failed Dungeon floor: double lock (exercise never doubles).
+        // A failed Dungeon floor doubles a reading or focus penalty only.
         penaltyMultiplier: (d) => sys != null && sys.isDungeonDay(d)
             ? DungeonRules.failMultiplier
             : 1,
-        xpPercent: (d) => tasks.isEmpty
-            ? 0 // no quest (no System chosen yet): nothing to earn
+        xpPercent: (d) => tasks.isEmpty || _capsExcused(g, d)
+            ? 0 // no quest, or an excused unmeasured cap: nothing to earn
             : sys != null &&
                   !sys.isDungeonDay(d) &&
                   sys.progress.reductionOn(d) > 0
             ? 50 // the reduction valve halves the day's XP
             : 100,
         // Each System's own penalty; older games stay on exercise.
-        penaltyKind: (_) => penaltyKindFor(sys?.active),
-        lockStartMinute: g.lockStartMinute,
+        // A day before a switch keeps the old System's penalty.
+        penaltyKind: (d) => penaltyKindFor(sys?.systemOn(d)),
+        lockStartMinute: g.lockStartOn(day.addDays(1)),
+        // Dungeon floors must be fully cleared: no near miss inside one.
+        nearMissAllowed: (d) => !(sys?.isDungeonDay(d) ?? false),
       );
       var state = result.state;
       events.addAll(result.events);
@@ -403,6 +428,15 @@ class GameService {
         ],
       );
     }
+    // Settings changes whose day has come become the settings in force.
+    final ps = g.pendingSleep;
+    if (ps != null && !today.isBefore(ps.$1)) {
+      g = g.copyWith(sleep: ps.$2, pendingSleep: () => null);
+    }
+    final pl = g.pendingLockStart;
+    if (pl != null && !today.isBefore(pl.$1)) {
+      g = g.copyWith(lockStartMinute: pl.$2, pendingLockStart: () => null);
+    }
     // Issue today's quest: it is fixed from now until today is judged.
     final current = g.systems;
     if (current != null) {
@@ -440,20 +474,44 @@ class GameService {
     );
     if (minutes == null) {
       if (!final_) return g;
-      // No reading at judging: a partial reading from earlier in the day
-      // must not stand. Only an honour confirmation does.
+      final readAt = g.capReadAt;
+      final measuredThatDay =
+          readAt != null && DayKey.fromDateTime(readAt) == day;
       final kept = {...?g.progress[day]};
-      var changed = false;
-      for (final t in caps) {
-        if (!kept.containsKey(t.id) || _honoured(g, day, t.id)) continue;
-        kept.remove(t.id);
-        changed = true;
+      if (!measuredThatDay) {
+        // Never measured that day (no usage access): only an honour
+        // confirmation keeps a cap; a stray reading doesn't.
+        var changed = false;
+        for (final t in caps) {
+          if (!kept.containsKey(t.id) || _honoured(g, day, t.id)) continue;
+          kept.remove(t.id);
+          changed = true;
+        }
+        if (!changed) return g;
+        return g.copyWith(
+          progress: {...g.progress, day: kept},
+          newLogEntries: [
+            LogEntry(now, 'cap_unmeasured', {'day': day.toString()}),
+          ],
+        );
       }
-      if (!changed) return g;
+      // It was measured that day but not at judging (the meter failed): a
+      // reading from 20:00 on stands; an earlier one can't, so the cap is
+      // excused rather than failed: no penalty, and no XP for the day.
+      final late = readAt.hour >= lateReadingHour;
+      for (final t in caps) {
+        if (_honoured(g, day, t.id)) continue;
+        if (late && kept.containsKey(t.id)) continue;
+        kept[t.id] = t.target;
+      }
       return g.copyWith(
         progress: {...g.progress, day: kept},
         newLogEntries: [
-          LogEntry(now, 'cap_unmeasured', {'day': day.toString()}),
+          LogEntry(now, late ? 'cap_reading_kept' : 'cap_unmeasured', {
+            'day': day.toString(),
+            'lastReadAt': instantToJson(readAt),
+            if (!late) 'excused': true,
+          }),
         ],
       );
     }
@@ -463,6 +521,7 @@ class GameService {
     };
     return g.copyWith(
       progress: {...g.progress, day: dayProgress},
+      capReadAt: final_ ? null : now,
       newLogEntries: final_
           ? [
               LogEntry(now, 'cap_measured', {
@@ -473,6 +532,18 @@ class GameService {
           : const [],
     );
   }
+
+  /// A screen-time reading taken from this hour on still stands if the
+  /// phone can't be read at judging.
+  static const lateReadingHour = 20;
+
+  /// The day's caps couldn't be measured at judging and were excused.
+  static bool _capsExcused(SavedGame g, DayKey day) => g.log.any(
+    (e) =>
+        e.type == 'cap_unmeasured' &&
+        e.data['day'] == day.toString() &&
+        e.data['excused'] == true,
+  );
 
   /// Whether the user confirmed [taskId] on [day] on the honour system.
   static bool _honoured(SavedGame g, DayKey day, String taskId) => g.log.any(
@@ -586,6 +657,9 @@ class GameService {
     Rank placement, {
     Map<String, Object?> answers = const {},
   }) async {
+    // Judge and issue first: today's quest is fixed under the current
+    // System, so a switch can't erase today's verdict or penalty.
+    await _tick();
     final sys = _game.systems;
     if (sys == null || dungeonInProgress) return false;
     if (sys.progress.completed.contains(kind)) return false;
@@ -1014,24 +1088,45 @@ class GameService {
     );
   }
 
-  /// Applies to locks scheduled after this change; a lock already scheduled
-  /// keeps its time.
-  Future<void> setSleepWindow(SleepWindow sleep) =>
+  /// Days before a settings change (rest period, lock time) takes effect:
+  /// a change made on a failing evening can never soften the lock that
+  /// follows it.
+  static const settingsDelayDays = 2;
+
+  /// The day a settings change made today takes effect.
+  DayKey get settingsEffectiveFrom => today.addDays(settingsDelayDays);
+
+  /// Waking minutes a rest period leaves.
+  static int wakingMinutes(SleepWindow s) {
+    final asleep = (s.endMinute - s.startMinute) % (24 * 60);
+    return 24 * 60 - asleep;
+  }
+
+  /// Changes the rest period from [settingsEffectiveFrom]. Refused (false)
+  /// if it would leave fewer than [GameConfig.minWakingMinutes] awake.
+  Future<bool> setSleepWindow(SleepWindow sleep) =>
       _serial(() => _setSleepWindow(sleep));
 
-  Future<void> _setSleepWindow(SleepWindow sleep) async {
+  Future<bool> _setSleepWindow(SleepWindow sleep) async {
+    if (wakingMinutes(sleep) < engine.config.minWakingMinutes) return false;
+    final from = settingsEffectiveFrom;
     await _commit(
       _game.copyWith(
-        sleep: sleep,
+        pendingSleep: () => (from, sleep),
         newLogEntries: [
           LogEntry(_clock.now(), 'sleep_changed', {
             'start': sleep.startMinute,
             'end': sleep.endMinute,
+            'effectiveFrom': from.toString(),
           }),
         ],
       ),
     );
+    return true;
   }
+
+  /// The rest period as it will be from the latest pending change.
+  SleepWindow get plannedSleep => _game.pendingSleep?.$2 ?? _game.sleep;
 
   Future<void> allocateStat(Stat stat) => _serial(() => _allocateStat(stat));
 
@@ -1151,21 +1246,38 @@ class GameService {
   int get contestsUsed =>
       _game.log.where((e) => e.type == 'verdict_contested').length;
 
-  /// When a penalty lock starts (minutes after midnight).
-  int get lockStartMinute => _game.lockStartMinute ?? defaultLockStart;
+  /// When a penalty lock starts today (minutes after midnight).
+  int get lockStartMinute => _game.lockStartOn(today) ?? defaultLockStart;
 
-  /// Sets the lock start for locks scheduled from now on; a lock already
-  /// scheduled keeps its time. Logged.
+  /// The lock start as it will be from the latest pending change.
+  int get plannedLockStart =>
+      _game.pendingLockStart?.$2 ?? _game.lockStartMinute ?? defaultLockStart;
+
+  /// The day the latest pending settings change takes effect, if any.
+  DayKey? get pendingSettingsFrom {
+    final a = _game.pendingSleep?.$1;
+    final b = _game.pendingLockStart?.$1;
+    if (a == null) return b;
+    if (b == null) return a;
+    return a.isAfter(b) ? a : b;
+  }
+
+  /// Sets the lock start from [settingsEffectiveFrom]; a lock already
+  /// scheduled, or tomorrow's, keeps its time. Logged.
   Future<void> setLockStart(int minute) => _serial(() => _setLockStart(minute));
 
   Future<void> _setLockStart(int minute) async {
     final m = minute.clamp(0, 24 * 60 - 1);
-    if (m == _game.lockStartMinute) return;
+    if (m == plannedLockStart) return;
+    final from = settingsEffectiveFrom;
     await _commit(
       _game.copyWith(
-        lockStartMinute: m,
+        pendingLockStart: () => (from, m),
         newLogEntries: [
-          LogEntry(_clock.now(), 'lock_start_changed', {'minute': m}),
+          LogEntry(_clock.now(), 'lock_start_changed', {
+            'minute': m,
+            'effectiveFrom': from.toString(),
+          }),
         ],
       ),
     );
@@ -1209,6 +1321,24 @@ class GameService {
       ),
     );
   }
+
+  /// Records that Android refused to start the watcher at [at] (once per
+  /// failure), so the report counts it with the outages.
+  Future<void> recordWatcherStartFailure(DateTime at) => _serial(() async {
+    final key = instantToJson(at);
+    if (_game.log.any(
+      (e) => e.type == 'watcher_start_failed' && e.data['at'] == key,
+    )) {
+      return;
+    }
+    await _commit(
+      _game.copyWith(
+        newLogEntries: [
+          LogEntry(_clock.now(), 'watcher_start_failed', {'at': key}),
+        ],
+      ),
+    );
+  });
 
   /// Times the blocker was found switched off during this trial.
   int get blockerOfflineIncidents =>

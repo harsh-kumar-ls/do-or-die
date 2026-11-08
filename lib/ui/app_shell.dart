@@ -214,10 +214,14 @@ class _AppShellState extends State<AppShell> {
                               ),
                             ),
                           ),
-                          _NavBar(
-                            current: _tab,
-                            penaltyAlert: m.inPenalty,
-                            onTap: _go,
+                          // Fixed-height chrome: labels grow only to 115%.
+                          MediaQuery.withClampedTextScaling(
+                            maxScaleFactor: 1.15,
+                            child: _NavBar(
+                              current: _tab,
+                              penaltyAlert: m.inPenalty,
+                              onTap: _go,
+                            ),
                           ),
                         ],
                       ),

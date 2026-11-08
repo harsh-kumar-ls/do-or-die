@@ -223,7 +223,11 @@ void main() {
     tester,
   ) async {
     var restarted = false;
-    await pumpShell(tester, onAbandoned: () => restarted = true);
+    await pumpShell(
+      tester,
+      clock: FixedClock(DateTime(2026, 10, 19, 10)),
+      onAbandoned: () => restarted = true,
+    );
     await openTab(tester, 'STATUS');
     await tester.tap(find.text('SYSTEM CHECK'));
     await pumpFor(tester, 800);

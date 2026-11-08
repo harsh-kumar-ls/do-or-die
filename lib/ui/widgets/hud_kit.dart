@@ -38,35 +38,40 @@ class SysTopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = HudScope.of(context);
-    return SizedBox(
-      height: 56,
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(dayLabel(now), style: Hud.head(14, p.text, spacing: .2)),
-                const SizedBox(height: 2),
-                // Shrinks to fit rather than cutting the System name off
-                // on narrow phones.
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    kicker.toUpperCase(),
-                    maxLines: 1,
-                    style: Hud.mono(10, p.dim, spacing: .16),
+    // Fixed-height chrome: its text grows only to 115%; the content below
+    // takes the full system font size.
+    return MediaQuery.withClampedTextScaling(
+      maxScaleFactor: 1.15,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 56),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(dayLabel(now), style: Hud.head(14, p.text, spacing: .2)),
+                  const SizedBox(height: 2),
+                  // Shrinks to fit rather than cutting the System name off
+                  // on narrow phones.
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      kicker.toUpperCase(),
+                      maxLines: 1,
+                      style: Hud.mono(10, p.dim, spacing: .16),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SoundToggle(),
-          const SizedBox(width: 8),
-          RankHexSmall(rank: rank),
-        ],
+            const SoundToggle(),
+            const SizedBox(width: 8),
+            RankHexSmall(rank: rank),
+          ],
+        ),
       ),
     );
   }

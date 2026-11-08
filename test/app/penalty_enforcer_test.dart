@@ -62,6 +62,14 @@ class FakeBlocker extends NoopAppBlocker {
     window = null;
   }
 
+  String? questDone;
+
+  @override
+  Future<void> setQuestDoneFor(String? day) async {
+    calls.add('questDone');
+    questDone = day;
+  }
+
   @override
   Future<void> setJudgeDueFrom(String day) async {
     calls.add('judge');
@@ -146,6 +154,23 @@ void main() {
     await enforcer.sync(g);
     expect(blocker.packages, isNot(contains(yt)));
   });
+
+  test(
+    'a cleared day is reported, so the phone stays quiet after midnight',
+    () async {
+      final g = await start();
+      await enforcer.sync(g);
+      expect(blocker.questDone, isNull);
+      for (final t in g.todaysTasks) {
+        await g.setProgress(t.id, t.goal);
+      }
+      await enforcer.sync(g);
+      expect(blocker.questDone, g.today.toString());
+      await g.setProgress(g.todaysTasks.first.id, 0); // undone
+      await enforcer.sync(g);
+      expect(blocker.questDone, isNull);
+    },
+  );
 
   test(
     'reset clears the phone; the next sync sends everything again',

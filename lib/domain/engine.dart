@@ -80,6 +80,14 @@ class QuestFailed extends GameEvent {
   final List<String> failedTaskIds;
 }
 
+/// Most of the quest was done (see [GameConfig.nearMissPercent]): no
+/// penalty and no lock, but no XP, and it doesn't count toward a Gate.
+class QuestNearMiss extends GameEvent {
+  const QuestNearMiss(super.day, this.failedTaskIds, this.percentDone);
+  final List<String> failedTaskIds;
+  final int percentDone;
+}
+
 class LevelUp extends GameEvent {
   const LevelUp(super.day, this.newLevel);
   final int newLevel;
@@ -178,6 +186,7 @@ class QuestEngine {
     PenaltyKind Function(DayKey day) penaltyKind = _exercise,
     (int, int)? Function(DayKey day)? exerciseFor,
     int? lockStartMinute,
+    bool Function(DayKey day) nearMissAllowed = _always,
   }) {
     final events = <GameEvent>[];
     var s = state;
@@ -197,6 +206,7 @@ class QuestEngine {
         penaltyKind(day),
         exerciseFor?.call(day),
         lockStartMinute,
+        nearMissAllowed(day),
         events,
       );
     }
@@ -222,6 +232,7 @@ class QuestEngine {
     PenaltyKind kind,
     (int, int)? exercise,
     int? lockStartMinute,
+    bool nearMissAllowed,
     List<GameEvent> events,
   ) {
     final failedIds = [
@@ -229,6 +240,17 @@ class QuestEngine {
         if (!t.isComplete(progress[t.id])) t.id,
     ];
     final cleared = failedIds.isEmpty;
+    final percentDone = tasks.isEmpty
+        ? 0
+        : (100 *
+                  tasks.fold<double>(
+                    0,
+                    (a, t) => a + t.completion(progress[t.id]),
+                  ) /
+                  tasks.length)
+              .floor();
+    final nearMiss =
+        !cleared && nearMissAllowed && percentDone >= config.nearMissPercent;
 
     var level = s.level;
     var xp = s.xp;
@@ -247,6 +269,8 @@ class QuestEngine {
         points += config.statPointsPerLevel;
         events.add(LevelUp(day, level));
       }
+    } else if (nearMiss) {
+      events.add(QuestNearMiss(day, failedIds, percentDone));
     } else {
       events.add(QuestFailed(day, failedIds));
     }
@@ -270,9 +294,9 @@ class QuestEngine {
     LockWindow? lock = s.lock;
     final tomorrow = day.addDays(1);
 
-    if (!cleared) {
-      // A failed Dungeon floor doubles the lock and a reading or focus
-      // penalty; exercise stays at the day's own quest volume.
+    if (!cleared && !nearMiss) {
+      // A failed Dungeon floor doubles a reading or focus penalty; the lock
+      // stays its normal length and exercise its own quest volume.
       final (primary, secondary) = penalties.amountsFor(
         kind,
         penaltyLevel,
@@ -291,8 +315,7 @@ class QuestEngine {
 
       final window = scheduler.schedule(
         day: tomorrow,
-        durationMinutes:
-            penalties.lockMinutesForLevel(penaltyLevel) * multiplier,
+        durationMinutes: penalties.lockMinutesForLevel(penaltyLevel),
         sleep: sleep,
         random: random,
         notBefore: now,

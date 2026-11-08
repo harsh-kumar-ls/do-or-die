@@ -265,6 +265,12 @@ class LockScheduler {
     final waking = wakeEnd.difference(wakeStart).inMinutes;
     final length = min(durationMinutes, waking);
     var start = day.at(startMinute);
+    // A night owl's waking day runs past midnight: a time before wake-up
+    // that still falls inside it means the early hours of the next day.
+    if (start.isBefore(wakeStart)) {
+      final later = day.addDays(1).at(startMinute);
+      if (later.isBefore(wakeEnd)) start = later;
+    }
     // A chosen time inside the rest period moves to the morning.
     if (start.isBefore(wakeStart) || !start.isBefore(wakeEnd)) {
       start = wakeStart;

@@ -40,6 +40,10 @@ class TrialReport {
     required this.releases,
     this.emergencyExits = 0,
     this.contests = 0,
+    this.ruleChanges = 0,
+    this.unmeasuredCaps = 0,
+    this.nearMisses = 0,
+    this.expiredPenalties = 0,
     required this.penaltyZones,
     required this.dungeonPenalties,
     required this.watcherOutages,
@@ -152,6 +156,19 @@ class TrialReport {
       releases: of('lock_released').length,
       emergencyExits: of('emergency_exit').length,
       contests: of('verdict_contested').length,
+      // Changes that can make the game easier, all of them on the record.
+      ruleChanges: [
+        'sleep_changed',
+        'lock_start_changed',
+        'system_switched',
+        'reduction_set',
+        'block_app_removed',
+      ].fold(0, (n, t) => n + of(t).length),
+      unmeasuredCaps: of('cap_unmeasured')
+          .where((e) => e.data['excused'] == true)
+          .length,
+      nearMisses: of('quest_near_miss').length,
+      expiredPenalties: of('penalty_expired').length,
       // Ordinary Penalty Zones only; Dungeon Penalties are counted apart.
       penaltyZones:
           of('penalty_issued')
@@ -159,7 +176,8 @@ class TrialReport {
               .length -
           of('dungeon_failed').length,
       dungeonPenalties: of('dungeon_failed').length,
-      watcherOutages: of('blocker_offline').length,
+      watcherOutages:
+          of('blocker_offline').length + of('watcher_start_failed').length,
       honourConfirmations: of('progress')
           .where((e) => e.data['honour'] == true)
           .length,
@@ -205,6 +223,18 @@ class TrialReport {
 
   /// Verdicts contested.
   final int contests;
+
+  /// Settings changed in a way that could make the game easier.
+  final int ruleChanges;
+
+  /// Days whose screen-time limit couldn't be measured and was excused.
+  final int unmeasuredCaps;
+
+  /// Days that were nearly cleared (no penalty, no XP).
+  final int nearMisses;
+
+  /// Penalties left unpaid when their day ended.
+  final int expiredPenalties;
   final int penaltyZones;
   final int dungeonPenalties;
   final int watcherOutages;

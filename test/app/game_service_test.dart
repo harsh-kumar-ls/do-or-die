@@ -168,8 +168,10 @@ void main() {
     );
     await g.setLockStart(20 * 60);
     final again = await reload();
-    expect(again.game.sleep.startMinute, 60);
-    expect(again.lockStartMinute, 20 * 60);
+    // Both take effect in two days; until then the old values stand.
+    expect(again.game.sleep.startMinute, 23 * 60);
+    expect(again.plannedSleep.startMinute, 60);
+    expect(again.plannedLockStart, 20 * 60);
     expect(
       again.game.log.where((e) => e.type == 'lock_start_changed'),
       hasLength(1),

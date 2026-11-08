@@ -19,6 +19,8 @@ class PenaltyEnforcer {
   bool _sentNoFocus = false;
   bool _sentNoWindow = false;
   String? _sentJudgeDue;
+  String? _sentQuestDone;
+  bool _sentQuestDoneOnce = false;
 
   /// Forgets what was sent, so the next [sync] pushes everything again (after
   /// a reset, or anything else that changed the phone's state behind it).
@@ -29,6 +31,8 @@ class PenaltyEnforcer {
     _sentNoFocus = false;
     _sentNoWindow = false;
     _sentJudgeDue = null;
+    _sentQuestDone = null;
+    _sentQuestDoneOnce = false;
   }
 
   /// Clears the phone's blocker for good (no game any more).
@@ -102,6 +106,15 @@ class PenaltyEnforcer {
     if (_sentJudgeDue != due) {
       await blocker.setJudgeDueFrom(due);
       _sentJudgeDue = due;
+    }
+
+    // A day already cleared, with nothing measured that could still fail
+    // it, needs no watcher or redirect after midnight.
+    final done = game.questSettled ? game.today.toString() : null;
+    if (!_sentQuestDoneOnce || _sentQuestDone != done) {
+      await blocker.setQuestDoneFor(done);
+      _sentQuestDone = done;
+      _sentQuestDoneOnce = true;
     }
   }
 }

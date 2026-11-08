@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../app/build_flags.dart';
 import '../../app/game_service.dart';
 
 import '../../data/codec.dart';
@@ -55,6 +56,7 @@ class OnboardingScreen extends StatefulWidget {
     this.nextSystemOnly = false,
     this.completed = const {},
     this.yesterdaySocialMinutes,
+    this.dryRun = true,
   });
 
   final AppBlocker blocker;
@@ -66,6 +68,9 @@ class OnboardingScreen extends StatefulWidget {
 
   /// Measured from usage access when available, to prefill the Focus test.
   final int? yesterdaySocialMinutes;
+
+  /// Whether this game starts with the 3-day dry run (once per install).
+  final bool dryRun;
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -153,12 +158,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       ),
       _Step.system => _SystemStep(
         choices: [
-          // Focus is the core System; Fitness and Personality are packs.
-          for (final k in const [
-            SystemKind.focus,
-            SystemKind.fitness,
-            SystemKind.personality,
-          ])
+          // Focus is the core System; Fitness and Personality are packs
+          // (hidden in a Focus-only tester build).
+          for (final k
+              in BuildFlags.focusOnly
+                  ? const [SystemKind.focus]
+                  : const [
+                      SystemKind.focus,
+                      SystemKind.fitness,
+                      SystemKind.personality,
+                    ])
             if (!widget.completed.contains(k)) k,
         ],
         chosen: _system,
@@ -207,6 +216,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         lockTargets: _blocked.length,
         sleepStart: _sleepStart,
         sleepEnd: _sleepEnd,
+        dryRun: widget.dryRun,
         onAccepted: () {
           _fx
             ..flash()
@@ -2186,6 +2196,7 @@ class _TermsStep extends StatefulWidget {
     required this.sleepStart,
     required this.sleepEnd,
     required this.onAccepted,
+    this.dryRun = true,
   });
 
   final SystemKind kind;
@@ -2193,6 +2204,7 @@ class _TermsStep extends StatefulWidget {
   final int sleepStart;
   final int sleepEnd;
   final VoidCallback onAccepted;
+  final bool dryRun;
 
   @override
   State<_TermsStep> createState() => _TermsStepState();
@@ -2241,7 +2253,7 @@ class _TermsStepState extends State<_TermsStep> {
       false,
     ),
     (
-      'Fail a Dungeon floor and the Dungeon Penalty doubles the lock and any reading or phone-free penalty. Exercise never exceeds your daily quest. Ranks never go down.',
+      'Fail a Dungeon floor and the Dungeon Penalty follows: the normal lock, any reading or phone-free penalty doubled, and the Gate shut for 7 days. Ranks never go down.',
       true,
     ),
     (
@@ -2249,7 +2261,9 @@ class _TermsStepState extends State<_TermsStep> {
       false,
     ),
     (
-      'The first 3 days are a dry run: failures are shown, never enforced.',
+      widget.dryRun
+          ? 'The first 3 days are a dry run: failures are shown, never enforced.'
+          : 'This install has had its dry run: penalties apply from the first day.',
       false,
     ),
     (healthNotice, false),
@@ -2557,7 +2571,7 @@ const stopRule =
 /// What a System's penalty costs at level 1, in words.
 String penaltyTerms(PenaltyKind kind) => switch (kind) {
   PenaltyKind.exercise => 'the push-ups and squats from your own daily quest, done again (never more, never doubled)',
-  PenaltyKind.reading => '20 pages of reading (+2 per level, up to 60) and a written reflection on why the quest failed',
+  PenaltyKind.reading => '20 pages of reading (+2 per level, up to 60) and a short written plan for tomorrow (five steps)',
   PenaltyKind.focus => 'a 60-minute phone-free block (+5 minutes per level, up to 3 hours), run in the app with your chosen apps locked',
   PenaltyKind.none => 'the app lock only; exercise is never a punishment',
 };
@@ -2565,7 +2579,7 @@ String penaltyTerms(PenaltyKind kind) => switch (kind) {
 /// A System's penalty in a few words, for the System cards.
 String penaltyShort(PenaltyKind kind) => switch (kind) {
   PenaltyKind.exercise => "the day's push-ups and squats again",
-  PenaltyKind.reading => '20 pages and a written reflection',
+  PenaltyKind.reading => '20 pages and a plan for tomorrow',
   PenaltyKind.focus => 'a 60-minute phone-free block',
   PenaltyKind.none => 'the app lock only',
 };

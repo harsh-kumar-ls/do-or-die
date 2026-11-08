@@ -146,10 +146,16 @@ class _DoOrDieAppState extends State<DoOrDieApp> {
     trustedClock: widget.platform.clock,
   );
 
+  /// Whether the next Awakening gets the 3-day dry run (once per install).
+  bool _dryRunAvailable = true;
+
   @override
   void initState() {
     super.initState();
     if (widget.initial != null) _model = _modelFor(widget.initial!);
+    widget.store.dryRunUsed().then((used) {
+      if (mounted) setState(() => _dryRunAvailable = !used);
+    });
   }
 
   @override
@@ -159,6 +165,8 @@ class _DoOrDieAppState extends State<DoOrDieApp> {
   }
 
   Future<void> _onboard(OnboardingResult r) async {
+    // One dry run per install: restarting never grants another.
+    final dryRun = !await widget.store.dryRunUsed();
     final service = await GameService.awaken(
       store: widget.store,
       system: r.system,
@@ -166,10 +174,11 @@ class _DoOrDieAppState extends State<DoOrDieApp> {
       placementAnswers: r.answers,
       blockedPackages: r.blocked,
       sleep: r.sleep,
-      dryRunDays: 3,
+      dryRunDays: dryRun ? 3 : 0,
       clock: widget.platform.clock,
       meter: widget.platform.meter,
     );
+    await widget.store.markDryRunUsed();
     final model = _modelFor(service);
     setState(() => _model = model);
     // Ask once registration is done, when the reason is obvious.
@@ -183,6 +192,8 @@ class _DoOrDieAppState extends State<DoOrDieApp> {
     setState(() => _model = null);
     old?.dispose();
     await _enforcer.reset();
+    final used = await widget.store.dryRunUsed();
+    if (mounted) setState(() => _dryRunAvailable = !used);
   }
 
   @override
@@ -198,7 +209,11 @@ class _DoOrDieAppState extends State<DoOrDieApp> {
               palette: HudPalette.system,
               child: Scaffold(
                 body: HudBackground(
-                  child: OnboardingScreen(blocker: blocker, onDone: _onboard),
+                  child: OnboardingScreen(
+                    blocker: blocker,
+                    onDone: _onboard,
+                    dryRun: _dryRunAvailable,
+                  ),
                 ),
               ),
             )

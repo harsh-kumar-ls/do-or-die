@@ -145,7 +145,7 @@ PLANS = {
             *CONTACT,
             *show("PERSONALITY"),
             act("Click the front card (the button named 'Personality System') once to flip it, then wait 1 second"),
-            check("The card now shows '[ PERSONALITY · BRIEF ]', a 'WHERE YOU START' list containing 'Read (pages)' with '10', and an 'IF YOU FAIL A DAY' section mentioning '20 pages and a written reflection' and no push-ups; the button at the bottom reads 'CHOOSE PERSONALITY SYSTEM'"),
+            check("The card now shows '[ PERSONALITY · BRIEF ]', a 'WHERE YOU START' list containing 'Read (pages)' with '10', and an 'IF YOU FAIL A DAY' section mentioning '20 pages and a plan for tomorrow' and no push-ups; the button at the bottom reads 'CHOOSE PERSONALITY SYSTEM'"),
             *show("FOCUS"),
             act("If the front card shows 'TAP TO INSPECT', click it once (the button named 'Focus System') and wait 1 second"),
             check("The card shows '[ FOCUS · BRIEF ]' and its 'IF YOU FAIL A DAY' section mentions 'a 60-minute phone-free block'; the button reads 'CHOOSE FOCUS SYSTEM'"),

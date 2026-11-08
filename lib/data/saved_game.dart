@@ -37,6 +37,9 @@ class SavedGame {
     this.systems,
     this.lockStartMinute,
     this.zoneOffsetMinutes,
+    this.pendingSleep,
+    this.pendingLockStart,
+    this.capReadAt,
   });
 
   factory SavedGame.fromJson(Map<String, Object?> j) => SavedGame(
@@ -60,6 +63,22 @@ class SavedGame {
         : systemsFromJson((j['systems'] as Map).cast<String, Object?>()),
     lockStartMinute: j['lockStartMinute'] as int?,
     zoneOffsetMinutes: j['zoneOffsetMinutes'] as int?,
+    pendingSleep: j['pendingSleep'] == null
+        ? null
+        : (
+            dayFromJson((j['pendingSleep'] as Map)['from']),
+            sleepFromJson(
+              ((j['pendingSleep'] as Map)['sleep'] as Map)
+                  .cast<String, Object?>(),
+            ),
+          ),
+    capReadAt: j['capReadAt'] == null ? null : instantFromJson(j['capReadAt']),
+    pendingLockStart: j['pendingLockStart'] == null
+        ? null
+        : (
+            dayFromJson((j['pendingLockStart'] as Map)['from']),
+            (j['pendingLockStart'] as Map)['minute'] as int,
+          ),
   );
 
   static const schemaVersion = 1;
@@ -93,6 +112,27 @@ class SavedGame {
   /// A time-zone change can't move that day's deadline later.
   final int? zoneOffsetMinutes;
 
+  /// A rest-period change waiting to take effect (from that day on).
+  final (DayKey, SleepWindow)? pendingSleep;
+
+  /// A lock-time change waiting to take effect (from that day on).
+  final (DayKey, int)? pendingLockStart;
+
+  /// When today's screen time was last read successfully during the day.
+  final DateTime? capReadAt;
+
+  /// The rest period in force on [day].
+  SleepWindow sleepOn(DayKey day) {
+    final p = pendingSleep;
+    return p != null && !day.isBefore(p.$1) ? p.$2 : sleep;
+  }
+
+  /// The lock start in force on [day] (null: random, older games).
+  int? lockStartOn(DayKey day) {
+    final p = pendingLockStart;
+    return p != null && !day.isBefore(p.$1) ? p.$2 : lockStartMinute;
+  }
+
   /// Whether a failure on [day] brings a real penalty.
   bool isEnforced(DayKey day) => liveFrom == null || !day.isBefore(liveFrom!);
 
@@ -109,6 +149,19 @@ class SavedGame {
     'systems': systems == null ? null : systemsToJson(systems!),
     'lockStartMinute': lockStartMinute,
     'zoneOffsetMinutes': zoneOffsetMinutes,
+    'capReadAt': capReadAt == null ? null : instantToJson(capReadAt!),
+    'pendingSleep': pendingSleep == null
+        ? null
+        : {
+            'from': dayToJson(pendingSleep!.$1),
+            'sleep': sleepToJson(pendingSleep!.$2),
+          },
+    'pendingLockStart': pendingLockStart == null
+        ? null
+        : {
+            'from': dayToJson(pendingLockStart!.$1),
+            'minute': pendingLockStart!.$2,
+          },
   };
 
   /// Returns a copy. [newLogEntries] are appended; existing entries can't be
@@ -123,6 +176,9 @@ class SavedGame {
     SystemsState? systems,
     int? lockStartMinute,
     int? zoneOffsetMinutes,
+    (DayKey, SleepWindow)? Function()? pendingSleep,
+    (DayKey, int)? Function()? pendingLockStart,
+    DateTime? capReadAt,
     List<LogEntry> newLogEntries = const [],
   }) => SavedGame(
     state: state ?? this.state,
@@ -135,6 +191,11 @@ class SavedGame {
     systems: systems ?? this.systems,
     lockStartMinute: lockStartMinute ?? this.lockStartMinute,
     zoneOffsetMinutes: zoneOffsetMinutes ?? this.zoneOffsetMinutes,
+    pendingSleep: pendingSleep != null ? pendingSleep() : this.pendingSleep,
+    pendingLockStart: pendingLockStart != null
+        ? pendingLockStart()
+        : this.pendingLockStart,
+    capReadAt: capReadAt ?? this.capReadAt,
     log: newLogEntries.isEmpty
         ? log
         : List.unmodifiable([...log, ...newLogEntries]),

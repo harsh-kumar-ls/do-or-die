@@ -10,6 +10,7 @@ import 'package:do_or_die/domain/systems.dart';
 import 'package:do_or_die/platform/blocker.dart';
 import 'package:do_or_die/ui/app_shell.dart';
 import 'package:do_or_die/ui/game_model.dart';
+import 'package:do_or_die/ui/screens/app_picker_screen.dart';
 import 'package:do_or_die/ui/screens/settings_screen.dart';
 import 'package:do_or_die/ui/screens/system_check_screen.dart';
 import 'package:do_or_die/ui/theme.dart';
@@ -106,11 +107,13 @@ void main() {
     expect(find.text('18:00'), findsOneWidget);
     await tester.tap(find.byTooltip('LOCK STARTS 30 minutes later'));
     await pumpFor(tester, 200);
-    expect(m.service.lockStartMinute, 18 * 60 + 30);
+    expect(m.service.plannedLockStart, 18 * 60 + 30);
+    expect(m.service.lockStartMinute, 18 * 60, reason: 'from in two days');
     expect(find.text('18:30'), findsOneWidget);
     await tester.tap(find.byTooltip('REST PERIOD STARTS 30 minutes earlier'));
     await pumpFor(tester, 200);
-    expect(m.service.game.sleep.startMinute, 22 * 60 + 30);
+    expect(m.service.plannedSleep.startMinute, 22 * 60 + 30);
+    expect(find.textContaining('take effect on'), findsOneWidget);
     final types = m.service.game.log.map((e) => e.type);
     expect(types, containsAll(['lock_start_changed', 'sleep_changed']));
   });
@@ -193,4 +196,30 @@ void main() {
     expect(m.service.contestsUsed, 1);
     expect(m.service.penaltyInEffect, isFalse);
   });
+
+  testWidgets('the app picker never lists an app that can never be locked', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      Scaffold(
+        body: AppPickerList(
+          blocker: _AppsBlocker(),
+          selected: const {},
+          pending: const {},
+          onChanged: (_, _) {},
+        ),
+      ),
+    );
+    expect(find.text('Instagram'), findsOneWidget);
+    expect(find.text('Maps'), findsNothing);
+  });
+}
+
+class _AppsBlocker extends NoopAppBlocker {
+  @override
+  Future<List<InstalledApp>> installedApps() async => const [
+    InstalledApp('com.instagram.android', 'Instagram', null),
+    InstalledApp('com.google.android.apps.maps', 'Maps', null),
+  ];
 }

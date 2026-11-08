@@ -15,6 +15,8 @@ class GameConfig {
     this.releasesPerLock = 2,
     this.contestCooldownDays = 14,
     this.blockRemovalDelayDays = 7,
+    this.nearMissPercent = 80,
+    this.minWakingMinutes = 12 * 60,
     this.xpPerClear = 100,
     this.baseXpToNextLevel = 300,
     this.xpToNextLevelPerLevel = 100,
@@ -57,6 +59,15 @@ class GameConfig {
   /// Removing an app from the lock list takes effect after this many days,
   /// so the list can't be emptied to dodge a lock or a screen-time cap.
   final int blockRemovalDelayDays;
+
+  /// A failed day with at least this much of the quest done (averaged over
+  /// its items) is a near miss: no penalty and no lock, but no XP and it
+  /// doesn't count toward a Gate. Never on a Dungeon floor.
+  final int nearMissPercent;
+
+  /// The rest period can't leave fewer waking minutes than this, so a lock
+  /// always has room and the rest period can't be stretched to dodge one.
+  final int minWakingMinutes;
 
   // Progression. Placeholder values; tune after the first week of the trial.
   final int xpPerClear;

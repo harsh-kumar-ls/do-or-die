@@ -306,17 +306,54 @@ void main() {
       expect(g.game.log.map((e) => e.type), contains('cap_measured'));
     });
 
-    test('measured over the cap: failed', () async {
+    test('measured well over the cap: failed', () async {
       final g = await awaken(SystemKind.focus, placement: Rank.d);
-      meter.minutes = 61;
+      meter.minutes = 90;
       final events = await nextDay(g);
       expect(events.whereType<QuestFailed>(), hasLength(1));
+    });
+
+    test('a few minutes over the cap: a near miss, no penalty', () async {
+      final g = await awaken(SystemKind.focus, placement: Rank.d);
+      meter.minutes = 63;
+      final events = await nextDay(g);
+      expect(events.whereType<QuestNearMiss>(), hasLength(1));
+      expect(g.state.lock, isNull);
+      expect(g.state.debt, isNull);
+      expect(g.state.xp, 0);
     });
 
     test('progress cannot be typed in for a cap', () async {
       final g = await awaken(SystemKind.focus, placement: Rank.d);
       await g.setProgress('social', 0);
       expect(g.liveProgress('social'), isNull);
+    });
+
+    test('measured kept by day, unreadable at judging: excused, not failed '
+        '(no penalty, no XP)', () async {
+      final g = await awaken(SystemKind.focus, placement: Rank.d);
+      clock.set(day1.at(15 * 60));
+      meter.minutes = 30;
+      await g.measureCaps();
+      meter.minutes = null; // the meter fails at midnight
+      final events = await nextDay(g);
+      expect(events.whereType<QuestFailed>(), isEmpty);
+      expect(events.whereType<QuestCleared>().single.xpGained, 0);
+      expect(g.state.lock, isNull);
+      expect(g.state.debt, isNull);
+      final entry = g.game.log.lastWhere((e) => e.type == 'cap_unmeasured');
+      expect(entry.data['excused'], isTrue);
+    });
+
+    test('a reading from 20:00 on stands when judging can not read', () async {
+      final g = await awaken(SystemKind.focus, placement: Rank.d);
+      clock.set(day1.at(21 * 60));
+      meter.minutes = 95; // already far over the 60-minute cap
+      await g.measureCaps();
+      meter.minutes = null;
+      final events = await nextDay(g);
+      expect(events.whereType<QuestFailed>(), hasLength(1));
+      expect(g.game.log.any((e) => e.type == 'cap_reading_kept'), isTrue);
     });
 
     test('without usage access, an unconfirmed cap is not kept', () async {
@@ -480,17 +517,18 @@ void main() {
       expect(seen.last, floorDay.at(18 * 60));
     });
 
-    test(
-      'a partial reading never stands when judging has no reading',
-      () async {
-        final g = await awaken(SystemKind.focus, placement: Rank.d);
-        meter.minutes = 5;
-        await g.measureCaps(); // 09:00 reading: 5 minutes
-        meter.minutes = null; // usage access revoked before midnight
-        final events = await nextDay(g);
-        expect(events.whereType<QuestFailed>(), hasLength(1));
-      },
-    );
+    test('an early reading never clears a day the meter could not judge: '
+        'excused at best (no XP), and the next unmeasured day fails', () async {
+      final g = await awaken(SystemKind.focus, placement: Rank.d);
+      meter.minutes = 5;
+      await g.measureCaps(); // 09:00 reading: 5 minutes
+      meter.minutes = null; // usage access gone before midnight
+      var events = await nextDay(g);
+      expect(events.whereType<QuestCleared>().single.xpGained, 0);
+      // Still gone the next day: never measured, never confirmed: failed.
+      events = await nextDay(g);
+      expect(events.whereType<QuestFailed>(), hasLength(1));
+    });
 
     test('a reading over the cap cannot be confirmed away', () async {
       final g = await awaken(SystemKind.focus, placement: Rank.d);
